@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { assignmentSchema, assignmentSnapshotSchema, teamTaskSchema } from '@ntfs/contracts';
 import type { AssignmentSnapshot } from '@ntfs/contracts';
 
-const selectAssignments = `SELECT a.id, a.task_id AS taskId, a.origin_task_id AS originTaskId, a.account_id AS accountId, a.group_id AS groupId, a.content, a.source, a.status, a.version,
+const selectAssignments = `SELECT a.id, a.task_id AS taskId, a.origin_task_id AS originTaskId, a.account_id AS accountId, a.group_id AS groupId, a.content, a.source, a.status, a.version, a.blocked_reason AS blockedReason, a.waiting_for AS waitingFor, a.waiting_task_id AS waitingTaskId,
   DATE_FORMAT(a.started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt,
   DATE_FORMAT(a.ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt,
   DATE_FORMAT(a.transferred_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS transferredAt FROM task_assignments a`;
@@ -12,6 +12,8 @@ const selectAssignments = `SELECT a.id, a.task_id AS taskId, a.origin_task_id AS
 /** 分工及进展SQL集中管理，不提供可任意代改个人事实的通用更新入口。 */
 export class AssignmentRepository {
   constructor(private readonly manager: EntityManager) {}
+  /** 本人分工阻塞不传播到团队任务，人工解除同时清空等待对象。 */
+  async blocker(id: string, reason: string, waiting: string, waitingId: string | null): Promise<void> { await this.manager.query('UPDATE task_assignments SET blocked_reason = ?, waiting_for = ?, waiting_task_id = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [reason, reason ? waiting : '', reason ? waitingId : null, id]); }
   /** 原地迁移有效责任，进展和个人关联保留原标识，首次来源仅写一次。 */
   async moveToChild(id: string, task: string): Promise<void> {
     await this.manager.query('UPDATE task_assignments SET origin_task_id = COALESCE(origin_task_id, task_id), task_id = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [task, id]);
@@ -32,7 +34,7 @@ export class AssignmentRepository {
 
   /** 读取当前团队任务，执行限制不信任客户端状态。 */
   async task(id: string) {
-    const rows: unknown = await this.manager.query(`SELECT id, project_id AS projectId, request_id AS requestId, parent_id AS parentId, owner_id AS ownerId, title, description, acceptance, status, version, in_milestone AS inMilestone, DATE_FORMAT(expected_on, '%Y-%m-%d') AS expectedOn, DATE_FORMAT(started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt, DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt, progress, position FROM team_tasks WHERE id = ? FOR UPDATE`, [id]);
+    const rows: unknown = await this.manager.query(`SELECT id, project_id AS projectId, request_id AS requestId, parent_id AS parentId, owner_id AS ownerId, title, description, acceptance, status, version, in_milestone AS inMilestone, DATE_FORMAT(expected_on, '%Y-%m-%d') AS expectedOn, DATE_FORMAT(started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt, DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt, progress, position, blocked_reason AS blockedReason, waiting_for AS waitingFor, waiting_task_id AS waitingTaskId FROM team_tasks WHERE id = ? FOR UPDATE`, [id]);
     return z.array(teamTaskSchema).parse(rows)[0];
   }
 

@@ -12,6 +12,7 @@ import { canViewPersonal } from './personal-policy.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { WorkRepository } from './work.repository.js';
 import { ensureParentActive } from './task.service.js';
+import { hasPermission } from '../organization/policy.js';
 
 /** 个人任务内容及实际执行只由本人维护，角色配置不能突破此边界。 */
 @Injectable()
@@ -48,6 +49,31 @@ export class PersonalService {
       const access = await loadWorkAccess(manager, this.identity, token, csrf);
       const repository = new PersonalRepository(manager);
       const item = 'itemId' in command ? await repository.item(command.itemId) : undefined;
+      if (command.action === 'manage_link') {
+        if (!item || item.kind !== 'work' || !item.projectId || !canViewPersonal(access, item)) throw new ForbiddenException('无权管理该工作关联。');
+        const project = access.organization.projects.find((entry) => entry.id === item.projectId && entry.teamId === access.actor.teamId);
+        if (!project) throw new ForbiddenException('无权管理其他团队的关联。');
+        const assignments = new AssignmentRepository(manager);
+        const canManage = (groupId: string) => hasPermission(access.actor, access.organization, 'work.assign', { teamId: project.teamId, groupId });
+        if (item.assignmentId) {
+          const original = await assignments.assignment(item.assignmentId);
+          if (!original || !canManage(original.groupId)) throw new ForbiddenException('没有原负责小组的安排权限。');
+        } else if (!access.organization.groups.some((group) => group.memberIds.includes(item.ownerId) && canManage(group.id))) throw new ForbiddenException('没有该成员所属小组的安排权限。');
+        if (item.version !== command.version) throw new ConflictException('个人关联已变化，请刷新。');
+        if (await stopReason(manager, item)) throw new ConflictException('原工作已停止，不能通过更换关联绕过执行限制。');
+        if (command.assignmentId) {
+          const target = await assignments.assignment(command.assignmentId);
+          if (!target || target.accountId !== item.ownerId || !canManage(target.groupId)) throw new ForbiddenException('只能关联该成员本人且有权管理的目标分工。');
+          const task = await assignments.task(target.taskId);
+          if (!task || task.projectId !== item.projectId || ['completed', 'cancelled'].includes(task.status) || ['completed', 'exited', 'transferred'].includes(target.status) || await assignments.hasChildren(task.id)) throw new ConflictException('目标必须是同项目可执行的未完成分工。');
+          await ensureParentActive(manager, task);
+        }
+        await repository.link(item.id, command.assignmentId);
+        await repository.event(item.ownerId, item.id, 'manage_link', { actorId: access.actor.id, beforeAssignmentId: item.assignmentId, assignmentId: command.assignmentId });
+        await new WorkRepository(manager).event(item.projectId, item.id, access.actor.id, 'personal.link_managed', { itemId: item.id, ownerId: item.ownerId, beforeAssignmentId: item.assignmentId, assignmentId: command.assignmentId });
+        await new IdentityRepository(manager).audit(access.actor.id, 'personal.link_managed', item.id);
+        return { objectId: item.id };
+      }
       if ('itemId' in command && (!item || item.ownerId !== access.actor.id)) throw new ForbiddenException('仅本人可修改个人事项。');
       const categories = await repository.categories(access.actor.id);
       const category = 'categoryId' in command && command.categoryId ? categories.find((entry) => entry.id === command.categoryId) : undefined;

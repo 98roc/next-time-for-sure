@@ -6,6 +6,8 @@ const reason = z.string().trim().min(1).max(20000);
 export const taskEndIntentSchema = z.enum(['complete_task', 'cancel_task']);
 /** 团队整体状态独立于成员事实；结束必须提交最新范围的确认摘要。 */
 export const taskCommandSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('task_times'), taskId: id, version, startedAt: z.string().datetime().nullable(), endedAt: z.string().datetime().nullable() }).strict(),
+  z.object({ action: z.literal('task_blocker'), taskId: id, version, blockedReason: z.string().trim().max(2000), waitingFor: z.string().trim().max(200), waitingTaskId: id.nullable() }).strict(),
   z.object({ action: z.literal('reorder_task'), taskId: id, version, beforeId: id.nullable(), order: z.array(z.object({ id, version }).strict()).max(5000) }).strict(),
   z.object({ action: z.literal('start_task'), taskId: id, version }).strict(),
   z.object({ action: z.literal('complete_task'), taskId: id, version, confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),

@@ -36,6 +36,12 @@ try {
   assert.match(await page.text(), /<title>下次一定/);
   const proxied = await fetch(`http://127.0.0.1:${webPort}/api/v1/health/ready`);
   readinessSchema.parse(await proxied.json());
+  // 空登录载荷只触发输入校验；验证代理保留同源 Host，不产生账号或登录会话。
+  const origin = `http://127.0.0.1:${webPort}`;
+  const invalidLogin = await fetch(`${origin}/api/v1/auth/login`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-origin' }, body: '{}' });
+  assert.equal(invalidLogin.status, 400, 'Same-origin writes must reach validation through the web proxy');
+  const crossSite = await fetch(`${origin}/api/v1/auth/login`, { method: 'POST', headers: { Origin: 'http://other.invalid', 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(crossSite.status, 403);
   const mcp = startNode(['apps/mcp/dist/probe-client.js'], { env: environment });
   children.push(mcp);
   const [code] = await once(mcp, 'exit');

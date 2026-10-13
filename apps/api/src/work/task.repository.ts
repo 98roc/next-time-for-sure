@@ -5,6 +5,12 @@ import type { SplitCommand, WorkSnapshot } from '@ntfs/contracts';
 /** 团队状态写入集中管理，不更新分工和个人事项的执行字段。 */
 export class TaskRepository {
   constructor(private readonly manager: EntityManager) {}
+  /** 主负责人补记整体时间，允许结束后修正，不联动状态或成员时间。 */
+  async times(id: string, startedAt: string | null, endedAt: string | null): Promise<void> {
+    await this.manager.query('UPDATE team_tasks SET started_at = ?, ended_at = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [startedAt ? new Date(startedAt) : null, endedAt ? new Date(endedAt) : null, id]);
+  }
+  /** 人工维护阻塞标记，清空原因同步清空等待信息，不改状态。 */
+  async blocker(id: string, reason: string, waiting: string, waitingId: string | null): Promise<void> { await this.manager.query('UPDATE team_tasks SET blocked_reason = ?, waiting_for = ?, waiting_task_id = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [reason, reason ? waiting : '', reason ? waitingId : null, id]); }
   /** 仅修改列内顺序，递增版本让旧确认和并发排序显式冲突。 */
   async position(id: string, position: number): Promise<void> { await this.manager.query('UPDATE team_tasks SET position = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [position, id]); }
   /** 子任务继承当前父任务主负责人，初始状态和时间独立，不继承规划日期。 */

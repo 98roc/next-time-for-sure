@@ -1,5 +1,5 @@
 .personal-columns { display: flex; gap: 20px; overflow-x: auto; padding: 24px 0; align-items: flex-start; }
-.personal-columns > section { min-width: 300px; width: 360px; flex-shrink: 0; }
+.personal-columns > section { min-width: 300px; width: 360px; min-height: 240px; flex-shrink: 0; }
 .personal-columns h2 { padding: 8px 0 16px; }
 .personal-card { margin-bottom: 16px; }
 .personal-card fieldset { border: 0; padding: 0; display: grid; gap: 12px; min-width: 0; }

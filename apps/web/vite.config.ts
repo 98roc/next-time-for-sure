@@ -6,7 +6,8 @@ export default defineConfig(({ mode }) => {
   const root = fileURLToPath(new URL('../..', import.meta.url));
   const environment = loadEnv(mode, root, '');
   const port = Number(process.env.WEB_PORT || environment.WEB_PORT || '5174');
-  const proxy = { '/api': `http://127.0.0.1:${process.env.API_PORT || environment.API_PORT || '3100'}` };
+  // 显式保留浏览器Host；字符串代理快捷写法会改写Host，使同源写入被后端拒绝。
+  const proxy = { '/api': { target: `http://127.0.0.1:${process.env.API_PORT || environment.API_PORT || '3100'}`, changeOrigin: false } };
   return {
     plugins: [react()],
     envDir: root,

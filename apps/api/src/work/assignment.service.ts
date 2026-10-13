@@ -10,7 +10,7 @@ import { loadWorkAccess, projectAccess } from './work-access.js';
 import { WorkRepository } from './work.repository.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { PersonalRepository } from './personal.repository.js';
-import { ensureParentActive } from './task.service.js';
+import { ensureParentActive, validateWaiting } from './task.service.js';
 
 /** 人员责任与本人执行分离，管理者不能通过分配命令代改执行事实。 */
 @Injectable()
@@ -20,8 +20,18 @@ export class AssignmentService {
   /** 返回项目团队侧分工及进展，不包含私人事项或个人任务明细。 */
   async snapshot(token: string, project: string): Promise<AssignmentSnapshot> {
     return this.database.transaction(async (manager) => {
-      const access = await loadWorkAccess(manager, this.identity, token); projectAccess(access, project);
-      return new AssignmentRepository(manager).snapshot(project);
+      const access = await loadWorkAccess(manager, this.identity, token);
+      const target = access.organization.projects.find((entry) => entry.id === project && entry.teamId === access.actor.teamId);
+      if (!target) throw new ForbiddenException('没有项目访问权限。');
+      const full = target.members.some((member) => member.accountId === access.actor.id) || access.organization.teams.some((team) => team.id === target.teamId && team.leaderId === access.actor.id);
+      const groups = access.organization.groups.filter((group) => group.teamId === target.teamId && group.leaderId === access.actor.id);
+      if (!full && !groups.length) throw new ForbiddenException('没有项目或本组工作访问权限。');
+      const state = await new AssignmentRepository(manager).snapshot(project);
+      if (full) return state;
+
+      // 非项目成员的组长只能看到本组成员分工，不借此开放整个项目。
+      const assignments = state.assignments.filter((entry) => groups.some((group) => group.memberIds.includes(entry.accountId)));
+      return { assignments, progress: state.progress.filter((entry) => assignments.some((assignment) => assignment.id === entry.assignmentId)) };
     });
   }
 
@@ -81,7 +91,7 @@ export class AssignmentService {
         }
       }
       if ('version' in command && assignment?.version !== command.version) throw new ConflictException('分工已变化，请刷新后操作。');
-      const supplement = command.action === 'record_progress' || command.action === 'correct_times' || command.action === 'complete';
+      const supplement = command.action === 'record_progress' || command.action === 'correct_times' || command.action === 'complete' || command.action === 'assignment_blocker';
       if (!supplement) await ensureParentActive(manager, task);
       if (!supplement && ['completed', 'cancelled'].includes(task.status)) throw new ConflictException('团队任务已停止执行，不能新增或继续工作。');
       if (!supplement && await repository.hasChildren(task.id)) throw new ConflictException('父任务已拆分，请在子任务安排执行。');
@@ -104,6 +114,7 @@ export class AssignmentService {
       } else {
         if (!assignment) throw new NotFoundException('分工不存在。');
         switch (command.action) {
+          case 'assignment_blocker': await validateWaiting(manager, task, command.waitingTaskId); await repository.blocker(assignment.id, command.blockedReason, command.waitingFor, command.waitingTaskId); break;
           case 'adjust': eligible(assignment.accountId, command.groupId); await repository.adjust(assignment.id, command.groupId, command.content); break;
           case 'exit':
             if (assignment.source !== 'claimed') throw new ForbiddenException('管理者分配的工作须由组长或团队负责人调整。');

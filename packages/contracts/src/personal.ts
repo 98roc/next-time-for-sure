@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { reportWeekSchema } from './assignments.js';
+import { workEventSchema } from './work.js';
 
 const id = z.string().uuid();
 const version = z.number().int().nonnegative();
@@ -8,6 +9,7 @@ const content = z.string().trim().max(20000);
 const checklist = z.array(z.object({ id, title, checked: z.boolean() }).strict()).max(100).refine((items) => new Set(items.map((item) => item.id)).size === items.length, '检查项标识不能重复');
 export const personalStatusSchema = z.enum(['not_started', 'in_progress', 'completed']);
 export const personalCommandSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('manage_link'), itemId: id, assignmentId: id.nullable(), version }).strict(),
   z.object({ action: z.literal('create_personal'), kind: z.enum(['work', 'private']), projectId: id.nullable(), assignmentId: id.nullable(), title, description: content, acceptance: content, categoryId: id.nullable(), operationId: id }).strict(),
   z.object({ action: z.literal('edit_personal'), itemId: id, title, description: content, acceptance: content, checklist, plannedOn: z.iso.date().nullable(), blockedReason: content, version }).strict(),
   z.object({ action: z.literal('link_personal'), itemId: id, assignmentId: id.nullable(), version }).strict(),
@@ -28,3 +30,6 @@ export type PersonalItem = z.infer<typeof personalItemSchema>;
 export const personalProgressSchema = z.object({ id, itemId: id, occurredOn: z.iso.date(), reportWeek: reportWeekSchema, content, createdAt: z.string() });
 export const personalSnapshotSchema = z.object({ items: z.array(personalItemSchema), categories: z.array(personalCategorySchema), progress: z.array(personalProgressSchema) });
 export type PersonalSnapshot = z.infer<typeof personalSnapshotSchema>;
+const historyTimes = z.object({ startedAt: z.string().nullable(), endedAt: z.string().nullable() }).nullable().optional();
+/** 历史保留完整载荷，同时校验页面展示的前后时间，管理关联事件可没有时间快照。 */
+export const personalHistorySchema = z.array(workEventSchema.extend({ payload: z.object({ before: historyTimes, after: historyTimes }).passthrough() }));

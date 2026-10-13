@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, unlink } from 'node:fs/promises';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { NestFactory } from '@nestjs/core';
 import { organizationSnapshotSchema } from '@ntfs/contracts';
@@ -31,6 +32,9 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
   let base = '';
   const retainedAccounts = new Set<string>();
   let retainTeam = false;
+  const inspect = process.argv.includes('--inspect-ui');
+  const inspectPath = fileURLToPath(new URL('../../../../.cache/ui-inspection.json', import.meta.url));
+  let inspectFileCreated = false;
 
   /** 会话夹具仅用于组织测试，登录及密码认证由identity:smoke独立验证。 */
   async function session(id: string): Promise<Session> {
@@ -52,7 +56,7 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
 
   try {
     await source.query('INSERT INTO accounts (id, login_name, display_name, password_hash, is_super_admin, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 0, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [superId, `${prefix}.admin`, '临时验收超管', await hashPassword(password)]);
-    await app.listen(0, '127.0.0.1'); base = await app.getUrl();
+    await app.listen(inspect ? 3100 : 0, '127.0.0.1'); base = await app.getUrl();
     const admin = await session(superId);
     const revoked = await session(superId);
     const revokedToken = revoked.cookie.slice('ntfs_session='.length);
@@ -102,6 +106,14 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
       await source.query('INSERT INTO accounts (id, login_name, display_name, password_hash, team_id, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [managerId, `${prefix}.manager`, '仅项目经理验收账号', await hashPassword(password), team.id]);
       await command(leader, { action: 'set_project_member', projectId: project.id, accountId: managerId, roles: ['project_manager'], version: project.version });
       await verifyWork({ call, leader, developer, admin, manager: await session(managerId), projectId: project.id, otherProjectId: other.id, ownerId: member.id });
+      if (inspect) {
+        // 临时浏览器夹具只写忽略文件；输入回车后按原流程撤销会话并清理全部随机数据。
+        await writeFile(inspectPath, JSON.stringify({ loginName: `${prefix}.member`, password: replacement, projectId: project.id, base }), { flag: 'wx', mode: 0o600 });
+        inspectFileCreated = true;
+        const input = createInterface({ input: process.stdin, output: process.stdout });
+        try { await input.question('UI inspection fixture ready on port 3100. Press Enter to clean up.\n'); }
+        finally { input.close(); }
+      }
       project = (await snapshot(leader)).projects.find((entry) => entry.id === testProjectId); assert.ok(project);
     }
     await command(developer, { action: 'set_project_member', projectId: project.id, accountId: member.id, roles: ['developer'], version: project.version }, 403);
@@ -140,6 +152,7 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
     }
     console.log('PASS: real HTTP + MySQL organization scope, mandatory password change, multi-group membership, merged project roles, concurrent 409, password reset, disable/re-enable, immediate leader revocation and audit');
   } finally {
+    if (inspectFileCreated) await unlink(inspectPath);
     await app.close();
     // 按唯一随机账号前缀定位本次数据；先解除循环外键，再清理关联记录。
     await source.transaction(async (manager) => {
@@ -155,6 +168,7 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
       await manager.query('DELETE pr FROM assignment_progress pr JOIN task_assignments a ON a.id = pr.assignment_id JOIN team_tasks w ON w.id = a.task_id JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE a FROM task_assignments a JOIN team_tasks w ON w.id = a.task_id JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE e FROM work_events e JOIN projects p ON p.id = e.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query('UPDATE team_tasks w JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id SET w.waiting_task_id = NULL WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE w FROM team_tasks w JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?) AND w.parent_id IS NOT NULL', teamNames);
       await manager.query('DELETE w FROM team_tasks w JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE r FROM work_requests r JOIN projects p ON p.id = r.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);

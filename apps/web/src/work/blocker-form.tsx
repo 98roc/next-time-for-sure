@@ -1,0 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
+import { workSnapshot } from './api';
+
+/** 阻塞单独维护，不以等待任务状态推断开始、结束或自动解除。 */
+export function BlockerForm({ projectId, taskId, value, pending, send }: { projectId: string; taskId: string; value: { blockedReason: string; waitingFor: string; waitingTaskId: string | null }; pending: boolean; send: (fields: { blockedReason: string; waitingFor: string; waitingTaskId: string | null }) => void }) {
+  const tasks = useQuery({ queryKey: ['blocker-options', projectId], queryFn: () => workSnapshot(projectId), retry: false });
+  return <details><summary>阻塞与等待对象</summary>{value.blockedReason && <p>当前阻塞：{value.blockedReason} {value.waitingFor}</p>}<form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); send({ blockedReason: String(form.get('reason')), waitingFor: String(form.get('waiting')), waitingTaskId: String(form.get('task')) || null }); }}><label>原因（清空表示人工解除）<textarea name="reason" maxLength={2000} defaultValue={value.blockedReason} /></label><label>等待对象（选填）<input name="waiting" maxLength={200} defaultValue={value.waitingFor} /></label><label>关联等待任务（选填）<select name="task" defaultValue={value.waitingTaskId ?? ''}><option value="">无关联任务</option>{tasks.data?.tasks.filter((entry) => entry.id !== taskId).map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>{tasks.isError && <p role="alert">等待任务列表加载失败。<button type="button" onClick={() => { void tasks.refetch(); }}>重试</button></p>}<button disabled={pending || tasks.isPending || tasks.isError}>保存阻塞标记</button></form></details>;
+}

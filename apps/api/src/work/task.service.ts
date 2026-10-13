@@ -37,12 +37,22 @@ export class TaskService {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token, csrf);
       const task = await requireTask(manager, command.taskId);
-      authorize(access, task, command.action);
+      if (command.action === 'task_blocker') {
+        projectAccess(access, task.projectId);
+        const participating = (await new AssignmentRepository(manager).snapshot(task.projectId)).assignments.some((entry) => entry.taskId === task.id && entry.accountId === access.actor.id && !['exited', 'transferred'].includes(entry.status));
+        if (task.ownerId !== access.actor.id && !participating) throw new ForbiddenException('只有主负责人或当前参与人可维护任务阻塞。');
+      } else authorize(access, task, command.action);
       if (task.version !== command.version) throw new ConflictException('任务已变化，请刷新核对。');
       const repository = new TaskRepository(manager);
       const history = new WorkRepository(manager);
 
-      if (command.action === 'reorder_task') {
+      if (command.action === 'task_times') {
+        if (command.startedAt && command.endedAt && Date.parse(command.startedAt) > Date.parse(command.endedAt)) throw new BadRequestException('结束时间不能早于开始时间。');
+        await repository.times(task.id, command.startedAt, command.endedAt);
+      } else if (command.action === 'task_blocker') {
+        await validateWaiting(manager, task, command.waitingTaskId);
+        await repository.blocker(task.id, command.blockedReason, command.waitingFor, command.waitingTaskId);
+      } else if (command.action === 'reorder_task') {
         const column = (await history.snapshot(task.projectId)).tasks.filter((entry) => entry.status === task.status);
         if (column.length !== command.order.length || column.some((entry, index) => entry.id !== command.order[index]?.id || entry.version !== command.order[index]?.version)) throw new ConflictException('列表顺序或内容已变化，请刷新后移动。');
         if (command.beforeId === task.id || (command.beforeId && !column.some((entry) => entry.id === command.beforeId))) throw new BadRequestException('目标必须是同一状态列内的其他任务。');
@@ -93,6 +103,12 @@ function authorize(access: WorkAccess, task: Task, action: TaskCommand['action']
   if (!allowed) throw new ForbiddenException('没有该任务的整体操作权限。');
 }
 function stopped(task: Task) { return task.status === 'completed' || task.status === 'cancelled'; }
+/** 依赖仅表达同项目其他任务，不允许自依赖或跨项目泄露。 */
+export async function validateWaiting(manager: EntityManager, task: Task, waitingId: string | null): Promise<void> {
+  if (!waitingId) return;
+  const waiting = await new AssignmentRepository(manager).task(waitingId);
+  if (!waiting || waiting.id === task.id || waiting.projectId !== task.projectId) throw new BadRequestException('等待任务必须是同项目的其他任务。');
+}
 async function requireTask(manager: EntityManager, id: string) { const task = await new AssignmentRepository(manager).task(id); if (!task) throw new NotFoundException('任务不存在。'); return task; }
 /** 子任务不得绕过已结束父任务恢复执行。 */
 export async function ensureParentActive(manager: EntityManager, task: Task): Promise<void> {

@@ -9,6 +9,7 @@ import { WorkPage } from './work/work-page';
 import { PersonalPage } from './personal/personal-page';
 import '@ntfs/ui/tokens.css';
 import './style.css';
+import './controls.css';
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 5000, refetchOnWindowFocus: false } } });
 const root = document.getElementById('root');
