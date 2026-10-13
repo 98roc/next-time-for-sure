@@ -18,3 +18,7 @@ export const readinessSchema = z.object({
 export type Readiness = z.infer<typeof readinessSchema>;
 export * from './identity.js';
 export * from './organization.js';
+export * from './work.js';
+export * from './assignments.js';
+export * from './personal.js';
+export * from './milestones.js';

@@ -4,7 +4,7 @@ import { organizationCommandSchema, permissionSchema, projectRoleSchema, roleSch
 import type { Identity, OrganizationCommand, OrganizationSnapshot, Permission, Role } from '@ntfs/contracts';
 
 export const roleLabels: Record<Role, string> = { team_leader: '团队负责人', group_leader: '组长', project_manager: '项目经理', project_lead: '项目研发负责人', developer: '研发人员' };
-const permissionLabels: Record<Permission, string> = { 'members.manage': '管理成员', 'groups.manage': '管理小组', 'projects.manage': '管理项目及角色', 'work.assign': '分配工作', 'requests.accept': '接收需求', 'milestones.manage': '维护里程碑', 'reports.publish': '发布周报' };
+const permissionLabels: Record<Permission, string> = { 'members.manage': '管理成员', 'groups.manage': '管理小组', 'projects.manage': '管理项目及角色', 'work.assign': '分配工作', 'requests.accept': '接收需求', 'milestones.manage': '维护里程碑', 'reports.publish': '发布周报', 'requests.submit': '提交需求', 'tasks.create': '创建团队任务' };
 type Action = OrganizationCommand['action'];
 const labels: Record<Action, string> = { create_team: '创建团队及负责人', create_member: '创建成员账号', link_member: '关联已有账号', set_leader: '变更团队负责人', create_group: '创建小组', update_group: '编辑小组', create_project: '创建项目', set_project_member: '设置项目成员角色', reset_password: '重置成员密码', set_disabled: '启用或停用账号', set_role_permissions: '配置预设角色权限' };
 

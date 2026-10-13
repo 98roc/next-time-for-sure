@@ -12,7 +12,8 @@
     "test": "tsc -p tsconfig.json && node --test dist/**/*.test.js",
     "admin:init": "tsc -p tsconfig.json && node dist/identity/bootstrap.js",
     "identity:smoke": "tsc -p tsconfig.json && node dist/identity/integration-smoke.js",
-    "organization:smoke": "tsc -p tsconfig.json && node dist/organization/integration-smoke.js"
+    "organization:smoke": "tsc -p tsconfig.json && node dist/organization/integration-smoke.js",
+    "work:smoke": "tsc -p tsconfig.json && node dist/work/integration-smoke.js"
   },
   "dependencies": {
     "@ntfs/contracts": "workspace:*",

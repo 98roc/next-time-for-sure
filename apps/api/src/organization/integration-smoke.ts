@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { NestFactory } from '@nestjs/core';
 import { organizationSnapshotSchema } from '@ntfs/contracts';
 import type { OrganizationCommand } from '@ntfs/contracts';
@@ -15,10 +15,11 @@ import { IdentityService } from '../identity/identity.service.js';
 import { digest, hashPassword } from '../identity/password.js';
 import { SafeExceptionFilter } from '../safe-exception.filter.js';
 
-type Session = { cookie: string; csrf: string };
+export type Session = { cookie: string; csrf: string };
+export type WorkFixture = { call: (path: string, auth?: Session, body?: unknown) => Promise<Response>; leader: Session; developer: Session; admin: Session; manager: Session; projectId: string; otherProjectId: string; ownerId: string };
 
 /** 真实数据库及HTTP组织验收；测试数据有唯一前缀，仅清理本次创建的记录。 */
-async function smoke(): Promise<void> {
+export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>): Promise<void> {
   const source = createDataSource(loadEnvironment());
   await source.initialize();
   const app = await NestFactory.create(AppModule, { logger: false });
@@ -93,7 +94,16 @@ async function smoke(): Promise<void> {
     await command(leader, { action: 'create_project', teamId: team.id, name: '多角色项目', managerId: member.id, leadId: member.id, developerIds: [member.id] });
     await command(leader, { action: 'create_project', teamId: team.id, name: '其他项目', managerId: team.leaderId, leadId: team.leaderId, developerIds: [] });
     const own = await snapshot(developer); assert.equal(own.projects.length, 1);
-    const project = own.projects[0]; assert.ok(project); assert.equal(project.members[0]?.roles.length, 3);
+    let project = own.projects[0]; assert.ok(project); assert.equal(project.members[0]?.roles.length, 3);
+    const testProjectId = project.id;
+    if (verifyWork) {
+      const other = (await snapshot(leader)).projects.find((entry) => entry.id !== testProjectId); assert.ok(other);
+      const managerId = randomUUID();
+      await source.query('INSERT INTO accounts (id, login_name, display_name, password_hash, team_id, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [managerId, `${prefix}.manager`, '仅项目经理验收账号', await hashPassword(password), team.id]);
+      await command(leader, { action: 'set_project_member', projectId: project.id, accountId: managerId, roles: ['project_manager'], version: project.version });
+      await verifyWork({ call, leader, developer, admin, manager: await session(managerId), projectId: project.id, otherProjectId: other.id, ownerId: member.id });
+      project = (await snapshot(leader)).projects.find((entry) => entry.id === testProjectId); assert.ok(project);
+    }
     await command(developer, { action: 'set_project_member', projectId: project.id, accountId: member.id, roles: ['developer'], version: project.version }, 403);
     await command(leader, { action: 'set_project_member', projectId: project.id, accountId: member.id, roles: ['developer'], version: project.version }, 400);
     await command(leader, { action: 'set_project_member', projectId: project.id, accountId: team.leaderId, roles: ['developer'], version: project.version });
@@ -136,11 +146,23 @@ async function smoke(): Promise<void> {
       const rows: unknown = await manager.query('SELECT id FROM accounts WHERE login_name LIKE ?', [`${prefix}.%`]);
       const ids = z.array(z.object({ id: z.string() })).parse(rows).map((entry) => entry.id).filter((id) => !retainedAccounts.has(id));
       const teamNames = [retainTeam ? `${prefix}.none` : `${prefix}.team`, `${prefix}.foreign`];
+      for (const id of ids) {
+        await manager.query('DELETE pr FROM personal_progress pr JOIN personal_items i ON i.id = pr.item_id WHERE i.owner_id = ?', [id]);
+        await manager.query('DELETE FROM personal_items WHERE owner_id = ?', [id]);
+        await manager.query('DELETE FROM personal_categories WHERE owner_id = ?', [id]);
+        await manager.query('DELETE FROM personal_events WHERE owner_id = ?', [id]);
+      }
+      await manager.query('DELETE pr FROM assignment_progress pr JOIN task_assignments a ON a.id = pr.assignment_id JOIN team_tasks w ON w.id = a.task_id JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query('DELETE a FROM task_assignments a JOIN team_tasks w ON w.id = a.task_id JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query('DELETE e FROM work_events e JOIN projects p ON p.id = e.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query('DELETE w FROM team_tasks w JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query('DELETE r FROM work_requests r JOIN projects p ON p.id = r.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE pm FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE p FROM projects p JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE gm FROM group_members gm JOIN work_groups g ON g.id = gm.group_id JOIN teams t ON t.id = g.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE g FROM work_groups g JOIN teams t ON t.id = g.team_id WHERE t.name IN (?, ?)', teamNames);
       for (const id of ids) {
+        await manager.query('DELETE FROM work_operations WHERE actor_id = ?', [id]);
         await manager.query('UPDATE accounts SET team_id = NULL WHERE id = ?', [id]);
         await manager.query('DELETE FROM login_sessions WHERE account_id = ?', [id]);
         await manager.query('DELETE FROM audit_events WHERE actor_id = ?', [id]);
@@ -152,4 +174,4 @@ async function smoke(): Promise<void> {
   }
 }
 
-await smoke();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await smoke();

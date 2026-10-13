@@ -1,0 +1,30 @@
+.milestone-panel { margin-block: 1rem; }
+.fish-scroll { overflow-x: auto; padding: 1rem .25rem; }
+.fish-axis { display: flex; align-items: stretch; width: max-content; min-width: 100%; position: relative; }
+.fish-axis::before { content: ''; position: absolute; top: 50%; width: 100%; border-top: 3px solid #7396b5; }
+.fish-day { width: 17rem; padding: 0 1rem; display: grid; grid-template-rows: 1fr 2rem 1fr; position: relative; }
+.fish-day h3 { grid-row: 2; margin: 0; align-self: center; justify-self: center; background: var(--surface, #fff); padding: .3rem .5rem; z-index: 1; font-size: .9rem; border-radius: .4rem; }
+.fish-branch { border-left: 2px solid #7396b5; padding: .75rem; display: flex; flex-direction: column; gap: .5rem; }
+.above .fish-branch { grid-row: 1; grid-column: 1; align-self: end; }
+.below .fish-branch { grid-row: 3; grid-column: 1; align-self: start; }
+.fish-node { display: flex; flex-direction: column; gap: .5rem; text-align: left; width: 100%; padding: .85rem; white-space: normal; overflow-wrap: anywhere; }
+.fish-node span { font-size: .85rem; }
+.fish-node[aria-pressed=true] { outline: 2px solid #7396b5; outline-offset: 2px; }
+.fish-node.completed { border-color: #4f8d78; }
+.fish-node.cancelled { opacity: .65; }
+.fish-node[draggable=true] { cursor: grab; }
+.fish-drop-target { background: var(--selected); border-radius: var(--radius); }
+.fish-placeholder { border: 1px dashed var(--accent); padding: .75rem; font-size: .85rem; }
+.fish-empty { position: relative; background: var(--surface, #fff); padding: 1rem; }
+.fish-unplanned { border: 1px dashed #7396b5; padding: 1rem; border-radius: .75rem; }
+.fish-unplanned > div { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .75rem; }
+.milestone-create, .milestone-detail { margin-top: 1rem; padding: 1rem; border: 1px solid #7396b555; border-radius: .75rem; }
+.milestone-editors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1.5rem; margin-block: 1rem; }
+.milestone-panel fieldset { display: grid; gap: .8rem; border: 0; padding: 0; min-width: 0; }
+@media (max-width: 640px) {
+  .fish-axis { flex-direction: column; width: 100%; }
+  .fish-axis::before { top: 0; left: .5rem; height: 100%; width: 0; border-top: 0; border-left: 3px solid #7396b5; }
+  .fish-day { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding-left: 1.5rem; }
+  .fish-day h3 { align-self: flex-start; }
+  .fish-branch { border-left: 0; width: 100%; box-sizing: border-box; }
+}
