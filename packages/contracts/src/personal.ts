@@ -16,6 +16,7 @@ export const personalCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('personal_progress'), itemId: id, occurredOn: z.iso.date(), reportWeek: reportWeekSchema, content: content.min(1), version, operationId: id }).strict(),
   z.object({ action: z.literal('personal_times'), itemId: id, startedAt: z.iso.datetime().nullable(), endedAt: z.iso.datetime().nullable(), version }).strict(),
   z.object({ action: z.literal('move_personal'), itemId: id, categoryId: id.nullable(), position: z.number().int().nonnegative().max(1000000), version }).strict(),
+  z.object({ action: z.literal('insert_personal'), itemId: id, categoryId: id.nullable(), beforeId: id.nullable(), version, order: z.array(z.object({ id, version }).strict()).max(5000) }).strict(),
   z.object({ action: z.literal('create_category'), name: title, operationId: id }).strict(),
   z.object({ action: z.literal('rename_category'), categoryId: id, name: title, version }).strict(),
   z.object({ action: z.literal('delete_category'), categoryId: id, version }).strict(),

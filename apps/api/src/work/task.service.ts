@@ -42,7 +42,14 @@ export class TaskService {
       const repository = new TaskRepository(manager);
       const history = new WorkRepository(manager);
 
-      if (command.action === 'change_owner') {
+      if (command.action === 'reorder_task') {
+        const column = (await history.snapshot(task.projectId)).tasks.filter((entry) => entry.status === task.status);
+        if (column.length !== command.order.length || column.some((entry, index) => entry.id !== command.order[index]?.id || entry.version !== command.order[index]?.version)) throw new ConflictException('列表顺序或内容已变化，请刷新后移动。');
+        if (command.beforeId === task.id || (command.beforeId && !column.some((entry) => entry.id === command.beforeId))) throw new BadRequestException('目标必须是同一状态列内的其他任务。');
+        const ordered = column.filter((entry) => entry.id !== task.id);
+        ordered.splice(command.beforeId ? ordered.findIndex((entry) => entry.id === command.beforeId) : ordered.length, 0, task);
+        for (const [index, entry] of ordered.entries()) if (entry.position !== index) await repository.position(entry.id, index);
+      } else if (command.action === 'change_owner') {
         const project = projectAccess(access, task.projectId);
         const owner = access.organization.accounts.find((entry) => entry.id === command.ownerId && entry.teamId === project.teamId && !entry.disabled);
         if (!owner || !project.members.some((member) => member.accountId === owner.id && member.roles.some((role) => role === 'developer' || role === 'project_lead'))) throw new BadRequestException('主负责人必须是当前项目可用研发成员。');

@@ -11,6 +11,8 @@ function localTime(value: string | null) { if (!value) return ''; const date = n
 export function PersonalCard({ item, own, data, assignments, pending, send }: Props) {
   const [checklist, setChecklist] = useState(item.checklist);
   const base = { itemId: item.id, version: item.version };
+  const column = data.items.filter((entry) => entry.ownerId === item.ownerId && entry.categoryId === item.categoryId);
+  const previous = column[column.findIndex((entry) => entry.id === item.id) - 1];
   function edit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     send({ ...base, action: 'edit_personal', title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), plannedOn: String(form.get('plannedOn')) || null, blockedReason: String(form.get('blockedReason')), checklist });
@@ -19,6 +21,7 @@ export function PersonalCard({ item, own, data, assignments, pending, send }: Pr
     {item.checklist.length > 0 && <ul>{item.checklist.map((entry) => <li key={entry.id}>{entry.checked ? '✓' : '○'} {entry.title}</li>)}</ul>}
     <p>实际开始：{item.startedAt ? new Date(item.startedAt).toLocaleString('zh-CN') : '未记录'}<br />实际结束：{item.endedAt ? new Date(item.endedAt).toLocaleString('zh-CN') : '未记录'}</p>
     {data.progress.filter((entry) => entry.itemId === item.id).map((entry) => <p key={entry.id}>{entry.occurredOn} · 归属周 {entry.reportWeek}<br />{entry.content}</p>)}
+    {own && <button disabled={pending || !previous} onClick={() => { if (previous) send({ action: 'insert_personal', ...base, categoryId: item.categoryId, beforeId: previous.id, order: column.filter((entry) => entry.id !== item.id).map(({ id, version }) => ({ id, version })) }); }}>在本分类上移</button>}
     {own && item.assignmentId && item.status === 'completed' && data.items.filter((entry) => entry.assignmentId === item.assignmentId).every((entry) => entry.status === 'completed') && <p role="status">关联的个人事项已全部完成；请到<a href={`/work?projectId=${item.projectId}`}>团队工作</a>确认是否完成本人分工。</p>}
     {own && <><div className="assignment-actions">{(item.status !== 'in_progress' || item.stopReason === '关联分工已完成') && (!item.stopReason || item.stopReason === '关联分工已完成') && <button disabled={pending} onClick={() => send({ ...base, action: 'start_personal' })}>{item.status === 'not_started' ? '开始' : '恢复执行'}</button>}{item.status !== 'completed' && <button disabled={pending} onClick={() => send({ ...base, action: 'complete_personal' })}>完成本人事项</button>}</div>
       <details><summary>编辑内容与检查清单</summary><form onSubmit={edit}><fieldset disabled={pending}><label>标题<input name="title" required defaultValue={item.title} maxLength={200} /></label><label>说明<textarea name="description" defaultValue={item.description} maxLength={20000} /></label><label>完成标准<textarea name="acceptance" defaultValue={item.acceptance} maxLength={20000} /></label><label>本人计划日期<input name="plannedOn" type="date" defaultValue={item.plannedOn ?? ''} /></label><label>阻塞说明（清空即解除）<textarea name="blockedReason" defaultValue={item.blockedReason} maxLength={20000} /></label>

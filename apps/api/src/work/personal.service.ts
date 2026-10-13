@@ -100,6 +100,15 @@ export class PersonalService {
             if (command.startedAt && command.endedAt && Date.parse(command.startedAt) > Date.parse(command.endedAt)) throw new BadRequestException('结束时间不能早于开始。');
             await repository.times(item.id, command.startedAt, command.endedAt); break;
           case 'move_personal': await repository.move(item.id, command.categoryId, command.position); break;
+          case 'insert_personal': {
+            const column = (await repository.candidates(access.actor.id, null)).filter((entry) => entry.categoryId === command.categoryId && entry.id !== item.id);
+            if (column.length !== command.order.length || column.some((entry, index) => entry.id !== command.order[index]?.id || entry.version !== command.order[index]?.version)) throw new ConflictException('目标分类已变化，请刷新后重新排序。');
+            if (command.beforeId && !column.some((entry) => entry.id === command.beforeId)) throw new BadRequestException('插入目标必须是该分类内的其他事项。');
+            const ordered = [...column];
+            ordered.splice(command.beforeId ? ordered.findIndex((entry) => entry.id === command.beforeId) : ordered.length, 0, item);
+            for (const [index, entry] of ordered.entries()) if (entry.position !== index || entry.categoryId !== command.categoryId) await repository.move(entry.id, command.categoryId, index);
+            break;
+          }
         }
       }
       const target = item?.id ?? objectId;

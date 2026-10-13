@@ -5,6 +5,8 @@ import type { SplitCommand, WorkSnapshot } from '@ntfs/contracts';
 /** 团队状态写入集中管理，不更新分工和个人事项的执行字段。 */
 export class TaskRepository {
   constructor(private readonly manager: EntityManager) {}
+  /** 仅修改列内顺序，递增版本让旧确认和并发排序显式冲突。 */
+  async position(id: string, position: number): Promise<void> { await this.manager.query('UPDATE team_tasks SET position = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [position, id]); }
   /** 子任务继承当前父任务主负责人，初始状态和时间独立，不继承规划日期。 */
   async child(parent: WorkSnapshot['tasks'][number], content: SplitCommand['children'][number]): Promise<string> {
     const id = randomUUID();

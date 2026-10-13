@@ -32,7 +32,7 @@ export class AssignmentRepository {
 
   /** 读取当前团队任务，执行限制不信任客户端状态。 */
   async task(id: string) {
-    const rows: unknown = await this.manager.query(`SELECT id, project_id AS projectId, request_id AS requestId, parent_id AS parentId, owner_id AS ownerId, title, description, acceptance, status, version, in_milestone AS inMilestone, DATE_FORMAT(expected_on, '%Y-%m-%d') AS expectedOn, DATE_FORMAT(started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt, DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt, progress FROM team_tasks WHERE id = ? FOR UPDATE`, [id]);
+    const rows: unknown = await this.manager.query(`SELECT id, project_id AS projectId, request_id AS requestId, parent_id AS parentId, owner_id AS ownerId, title, description, acceptance, status, version, in_milestone AS inMilestone, DATE_FORMAT(expected_on, '%Y-%m-%d') AS expectedOn, DATE_FORMAT(started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt, DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt, progress, position FROM team_tasks WHERE id = ? FOR UPDATE`, [id]);
     return z.array(teamTaskSchema).parse(rows)[0];
   }
 

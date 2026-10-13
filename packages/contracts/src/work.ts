@@ -20,7 +20,7 @@ export const workCommandSchema = z.discriminatedUnion('action', [
 ]);
 export type WorkCommand = z.infer<typeof workCommandSchema>;
 export const workRequestSchema = z.object({ id, projectId: id, submitterId: id, title, description: details, acceptance: details, status: requestStatusSchema, version });
-export const teamTaskSchema = z.object({ id, projectId: id, requestId: id.nullable(), parentId: id.nullable(), ownerId: id, title, description: details, acceptance: details, status: taskStatusSchema, version, inMilestone: z.union([z.boolean(), z.literal(0), z.literal(1)]).transform(Boolean), expectedOn: z.iso.date().nullable(), startedAt: z.string().nullable(), endedAt: z.string().nullable(), progress: z.number().int().min(0).max(100) });
+export const teamTaskSchema = z.object({ id, projectId: id, requestId: id.nullable(), parentId: id.nullable(), ownerId: id, title, description: details, acceptance: details, status: taskStatusSchema, version, inMilestone: z.union([z.boolean(), z.literal(0), z.literal(1)]).transform(Boolean), expectedOn: z.iso.date().nullable(), startedAt: z.string().nullable(), endedAt: z.string().nullable(), progress: z.number().int().min(0).max(100), position: z.number().int().nonnegative() });
 export const workEventSchema = z.object({ id, objectId: id, actorId: id, action: z.string(), payload: z.record(z.string(), z.unknown()), createdAt: z.string() });
 export const workSnapshotSchema = z.object({ requests: z.array(workRequestSchema), tasks: z.array(teamTaskSchema), events: z.array(workEventSchema) });
 export type WorkSnapshot = z.infer<typeof workSnapshotSchema>;

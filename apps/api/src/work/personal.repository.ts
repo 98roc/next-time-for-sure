@@ -12,7 +12,7 @@ export class PersonalRepository {
 
   /** 数据库先排除他人的私人事项，工作事项再由服务按角色裁剪。 */
   async candidates(owner: string, team: string | null): Promise<PersonalItem[]> {
-    return decodeItems(await this.manager.query(`${selection} LEFT JOIN projects p ON p.id = i.project_id WHERE i.owner_id = ? OR (i.kind = 'work' AND p.team_id = ?) ORDER BY i.position, i.created_at`, [owner, team]));
+    return decodeItems(await this.manager.query(`${selection} LEFT JOIN projects p ON p.id = i.project_id WHERE i.owner_id = ? OR (i.kind = 'work' AND p.team_id = ?) ORDER BY i.position, i.created_at, i.id`, [owner, team]));
   }
   /** 锁定单条事项用于本人编辑及版本检查。 */
   async item(id: string): Promise<PersonalItem | undefined> { return decodeItems(await this.manager.query(`${selection} WHERE i.id = ? FOR UPDATE`, [id]))[0]; }

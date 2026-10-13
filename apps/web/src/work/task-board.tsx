@@ -26,10 +26,16 @@ export function TaskBoard({ tasks, identity, organization, projectId }: { tasks:
   const stopped = (task: Task) => ['completed', 'cancelled'].includes(task.status);
   const canMove = (task: Task) => task.ownerId === identity.id || (stopped(task) && manager);
   const hasAssignment = (task: Task) => assignments.data?.assignments.some((entry) => (entry.taskId === task.id || tasks.some((child) => child.parentId === task.id && child.id === entry.taskId)) && !['exited', 'transferred'].includes(entry.status));
+  function reorder(task: Task, beforeId: string | null) {
+    setDragged(null); setTarget(''); setError('');
+    if (busy || task.id === beforeId) return;
+    save.mutate({ action: 'reorder_task', taskId: task.id, version: task.version, beforeId, order: tasks.filter((entry) => entry.status === task.status).map(({ id, version }) => ({ id, version })) });
+  }
 
   async function move(task: Task, status: string) {
     setDragged(null); setTarget(''); setError(''); setReview(null); setReopen(null);
-    if (busy || task.status === status) return;
+    if (busy) return;
+    if (task.status === status) { reorder(task, null); return; }
     if (!canMove(task)) { setError('没有该任务的状态操作权限。'); return; }
     if (stopped(task)) {
       const restored = task.startedAt ? 'in_progress' : 'not_started';
@@ -47,8 +53,12 @@ export function TaskBoard({ tasks, identity, organization, projectId }: { tasks:
   }
   function card(task: Task) {
     const destination = stopped(task) ? (task.startedAt ? 'in_progress' : 'not_started') : task.status === 'not_started' ? 'in_progress' : 'completed';
-    return <article className="task-board-card" key={task.id} draggable={Boolean(canMove(task) && !busy)} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', task.id); setDragged(task); }} onDragEnd={() => { setDragged(null); setTarget(''); }}>
+    const column = tasks.filter((entry) => entry.status === task.status);
+    const previous = column[column.findIndex((entry) => entry.id === task.id) - 1];
+    return <article className="task-board-card" key={task.id} onDragOver={(event) => { if (dragged?.status === task.status && dragged.id !== task.id && !busy) { event.preventDefault(); event.stopPropagation(); setTarget(task.id); } }} onDrop={(event) => { if (dragged?.status === task.status) { event.preventDefault(); event.stopPropagation(); reorder(dragged, task.id); } }} draggable={Boolean(canMove(task) && !busy)} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', task.id); setDragged(task); }} onDragEnd={() => { setDragged(null); setTarget(''); }}>
+      {target === task.id && <p className="drop-placeholder">插入此卡片之前</p>}
       <h3><a href={`#task-${task.id}`}>{task.title}</a></h3><p>{task.parentId ? '子任务 · ' : ''}{organization.accounts.find((entry) => entry.id === task.ownerId)?.displayName ?? '成员'}</p>{task.expectedOn && <p>预计 {task.expectedOn}</p>}{assignments.data && !assignments.isError && !hasAssignment(task) && <span className="status-badge">待分配</span>}
+      {task.ownerId === identity.id && <div><button disabled={busy || !previous} onClick={() => { if (previous) reorder(task, previous.id); }}>上移</button><button disabled={busy} onClick={() => reorder(task, null)}>移至列末</button></div>}
       {canMove(task) && <div><button disabled={busy} onClick={() => { void move(task, destination); }}>{stopped(task) ? '重开…' : task.status === 'not_started' ? '开始' : '整体结束…'}</button>{task.status === 'not_started' && <button disabled={busy} onClick={() => { void move(task, 'completed'); }}>整体结束…</button>}</div>}
     </article>;
   }
