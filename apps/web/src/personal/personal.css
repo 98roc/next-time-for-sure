@@ -8,3 +8,6 @@
 .checklist-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .checklist-row input[type=checkbox] { width: auto; }
 @media (max-width: 540px) { .personal-columns > section { min-width: 280px; width: calc(100vw - 52px); } }
+.personal-drop-active { outline: 2px dashed var(--accent); background: var(--selected); }
+.personal-drop-placeholder { padding: .75rem; border: 1px dashed var(--accent); }
+.personal-drag-handle { margin-top: .75rem; cursor: grab; }
