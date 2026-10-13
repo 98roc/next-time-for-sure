@@ -2,7 +2,7 @@
 
 面向小型研发团队的任务协同平台，连接需求、项目里程碑、团队分工、个人执行、周计划与周报，让安排、进展和变化都有据可查。
 
-> **当前状态：需求与设计阶段。** 仓库包含需求文档、开发规范和已确认的交互原型，尚未提供应用代码、安装包或在线演示。以下能力为建设目标，不代表已经实现。
+> **当前状态：第1阶段工程底座。** 已建立网页、后端、数据库迁移和MCP公开探针，桌面端为窗口骨架。下列业务能力仍是建设目标；尚无正式业务功能或Windows安装包。实际检查范围见[第1阶段验证记录](docs/development/第1阶段验证记录.md)。
 
 ## 想解决什么问题
 
@@ -24,7 +24,7 @@
 | Windows桌面 | 复用网页业务能力，增加托盘驻留和系统通知 |
 | 外部Agent | 通过个人访问Token调用业务能力，配合Skill处理需求、任务和周报 |
 
-外部Agent首期兼容目标为 **Codex、ZCode、Qoder、Workbody**，具体协议、版本和接入效果仍需逐一验证。网页与桌面端首期不内置聊天助手。
+外部Agent首期兼容目标为 **Codex、ZCode、Qoder、Workbody**，本轮只实际验收Codex，其他三个目标保持未验证，不阻塞本轮交付。网页与桌面端首期不内置聊天助手。
 
 微信聊天内直接操作、飞书或语雀文档联动、存量工具数据迁移均不在首期范围。完整业务规则以需求文档为准。
 
@@ -49,7 +49,20 @@
 - [界面设计基准](docs/design/界面设计方向.md)：已确认的留白布局、雾蓝配色、任务看板与鱼骨式里程碑交互。
 - [可操作界面原型](docs/design/prototypes/workspace.html)：下载或克隆后用浏览器打开；示例数据，不连接业务服务。
 
-目前可克隆仓库阅读和参与需求讨论；运行、测试与部署说明将在对应工程具备后补充。
+- [实施计划](docs/development/首期研发实施计划.md)：阶段范围与完成标准。
+- [工程基线与验收对照](docs/development/工程基线与验收对照.md)：对象关系、权限设计及实现状态。
+- [本地开发与启动](docs/development/本地开发与启动.md)：nvm、配置、迁移、运行及Codex探针接入。
+
+在根目录配置被Git忽略的`.env.local`后，可通过PowerShell运行：
+
+```powershell
+.\scripts\pnpm.ps1 install --frozen-lockfile
+.\scripts\pnpm.ps1 build
+.\scripts\pnpm.ps1 db:migrate
+.\scripts\pnpm.ps1 dev
+```
+
+默认网页地址为`http://127.0.0.1:5174`。工程检查使用`.\scripts\pnpm.ps1 check`，真实数据库与MCP冒烟使用`.\scripts\pnpm.ps1 smoke`。
 
 ```bash
 git clone https://github.com/98roc/next-time-for-sure.git

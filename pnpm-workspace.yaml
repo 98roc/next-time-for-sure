@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - esbuild
+  - electron
+
+ignoredBuiltDependencies:
+  - '@scarf/scarf'
+
+# Swagger锁定的旧版存在GHSA-r3ph-w7gj-g6xm；仅提升该依赖到同主版本修复版。
+overrides:
+  '@nestjs/swagger>js-yaml': 5.4.1

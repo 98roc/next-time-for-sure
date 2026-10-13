@@ -1,0 +1,10 @@
+:root { color-scheme: light dark; --accent: #5066a6; --selected: #eef1fa; --canvas: #f5f6f9; --surface: #fff; --text: #242730; --muted: #686e7c; --line: #e3e6ed; --radius: 10px; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+@media (prefers-color-scheme: dark) { :root { --accent: #a8b9ee; --selected: #292f43; --canvas: #17191e; --surface: #20232a; --text: #edf0f5; --muted: #a3aab7; --line: #363b47; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--canvas); color: var(--text); }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.status-badge { display: inline-flex; padding: 5px 10px; border-radius: 6px; font-size: 12px; background: var(--selected); color: var(--accent); }
+.status-badge--success { background: #e6f2ea; color: #28643a; }
+.status-badge--warning { background: #fff0d8; color: #855a18; }

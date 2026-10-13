@@ -1,0 +1,28 @@
+{
+  "name": "next-time-for-sure",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "pnpm --filter @ntfs/contracts build && pnpm --filter @ntfs/ui build && pnpm --filter @ntfs/api build && pnpm --filter @ntfs/web build && pnpm --filter @ntfs/mcp build && pnpm --filter @ntfs/desktop build",
+    "typecheck": "pnpm --filter @ntfs/contracts build && pnpm --filter @ntfs/ui build && pnpm -r typecheck",
+    "lint": "eslint . --max-warnings 0",
+    "test": "pnpm --filter @ntfs/api test && pnpm --filter @ntfs/mcp test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "dev": "pnpm --filter @ntfs/contracts build && pnpm --filter @ntfs/ui build && pnpm --filter @ntfs/api build && node scripts/dev.mjs",
+    "db:migrate": "pnpm --filter @ntfs/api db:migrate",
+    "db:status": "pnpm --filter @ntfs/api db:status",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.2"
+  }
+}
