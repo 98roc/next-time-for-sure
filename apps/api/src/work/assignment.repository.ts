@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { assignmentSchema, assignmentSnapshotSchema, teamTaskSchema } from '@ntfs/contracts';
 import type { AssignmentSnapshot } from '@ntfs/contracts';
 
-const selectAssignments = `SELECT a.id, a.task_id AS taskId, a.account_id AS accountId, a.group_id AS groupId, a.content, a.source, a.status, a.version,
+const selectAssignments = `SELECT a.id, a.task_id AS taskId, a.origin_task_id AS originTaskId, a.account_id AS accountId, a.group_id AS groupId, a.content, a.source, a.status, a.version,
   DATE_FORMAT(a.started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt,
   DATE_FORMAT(a.ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt,
   DATE_FORMAT(a.transferred_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS transferredAt FROM task_assignments a`;
@@ -12,6 +12,10 @@ const selectAssignments = `SELECT a.id, a.task_id AS taskId, a.account_id AS acc
 /** 分工及进展SQL集中管理，不提供可任意代改个人事实的通用更新入口。 */
 export class AssignmentRepository {
   constructor(private readonly manager: EntityManager) {}
+  /** 原地迁移有效责任，进展和个人关联保留原标识，首次来源仅写一次。 */
+  async moveToChild(id: string, task: string): Promise<void> {
+    await this.manager.query('UPDATE task_assignments SET origin_task_id = COALESCE(origin_task_id, task_id), task_id = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [task, id]);
+  }
 
   /** 指定项目的团队侧分工和进展，返回前由服务校验项目访问权。 */
   async snapshot(projectId: string): Promise<AssignmentSnapshot> {

@@ -20,7 +20,7 @@ export const assignmentCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('correct_times'), assignmentId: id, startedAt: z.iso.datetime().nullable(), endedAt: z.iso.datetime().nullable(), version }).strict(),
 ]);
 export type AssignmentCommand = z.infer<typeof assignmentCommandSchema>;
-export const assignmentSchema = z.object({ id, taskId: id, accountId: id, groupId: id, content, source: z.enum(['assigned', 'claimed']), status: assignmentStatusSchema, version, startedAt: z.string().nullable(), endedAt: z.string().nullable(), transferredAt: z.string().nullable() });
+export const assignmentSchema = z.object({ id, taskId: id, originTaskId: id.nullable(), accountId: id, groupId: id, content, source: z.enum(['assigned', 'claimed']), status: assignmentStatusSchema, version, startedAt: z.string().nullable(), endedAt: z.string().nullable(), transferredAt: z.string().nullable() });
 export type Assignment = z.infer<typeof assignmentSchema>;
 export const assignmentProgressSchema = z.object({ id, assignmentId: id, occurredOn: date, reportWeek: reportWeekSchema, content, createdAt: z.string() });
 export const assignmentSnapshotSchema = z.object({ assignments: z.array(assignmentSchema), progress: z.array(assignmentProgressSchema) });

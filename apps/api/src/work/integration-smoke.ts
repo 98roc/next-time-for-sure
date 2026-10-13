@@ -1,3 +1,4 @@
+import { verifySplits } from './split.integration.js';
 import { verifyTasks } from './task.integration.js';
 import { verifyMilestones } from './milestone.integration.js';
 import assert from 'node:assert/strict';
@@ -61,6 +62,7 @@ async function verify(fixture: WorkFixture): Promise<void> {
   await verifyPersonal(fixture, taskId);
   await verifyMilestones(fixture, taskId);
   await verifyTasks(fixture, taskId);
+  await verifySplits(fixture);
   console.log('PASS: intake, latest-content acceptance, supplements, defer/resume/reject/resubmit, accept-versus-withdraw race, replay idempotency and direct task creation');
 }
 

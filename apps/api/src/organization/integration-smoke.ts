@@ -155,6 +155,7 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
       await manager.query('DELETE pr FROM assignment_progress pr JOIN task_assignments a ON a.id = pr.assignment_id JOIN team_tasks w ON w.id = a.task_id JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE a FROM task_assignments a JOIN team_tasks w ON w.id = a.task_id JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE e FROM work_events e JOIN projects p ON p.id = e.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query('DELETE w FROM team_tasks w JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?) AND w.parent_id IS NOT NULL', teamNames);
       await manager.query('DELETE w FROM team_tasks w JOIN projects p ON p.id = w.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE r FROM work_requests r JOIN projects p ON p.id = r.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE pm FROM project_members pm JOIN projects p ON p.id = pm.project_id JOIN teams t ON t.id = p.team_id WHERE t.name IN (?, ?)', teamNames);

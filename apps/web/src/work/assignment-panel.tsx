@@ -12,10 +12,10 @@ function localTime(value: string | null): string {
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 23);
 }
-type Props = { task: WorkSnapshot['tasks'][number]; organization: OrganizationSnapshot; identity: Identity };
+type Props = { task: WorkSnapshot['tasks'][number]; organization: OrganizationSnapshot; identity: Identity; hasChildren: boolean };
 
 /** 分工独立显示来源、负责小组与本人事实，不用任务整体状态覆盖个人状态。 */
-export function AssignmentPanel({ task, organization, identity }: Props) {
+export function AssignmentPanel({ task, organization, identity, hasChildren }: Props) {
   const client = useQueryClient();
   const state = useQuery({ queryKey: ['assignments', identity.id, task.projectId], queryFn: () => assignmentSnapshot(task.projectId), retry: false });
   const [error, setError] = useState('');
@@ -32,7 +32,7 @@ export function AssignmentPanel({ task, organization, identity }: Props) {
   const managedGroups = organization.groups.filter((group) => group.teamId === project?.teamId && ((teamLeader && permission('team_leader')) || (group.leaderId === identity.id && permission('group_leader'))));
   const ownGroups = organization.groups.filter((group) => group.teamId === project?.teamId && group.memberIds.includes(identity.id));
   const entries = state.isError ? [] : state.data?.assignments.filter((entry) => entry.taskId === task.id) ?? [];
-  const executable = !['completed', 'cancelled'].includes(task.status);
+  const executable = !hasChildren && !['completed', 'cancelled'].includes(task.status);
   const person = (id: string) => organization.accounts.find((entry) => entry.id === id)?.displayName ?? '成员';
 
   function send(input: unknown) {
@@ -51,8 +51,8 @@ export function AssignmentPanel({ task, organization, identity }: Props) {
     send({ action: claim ? 'claim' : 'assign', taskId: task.id, groupId: String(form.get('groupId')), content: String(form.get('content')), operationId: crypto.randomUUID(), ...(claim ? {} : { accountId: String(form.get('accountId')) }) });
   }
   return <details className="assignment-panel"><summary>人员分工 · {entries.filter((entry) => !['exited', 'transferred'].includes(entry.status)).length}项</summary>
-    {state.isPending && <p role="status">正在加载分工…</p>}{(state.isError || save.isError || error) && <p role="alert" className="form-error">{error || save.error?.message || state.error?.message} <button onClick={() => { void state.refetch(); }}>刷新分工</button></p>}{notice && <p role="status">{notice}</p>}
-    {entries.map((entry) => <section className="assignment-entry request-card" key={`${entry.id}:${entry.version}`}><h4>{person(entry.accountId)} · {statuses[entry.status]}</h4><p>{organization.groups.find((group) => group.id === entry.groupId)?.name} · {entry.source === 'claimed' ? '自行认领' : '管理者分配'}</p>{entry.content && <p>{entry.content}</p>}<p>实际开始：{entry.startedAt ? new Date(entry.startedAt).toLocaleString('zh-CN') : '未记录'}<br />实际结束：{entry.endedAt ? new Date(entry.endedAt).toLocaleString('zh-CN') : '未记录'}</p>{entry.transferredAt && <p>转交时间：{new Date(entry.transferredAt).toLocaleString('zh-CN')}</p>}
+    {hasChildren && <p>父任务只汇总和整体结束，请在子任务安排执行；这里保留原分工历史。</p>}{state.isPending && <p role="status">正在加载分工…</p>}{(state.isError || save.isError || error) && <p role="alert" className="form-error">{error || save.error?.message || state.error?.message} <button onClick={() => { void state.refetch(); }}>刷新分工</button></p>}{notice && <p role="status">{notice}</p>}
+    {entries.map((entry) => <section className="assignment-entry request-card" key={`${entry.id}:${entry.version}`}><h4>{person(entry.accountId)} · {statuses[entry.status]}</h4><p>{organization.groups.find((group) => group.id === entry.groupId)?.name} · {entry.source === 'claimed' ? '自行认领' : '管理者分配'}</p>{entry.content && <p>{entry.content}</p>}{entry.originTaskId && <p>拆分迁移自<a href={`#task-${entry.originTaskId}`}>原任务</a>，进展与实际时间保留原记录。</p>}<p>实际开始：{entry.startedAt ? new Date(entry.startedAt).toLocaleString('zh-CN') : '未记录'}<br />实际结束：{entry.endedAt ? new Date(entry.endedAt).toLocaleString('zh-CN') : '未记录'}</p>{entry.transferredAt && <p>转交时间：{new Date(entry.transferredAt).toLocaleString('zh-CN')}</p>}
       {state.data?.progress.filter((progress) => progress.assignmentId === entry.id).map((progress) => <p key={progress.id}>{progress.occurredOn} · 归属周 {progress.reportWeek}<br />{progress.content}</p>)}
       {entry.accountId === identity.id && <OwnExecution entry={entry} executable={executable} pending={save.isPending} send={send} />}
       {executable && !['exited', 'transferred'].includes(entry.status) && managedGroups.some((group) => group.id === entry.groupId) && <details><summary>调整或转交责任</summary><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const action = String(form.get('action')); send({ action, assignmentId: entry.id, groupId: String(form.get('groupId')), content: String(form.get('content')), version: entry.version, ...(action === 'transfer' ? { accountId: String(form.get('accountId')), reason: String(form.get('reason')), operationId: crypto.randomUUID() } : {}) }); }}><label>操作<select name="action"><option value="adjust">调整负责小组与内容</option><option value="transfer">转交给其他成员</option></select></label><label>负责小组<select name="groupId" defaultValue={entry.groupId}>{managedGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label><label>工作内容<textarea name="content" defaultValue={entry.content} maxLength={20000} /></label><label>接手人（转交时使用）<select name="accountId">{organization.accounts.filter((account) => !account.disabled && account.id !== entry.accountId).map((account) => <option key={account.id} value={account.id}>{account.displayName}</option>)}</select></label><label>转交原因<textarea name="reason" maxLength={20000} /></label><button disabled={save.isPending}>保存责任调整</button></form></details>}

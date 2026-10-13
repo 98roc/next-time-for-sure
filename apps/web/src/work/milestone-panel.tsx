@@ -31,6 +31,7 @@ export function MilestonePanel({ projectId, tasks, identity, organization, canMa
   const nodes = tasks.filter((task) => task.inMilestone);
   const dates = [...new Set(nodes.flatMap((task) => task.expectedOn ? [task.expectedOn] : []))].sort();
   const selected = tasks.find((task) => task.id === selectedId);
+  const dateConflicts = tasks.filter((task) => task.parentId && task.expectedOn && tasks.some((parent) => parent.id === task.parentId && parent.expectedOn && task.expectedOn && task.expectedOn > parent.expectedOn));
   const project = organization.projects.find((entry) => entry.id === projectId);
   const owners = organization.accounts.filter((account) => !account.disabled && project?.members.some((member) => member.accountId === account.id && member.roles.some((role) => role === 'developer' || role === 'project_lead')));
 
@@ -55,6 +56,7 @@ export function MilestonePanel({ projectId, tasks, identity, organization, canMa
       onClick={() => { setSelectedId(task.id); setDraft(null); }}><strong>{task.title}</strong><span>{statuses[task.status]} · {organization.accounts.find((account) => account.id === task.ownerId)?.displayName ?? '成员'}</span></button>;
   }
   return <section className="panel milestone-panel" aria-label="项目里程碑"><h2>项目里程碑</h2><p>预计完成日期 · 同日支持多个事项 · 节点与团队任务共用数据</p>
+    {dateConflicts.length > 0 && <div role="status"><p>以下子任务日期晚于父任务，请团队负责人或项目研发负责人核对规划；系统不会自动顺延父任务。</p><ul>{dateConflicts.map((task) => <li key={task.id}><a href={`#task-${task.id}`}>{task.title}</a> · {task.expectedOn}</li>)}</ul></div>}
     {(error || save.isError) && <p role="alert" className="form-error">{error || save.error?.message} 图中保留已保存位置；请刷新核对后重试。<button onClick={() => { void client.invalidateQueries({ queryKey: ['work'] }); }}>刷新规划</button></p>}{notice && <p role="status">{notice}</p>}
     {canManage && <p>点击节点可编辑日期、移出规划；也可拖至已有日期或未规划区，确认原因后保存。</p>}
     <div className="fish-scroll" tabIndex={0} aria-label="里程碑时间轴，可横向滚动"><div className="fish-axis">{dates.map((date, index) => <section key={date} className={`fish-day ${index % 2 ? 'below' : 'above'} ${dropTarget === date ? 'fish-drop-target' : ''}`} onDragOver={(event) => { if (canManage && dragging) { event.preventDefault(); setDropTarget(date); } }} onDrop={(event) => { event.preventDefault(); drop(date); }}><h3><time dateTime={date}>{date}</time></h3><div className="fish-branch">{nodes.filter((task) => task.expectedOn === date).map(node)}{dropTarget === date && <p className="fish-placeholder">松开后确认调整至 {date}</p>}</div></section>)}{dates.length === 0 && <p className="fish-empty">暂无已排期节点，可新增建设事项或从未规划区设置日期。</p>}</div></div>

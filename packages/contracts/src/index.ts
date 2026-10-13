@@ -23,3 +23,4 @@ export * from './assignments.js';
 export * from './personal.js';
 export * from './milestones.js';
 export * from './tasks.js';
+export * from './splits.js';
