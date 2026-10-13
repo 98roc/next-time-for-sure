@@ -1,3 +1,4 @@
+import { verifyTasks } from './task.integration.js';
 import { verifyMilestones } from './milestone.integration.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -59,6 +60,7 @@ async function verify(fixture: WorkFixture): Promise<void> {
   await verifyAssignments(fixture, taskId, directId);
   await verifyPersonal(fixture, taskId);
   await verifyMilestones(fixture, taskId);
+  await verifyTasks(fixture, taskId);
   console.log('PASS: intake, latest-content acceptance, supplements, defer/resume/reject/resubmit, accept-versus-withdraw race, replay idempotency and direct task creation');
 }
 

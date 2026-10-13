@@ -22,3 +22,4 @@ export * from './work.js';
 export * from './assignments.js';
 export * from './personal.js';
 export * from './milestones.js';
+export * from './tasks.js';

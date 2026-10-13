@@ -1,3 +1,4 @@
+import { TaskLifecycle1791849608000 } from './migrations/1791849608000-task-lifecycle.js';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import type { Environment } from '../config/environment.js';
@@ -11,7 +12,7 @@ import { Milestones1791849607000 } from './migrations/1791849607000-milestones.j
 import { Personal1791849606000 } from './migrations/1791849606000-personal.js';
 
 /** 已知迁移顺序，用于只读就绪检查，避免检查过程创建迁移表。 */
-export const requiredMigrationNames = ['Foundation1791849600000', 'Identity1791849601000', 'Organization1791849602000', 'SchemaComments1791849603000', 'WorkIntake1791849604000', 'Assignments1791849605000', 'Personal1791849606000', 'Milestones1791849607000'];
+export const requiredMigrationNames = ['Foundation1791849600000', 'Identity1791849601000', 'Organization1791849602000', 'SchemaComments1791849603000', 'WorkIntake1791849604000', 'Assignments1791849605000', 'Personal1791849606000', 'Milestones1791849607000', 'TaskLifecycle1791849608000'];
 
 /** API与迁移工具使用同一配置；关闭结构同步、自动迁移及SQL日志。 */
 export function createDataSource(environment: Environment): DataSource {
@@ -30,7 +31,7 @@ export function createDataSource(environment: Environment): DataSource {
     migrationsRun: false,
     migrationsTransactionMode: 'none',
     migrationsTableName: 'schema_migrations',
-    migrations: [Foundation1791849600000, Identity1791849601000, Organization1791849602000, SchemaComments1791849603000, WorkIntake1791849604000, Assignments1791849605000, Personal1791849606000, Milestones1791849607000],
+    migrations: [Foundation1791849600000, Identity1791849601000, Organization1791849602000, SchemaComments1791849603000, WorkIntake1791849604000, Assignments1791849605000, Personal1791849606000, Milestones1791849607000, TaskLifecycle1791849608000],
     entities: [],
     logging: false,
     extra: { connectionLimit: 5, connectTimeout: 5000 },

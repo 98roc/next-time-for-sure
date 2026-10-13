@@ -11,6 +11,7 @@ import { PersonalRepository } from './personal.repository.js';
 import { canViewPersonal } from './personal-policy.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { WorkRepository } from './work.repository.js';
+import { ensureParentActive } from './task.service.js';
 
 /** 个人任务内容及实际执行只由本人维护，角色配置不能突破此边界。 */
 @Injectable()
@@ -119,6 +120,7 @@ async function stopReason(manager: EntityManager, item: PersonalItem): Promise<s
   if (!assignment) return '关联分工不可用';
   const task = await repository.task(assignment.taskId);
   if (!task || ['completed', 'cancelled'].includes(task.status)) return '关联团队任务已结束或取消';
+  if (task.parentId) { const parent = await repository.task(task.parentId); if (!parent || ['completed', 'cancelled'].includes(parent.status)) return '关联父任务已结束或取消'; }
   if (assignment.status === 'completed') return '关联分工已完成';
   if (['exited', 'transferred'].includes(assignment.status)) return '关联分工已退出或转交';
   return null;
@@ -131,6 +133,7 @@ async function validateLink(manager: EntityManager, access: WorkAccess, project:
   if (!assignment || assignment.accountId !== access.actor.id) throw new ForbiddenException('只能关联本人分工。');
   const task = await repository.task(assignment.taskId);
   if (!task || task.projectId !== project) throw new BadRequestException('只能关联同一项目的分工。');
+  await ensureParentActive(manager, task);
   if (['completed', 'cancelled'].includes(task.status) || ['exited', 'transferred'].includes(assignment.status) || await repository.hasChildren(task.id)) throw new ConflictException('关联范围已停止执行或已拆分，不能新增或恢复工作。');
   if (reopen && assignment.status === 'completed') {
     await repository.restoreUnfinished(assignment.id);

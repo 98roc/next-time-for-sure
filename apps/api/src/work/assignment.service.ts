@@ -10,6 +10,7 @@ import { loadWorkAccess, projectAccess } from './work-access.js';
 import { WorkRepository } from './work.repository.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { PersonalRepository } from './personal.repository.js';
+import { ensureParentActive } from './task.service.js';
 
 /** 人员责任与本人执行分离，管理者不能通过分配命令代改执行事实。 */
 @Injectable()
@@ -80,10 +81,11 @@ export class AssignmentService {
         }
       }
       if ('version' in command && assignment?.version !== command.version) throw new ConflictException('分工已变化，请刷新后操作。');
-      const supplement = command.action === 'record_progress' || command.action === 'correct_times';
+      const supplement = command.action === 'record_progress' || command.action === 'correct_times' || command.action === 'complete';
+      if (!supplement) await ensureParentActive(manager, task);
       if (!supplement && ['completed', 'cancelled'].includes(task.status)) throw new ConflictException('团队任务已停止执行，不能新增或继续工作。');
       if (!supplement && await repository.hasChildren(task.id)) throw new ConflictException('父任务已拆分，请在子任务安排执行。');
-      if (assignment && !supplement && ['exited', 'transferred'].includes(assignment.status)) throw new ConflictException('原分工已停止执行，仅允许补记与整理。');
+      if (assignment && (!supplement || command.action === 'complete') && ['exited', 'transferred'].includes(assignment.status)) throw new ConflictException('原分工已停止执行，仅允许补记与整理。');
 
       let objectId = assignment?.id ?? '';
       if (command.action === 'assign' || command.action === 'claim' || command.action === 'transfer') {
