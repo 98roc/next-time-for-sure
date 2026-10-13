@@ -19,7 +19,8 @@
     "admin:init": "pnpm --filter @ntfs/api admin:init",
     "identity:smoke": "pnpm --filter @ntfs/api identity:smoke",
     "organization:smoke": "pnpm --filter @ntfs/api organization:smoke",
-    "work:smoke": "pnpm --filter @ntfs/api work:smoke"
+    "work:smoke": "pnpm --filter @ntfs/api work:smoke",
+    "weekly:smoke": "pnpm --filter @ntfs/api weekly:smoke"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

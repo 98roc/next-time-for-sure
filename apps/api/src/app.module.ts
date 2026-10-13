@@ -4,7 +4,8 @@ import { IdentityModule } from './identity/identity.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
 import { WorkModule } from './work/work.module.js';
 import { HealthController } from './health/health.controller.js';
+import { WeeklyPlansModule } from './weekly-plans/weekly-plans.module.js';
 
 /** 工程底座模块，业务模块按实施阶段加入，不开放伪业务接口。 */
-@Module({ imports: [DatabaseModule, IdentityModule, OrganizationModule, WorkModule], controllers: [HealthController] })
+@Module({ imports: [DatabaseModule, IdentityModule, OrganizationModule, WorkModule, WeeklyPlansModule], controllers: [HealthController] })
 export class AppModule {}
