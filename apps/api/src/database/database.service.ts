@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { loadEnvironment } from '../config/environment.js';
 import { createDataSource, requiredMigrationNames } from './data-source.js';
 import type { Readiness } from '@ntfs/contracts';
+import type { EntityManager } from 'typeorm';
 
 /** 管理单一连接池；数据库不可用时进程仍能报告存活，但就绪返回503。 */
 @Injectable()
@@ -16,6 +17,12 @@ export class DatabaseService implements OnModuleDestroy {
     if (this.source.isInitialized) return;
     this.initializing ??= this.source.initialize().then(() => undefined).finally(() => { this.initializing = undefined; });
     await this.initializing;
+  }
+
+  /** 使用单事务连接完成身份校验与业务写入，异常时回滚。 */
+  async transaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+    await this.connect();
+    return this.source.transaction('READ COMMITTED', work);
   }
 
   /** 验证基线及待执行迁移，不在HTTP请求中自动迁移。 */

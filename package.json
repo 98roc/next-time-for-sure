@@ -15,7 +15,10 @@
     "dev": "pnpm --filter @ntfs/contracts build && pnpm --filter @ntfs/ui build && pnpm --filter @ntfs/api build && node scripts/dev.mjs",
     "db:migrate": "pnpm --filter @ntfs/api db:migrate",
     "db:status": "pnpm --filter @ntfs/api db:status",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "admin:init": "pnpm --filter @ntfs/api admin:init",
+    "identity:smoke": "pnpm --filter @ntfs/api identity:smoke",
+    "organization:smoke": "pnpm --filter @ntfs/api organization:smoke"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

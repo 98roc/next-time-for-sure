@@ -2,9 +2,12 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import type { Environment } from '../config/environment.js';
 import { Foundation1791849600000 } from './migrations/1791849600000-foundation.js';
+import { Identity1791849601000 } from './migrations/1791849601000-identity.js';
+import { Organization1791849602000 } from './migrations/1791849602000-organization.js';
+import { SchemaComments1791849603000 } from './migrations/1791849603000-schema-comments.js';
 
 /** 已知迁移顺序，用于只读就绪检查，避免检查过程创建迁移表。 */
-export const requiredMigrationNames = ['Foundation1791849600000'];
+export const requiredMigrationNames = ['Foundation1791849600000', 'Identity1791849601000', 'Organization1791849602000', 'SchemaComments1791849603000'];
 
 /** API与迁移工具使用同一配置；关闭结构同步、自动迁移及SQL日志。 */
 export function createDataSource(environment: Environment): DataSource {
@@ -23,7 +26,7 @@ export function createDataSource(environment: Environment): DataSource {
     migrationsRun: false,
     migrationsTransactionMode: 'none',
     migrationsTableName: 'schema_migrations',
-    migrations: [Foundation1791849600000],
+    migrations: [Foundation1791849600000, Identity1791849601000, Organization1791849602000, SchemaComments1791849603000],
     entities: [],
     logging: false,
     extra: { connectionLimit: 5, connectTimeout: 5000 },

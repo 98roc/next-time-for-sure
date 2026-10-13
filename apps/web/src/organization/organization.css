@@ -1,0 +1,21 @@
+.org-layout { max-width: 1200px; margin: 0 auto; padding: 40px 28px; }
+.org-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.org-header nav { display: flex; gap: 20px; white-space: nowrap; }
+.org-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 400px); gap: 24px; align-items: start; }
+.org-directory { display: grid; gap: 18px; }
+.org-directory .panel, .org-editor { padding: 24px; }
+.org-directory h2 { margin-top: 0; }
+.org-directory article + article { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 8px; }
+.org-directory ul { list-style: none; padding: 0; }
+.org-directory li { display: grid; gap: 6px; padding: 10px 0; }
+.org-directory li span, .org-directory small { color: var(--muted); font-size: 13px; }
+.org-editor form, .org-editor fieldset { display: grid; gap: 16px; }
+.org-editor fieldset { border: 0; padding: 0; margin: 16px 0 0; min-width: 0; }
+.org-editor label { display: grid; gap: 8px; font-size: 14px; }
+.org-editor input:not([type=checkbox]), .org-editor select { width: 100%; min-width: 0; padding: 10px; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.org-editor small { color: var(--muted); }
+.org-editor .checks { border-top: 1px solid var(--line); padding-top: 12px; }
+.org-editor legend { font-size: 13px; margin-bottom: 8px; }
+.org-editor .checks label { display: flex; align-items: center; gap: 8px; }
+.org-feedback { display: flex; gap: 18px; align-items: center; margin-bottom: 18px; }
+@media (max-width: 760px) { .org-layout { padding: 24px 16px; } .org-header { display: block; } .org-header nav { margin-top: 20px; } .org-columns { grid-template-columns: 1fr; } .org-editor { grid-row: 1; } }

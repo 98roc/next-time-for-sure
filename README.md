@@ -2,7 +2,7 @@
 
 面向小型研发团队的任务协同平台，连接需求、项目里程碑、团队分工、个人执行、周计划与周报，让安排、进展和变化都有据可查。
 
-> **当前状态：第1阶段工程底座。** 已建立网页、后端、数据库迁移和MCP公开探针，桌面端为窗口骨架。下列业务能力仍是建设目标；尚无正式业务功能或Windows安装包。实际检查范围见[第1阶段验证记录](docs/development/第1阶段验证记录.md)。
+> **当前状态：第2阶段账号、组织与权限。** 已实现登录改密、团队、小组、项目角色和权限配置；任务、周计划、周报仍是建设目标，桌面端为窗口骨架。实际检查范围见[第2阶段验证记录](docs/development/第2阶段验证记录.md)。
 
 ## 想解决什么问题
 
@@ -44,12 +44,11 @@
 
 - [产品需求说明书](docs/product/需求说明书.md)：产品范围、角色和目标业务行为。
 - [研发需求说明书](docs/product/研发需求说明书.md)：业务规则、跨入口一致性及待验证事项。
-- [首期研发实施计划](docs/development/首期研发实施计划.md)：七个实施阶段、技术约定及验收标准，当前待实施。
+- [首期研发实施计划](docs/development/首期研发实施计划.md)：七个实施阶段、技术约定及验收标准。
 - [协作与开发规范](AGENTS.md)：代码原则、注释、验证及文档约定。
 - [界面设计基准](docs/design/界面设计方向.md)：已确认的留白布局、雾蓝配色、任务看板与鱼骨式里程碑交互。
 - [可操作界面原型](docs/design/prototypes/workspace.html)：下载或克隆后用浏览器打开；示例数据，不连接业务服务。
 
-- [实施计划](docs/development/首期研发实施计划.md)：阶段范围与完成标准。
 - [工程基线与验收对照](docs/development/工程基线与验收对照.md)：对象关系、权限设计及实现状态。
 - [本地开发与启动](docs/development/本地开发与启动.md)：nvm、配置、迁移、运行及Codex探针接入。
 
@@ -63,6 +62,8 @@
 ```
 
 默认网页地址为`http://127.0.0.1:5174`。工程检查使用`.\scripts\pnpm.ps1 check`，真实数据库与MCP冒烟使用`.\scripts\pnpm.ps1 smoke`。
+
+首次初始化超管运行`.\scripts\pnpm.ps1 admin:init`（已有账号时拒绝执行）。凭据仅写入忽略的`.bootstrap-credentials.local`。访问`/account`登录并改密，再从`/organization`管理组织。当前本机保留的示例账号见忽略文件`.demo-credentials.local`。详见[账号与组织使用说明](docs/development/账号与组织使用说明.md)。
 
 ```bash
 git clone https://github.com/98roc/next-time-for-sure.git

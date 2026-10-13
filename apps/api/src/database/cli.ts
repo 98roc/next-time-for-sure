@@ -35,6 +35,21 @@ async function main(): Promise<void> {
       const rows: unknown = await source.query('SELECT name FROM schema_migrations ORDER BY id');
       const appliedNames = z.array(z.object({ name: z.string() })).parse(rows).map((row) => row.name);
       console.log(`Pending migrations: ${requiredMigrationNames.some((name) => !appliedNames.includes(name))}`);
+
+      // 从实际数据库核验注释，覆盖框架迁移表及未来新增表、字段。
+      const comments: unknown = await source.query(`
+        SELECT TABLE_NAME AS object_name, TABLE_COMMENT AS comment_text
+        FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+        UNION ALL
+        SELECT CONCAT(TABLE_NAME, '.', COLUMN_NAME), COLUMN_COMMENT
+        FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()`);
+      const entries = z.array(z.object({ object_name: z.string(), comment_text: z.string() })).parse(comments);
+      const missing = entries.filter((entry) => !/[\u4e00-\u9fff]/u.test(entry.comment_text));
+      console.log(`Chinese schema comments: ${entries.length - missing.length}/${entries.length}`);
+      if (missing.length > 0) {
+        console.error(`Missing Chinese comments: ${missing.map((entry) => entry.object_name).join(', ')}`);
+        throw new Error('Schema comments incomplete');
+      }
     } finally {
       if (source.isInitialized) await source.destroy();
     }
