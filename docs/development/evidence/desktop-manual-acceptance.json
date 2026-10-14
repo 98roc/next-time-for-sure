@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-14T03:38:12.488Z",
+  "installation": "Windows NSIS installed client on secondary display",
+  "evidence": "User confirmed visible behavior; API and database readback verified event state; OS process inventory verified exit",
+  "passed": [
+    "system notification visible",
+    "notification click opens the specified project",
+    "show and click leave read_at unchanged",
+    "API mark-read persists shared state",
+    "close hides to tray and tray reopens window",
+    "no duplicate notification after reopen",
+    "explicit quit removes tray and all desktop processes",
+    "no system display while application exited",
+    "restart delivers one new notification and does not replay old events",
+    "minimized window receives one notification without foreground activation"
+  ],
+  "notifications": {
+    "events": 4,
+    "recordsPerEvent": 1,
+    "deliveryAttemptsPerEvent": 1
+  },
+  "cleanup": {
+    "task": "deleted through lifecycle preview and command",
+    "notifications": "only four events belonging to acceptance task removed",
+    "history": "business audit retained",
+    "ledger": "persistent desktop deduplication ledger retained"
+  },
+  "unverified": [
+    "desktop account switching or logout notification isolation",
+    "automatic skill discovery",
+    "real Codex write and confirmation blocked by client approval policy"
+  ]
+}
