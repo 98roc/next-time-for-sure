@@ -9,6 +9,12 @@ import { WeeklyPlansService } from './weekly-plans.service.js';
 @ApiTags('weekly-plans') @Controller('weekly-plans')
 export class WeeklyPlansController {
   constructor(private readonly plans: WeeklyPlansService) {}
+  /** 正式计划按当前团队身份读取，不暴露其他团队快照。 */
+  @Get('publications') @Header('Cache-Control', 'no-store')
+  publications(@Req() request: IncomingMessage, @Query() query: unknown) { const input = parseBody(weeklyCandidatesQuerySchema, query); return this.plans.publications(sessionToken(request), input.teamId, input.week); }
+  /** 发布之前显示完整范围并获得确认摘要。 */
+  @Get('preview') @Header('Cache-Control', 'no-store')
+  preview(@Req() request: IncomingMessage, @Query() query: unknown) { const input = parseBody(weeklyCandidatesQuerySchema, query); return this.plans.preview(sessionToken(request), input.teamId, input.week); }
 
   /** 查看有权编排的共享草稿内容，不自动创建。 */
   @Get() @Header('Cache-Control', 'no-store')

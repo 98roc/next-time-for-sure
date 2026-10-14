@@ -1,3 +1,4 @@
+import { ReportingRepository } from '../weekly-plans/reporting.repository.js';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { AssignmentCommand, AssignmentSnapshot, Assignment, PersonalItem } from '@ntfs/contracts';
 import { DatabaseService } from '../database/database.service.js';
@@ -75,6 +76,7 @@ export class AssignmentService {
       else if (command.action === 'adjust' || command.action === 'transfer') {
         if (!assignment) throw new NotFoundException('分工不存在。');
         manage(assignment.groupId); manage(command.groupId);
+        if (assignment.groupId !== command.groupId && await new ReportingRepository(manager).publishedTask(project.teamId, task.id) && !access.organization.teams.some((team) => team.id === project.teamId && team.leaderId === access.actor.id)) throw new ForbiddenException('已发布安排的跨组调整须由团队负责人确认。');
       } else {
         projectAccess(access, project.id);
         if (assignment && assignment.accountId !== access.actor.id) throw new ForbiddenException('仅本人可修改执行事实或退出认领。');

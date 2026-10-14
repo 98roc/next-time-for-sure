@@ -1,0 +1,107 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { assignmentSnapshotSchema, organizationSnapshotSchema, personalSnapshotSchema, planPublicationsSchema, publicationPreviewSchema, reportStateSchema, tagStateSchema, weeklyCandidatesSchema, workSnapshotSchema, weeklyDraftResponseSchema } from '@ntfs/contracts';
+import type { WorkFixture, Session } from '../organization/integration-smoke.js';
+
+/** 两周真实接口验收发布快照、增量整理、权限、隐私及来源日期。 */
+export async function reportingSmoke({ call, developer, leader, manager, admin, projectId, ownerId }: WorkFixture) {
+  const org = organizationSnapshotSchema.parse(await (await call('organization', leader)).json());
+  const team = org.teams[0]; const group = org.groups.find((entry) => entry.leaderId === ownerId); assert.ok(team && group);
+  const week = '2026-11-02'; const next = '2026-11-09'; const base = { teamId: team.id, week };
+  const write = async (path: string, body: unknown, auth: Session = leader) => { const response = await call(path, auth, body); const result: unknown = await response.json(); assert.equal(response.status, 200, JSON.stringify(result)); return z.object({ objectId: z.string() }).parse(result).objectId; };
+  const task = await write('work/commands', { action: 'create_task', projectId, title: '两周演练任务', description: '', acceptance: '', operationId: randomUUID() }, developer);
+  const assignmentId = await write('assignments/commands', { action: 'assign', taskId: task, accountId: ownerId, groupId: group.id, content: '接口开发', operationId: randomUUID() });
+  const assignment = async () => { const state = assignmentSnapshotSchema.parse(await (await call(`assignments?projectId=${projectId}`, developer)).json()); const value = state.assignments.find((entry) => entry.id === assignmentId); assert.ok(value); return value; };
+  const addProgress = async (content: string, reportWeek = week) => write('assignments/commands', { action: 'record_progress', assignmentId, version: (await assignment()).version, occurredOn: '2026-11-08', reportWeek, content, operationId: randomUUID() }, developer);
+  const candidate = weeklyCandidatesSchema.parse(await (await call(`weekly-plans/candidates?teamId=${team.id}&week=${week}`, leader)).json()).assignments.find((entry) => entry.assignmentId === assignmentId); assert.ok(candidate);
+  await write('weekly-plans/commands', { action: 'save_arrangement', ...base, assignmentId, assignmentVersion: candidate.assignmentVersion, taskVersion: candidate.taskVersion, version: null, goal: '交付接口', expectedProgress: 20, plannedDays: '2.50' });
+  const pending = await write('work/commands', { action: 'create_task', projectId, title: '待分配需求', description: '', acceptance: '', operationId: randomUUID() }, developer);
+  await write('weekly-plans/commands', { action: 'add_pending', ...base, taskId: pending, taskVersion: 0 });
+  const planPreview = publicationPreviewSchema.parse(await (await call(`weekly-plans/preview?teamId=${team.id}&week=${week}`, leader)).json());
+  assert.equal(planPreview.rows.length, 2);
+  const publish = { action: 'publish_plan', ...base, confirmation: planPreview.confirmation, reason: '第一周基线' };
+  assert.equal((await call('weekly-plans/commands', developer, publish)).status, 403);
+  const planId = await write('weekly-plans/commands', publish); assert.equal(await write('weekly-plans/commands', publish), planId);
+  const plans = async () => planPublicationsSchema.parse(await (await call(`weekly-plans/publications?teamId=${team.id}&week=${week}`, manager)).json());
+  assert.equal((await plans()).publications.length, 1); assert.equal((await plans()).canEdit, false);
+  await write('weekly-plans/commands', { action: 'carry_forward', teamId: team.id, week: next });
+
+  const mark = { objectId: task, objectKind: 'task', dimension: 'weekly', week, marked: true, version: null };
+  await write('work-tags/commands', mark, developer);
+  assert.equal((await call('work-tags/commands', developer, mark)).status, 409);
+  assert.equal((await call('work-tags/commands', manager, { ...mark, version: 0 })).status, 403);
+  const progressId = await addProgress('完成接口校验'); await addProgress('完成接口异常处理');
+  const personalId = await write('personal/commands', { action: 'create_personal', kind: 'work', projectId, assignmentId, title: '关联实现', description: '', acceptance: '', categoryId: null, operationId: randomUUID() }, developer);
+  await write('personal/commands', { action: 'personal_progress', itemId: personalId, version: 0, occurredOn: '2026-11-08', reportWeek: week, content: '完成接口校验', operationId: randomUUID() }, developer);
+  const privateId = await write('personal/commands', { action: 'create_personal', kind: 'private', projectId: null, assignmentId: null, title: 'PRIVATE_DO_NOT_REPORT', description: '', acceptance: '', categoryId: null, operationId: randomUUID() }, developer);
+  await write('personal/commands', { action: 'personal_progress', itemId: privateId, version: 0, occurredOn: '2026-11-08', reportWeek: week, content: 'PRIVATE_DO_NOT_REPORT', operationId: randomUUID() }, developer);
+  const state = async (auth: Session = leader, reportWeek = week) => reportStateSchema.parse(await (await call(`reports?teamId=${team.id}&week=${reportWeek}`, auth)).json());
+  await write('reports/commands', { action: 'generate', ...base }, developer);
+  await write('reports/commands', { action: 'generate', ...base });
+  let report = await state(); assert.ok(report.draft); assert.equal(JSON.stringify(report).includes('PRIVATE_DO_NOT_REPORT'), false);
+  const entries = report.draft.entries.filter((entry) => entry.sources.some((source) => source.sourceKind === 'assignment'));
+  assert.equal(entries.length, 2);
+  await write('reports/commands', { action: 'merge', ...base, version: report.draft.version, entryIds: entries.map((entry) => entry.id), text: '人工合并的接口成果' }, developer);
+  report = await state(); assert.ok(report.draft);
+  const excluded = report.draft.entries.find((entry) => entry.sources.some((source) => source.sourceKind === 'personal')); assert.ok(excluded);
+  await write('reports/commands', { action: 'edit', ...base, version: report.draft.version, entryId: excluded.id, text: excluded.text, excluded: true, acceptChanges: false }, developer);
+  await write('reports/commands', { action: 'generate', ...base });
+  report = await state(); assert.ok(report.draft);
+  assert.equal(report.draft.entries.some((entry) => entry.text === '人工合并的接口成果'), true);
+  assert.equal(report.draft.entries.find((entry) => entry.id === excluded.id)?.excluded, true);
+  const reportPreview = async (reportWeek = week) => publicationPreviewSchema.parse(await (await call(`reports/preview?teamId=${team.id}&week=${reportWeek}`, leader)).json());
+  const publishReport = async (reportWeek = week) => { const draft = (await state(leader, reportWeek)).draft; assert.ok(draft); return { action: 'publish', teamId: team.id, week: reportWeek, version: draft.version, confirmation: (await reportPreview(reportWeek)).confirmation, reason: '阶段演练发布' }; };
+  const publication = await publishReport(); const reportId = await write('reports/commands', publication); assert.equal(await write('reports/commands', publication), reportId);
+  const publicState = await state(manager); assert.equal(publicState.draft, null); assert.equal(publicState.sources.length, 0); assert.equal(publicState.publications.length, 1); assert.equal(publicState.publications[0]?.next.length, 1);
+  assert.equal((await call(`reports?teamId=${team.id}&week=${week}`, admin)).status, 403);
+  const frozen = JSON.stringify(publicState.publications[0]);
+  await addProgress('发布后补记'); report = await state(); assert.ok(report.draft); assert.equal(report.draft.newCount, 1);
+  assert.equal(JSON.stringify((await state(manager)).publications[0]), frozen);
+  await write('reports/commands', { action: 'generate', ...base });
+  await write('work-tags/commands', { ...mark, marked: false, version: 0 }, developer);
+  report = await state(); assert.ok(report.draft); assert.ok(report.draft.changedKeys.length > 0);
+  assert.equal((await call('reports/commands', leader, await publishReport())).status, 409);
+  for (const entry of report.draft.entries) {
+    const current = (await state()).draft; assert.ok(current);
+    await write('reports/commands', { action: 'edit', ...base, version: current.version, entryId: entry.id, text: entry.text, excluded: entry.excluded, acceptChanges: true });
+  }
+  await write('reports/commands', await publishReport()); assert.equal((await state(manager)).publications.length, 2);
+  assert.equal(JSON.stringify((await state(manager)).publications[1]), frozen);
+  const source = (await state(developer)).sources.find((entry) => entry.sourceId === progressId); assert.ok(source);
+  await write('reports/commands', { action: 'reassign_week', ...base, sourceKind: 'assignment', sourceId: progressId, sourceHash: source.hash, targetWeek: next }, developer);
+  const original = assignmentSnapshotSchema.parse(await (await call(`assignments?projectId=${projectId}`, developer)).json()).progress.find((entry) => entry.id === progressId);
+  assert.equal(original?.occurredOn, '2026-11-08'); assert.equal(original?.reportWeek, next);
+  await write('reports/commands', { action: 'generate', teamId: team.id, week: next });
+  await write('reports/commands', await publishReport(next)); assert.equal((await state(manager, next)).publications.length, 1);
+  const tags = tagStateSchema.parse(await (await call(`work-tags?objectId=${personalId}&objectKind=personal`, developer)).json()); assert.equal(tags.inherited, true);
+  const personal = personalSnapshotSchema.parse(await (await call('personal', developer)).json()); assert.equal(personal.progress.find((entry) => entry.itemId === personalId)?.content, '完成接口校验');
+  // 发布后日期调整需团队负责人；拆分沿用分工和标签，历史内容仍指向发布时任务。
+  const taskState = async () => { const tasks = workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, developer)).json()).tasks; const current = tasks.find((entry) => entry.id === task); assert.ok(current); return { tasks, current }; };
+  await write('milestones/commands', { action: 'add_node', taskId: task, version: (await taskState()).current.version, expectedOn: '2026-11-13' }, developer);
+  const reschedule = { action: 'reschedule_node', taskId: task, version: (await taskState()).current.version, expectedOn: '2026-11-16', reason: '调整交付日期' };
+  assert.equal((await call('milestones/commands', developer, reschedule)).status, 403);
+  await write('milestones/commands', reschedule);
+  await write('work-tags/commands', { objectId: task, objectKind: 'task', dimension: 'milestone', week: null, marked: true, version: null }, developer);
+  const childKey = randomUUID();
+  await write('tasks/split', { taskId: task, version: (await taskState()).current.version, operationId: randomUUID(), children: [{ key: childKey, title: '拆分后接口任务', description: '', acceptance: '' }], moves: [{ assignmentId, version: (await assignment()).version, childKey }] }, developer);
+  const child = (await taskState()).tasks.find((entry) => entry.parentId === task); assert.ok(child);
+  assert.equal((await assignment()).taskId, child.id);
+  assert.equal(tagStateSchema.parse(await (await call(`work-tags?objectId=${child.id}&objectKind=task`, developer)).json()).tags.some((tag) => tag.dimension === 'milestone' && tag.marked), true);
+  assert.equal(JSON.stringify((await state(manager)).publications[1]), frozen);
+  const draftAfterSplit = weeklyDraftResponseSchema.parse(await (await call(`weekly-plans?teamId=${team.id}&week=${next}`, leader)).json()).draft;
+  assert.equal(draftAfterSplit?.rows.find((row) => row.sourceIds.includes(assignmentId))?.taskId, child.id);
+  const oldDraft = (await state()).draft; assert.ok(oldDraft);
+  const editableEntry = oldDraft.entries.find((entry) => !entry.excluded); assert.ok(editableEntry);
+  const edit = { action: 'edit', ...base, version: oldDraft.version, entryId: editableEntry.id, text: editableEntry.text, excluded: false, acceptChanges: true };
+  const races = await Promise.all([call('reports/commands', leader, edit), call('reports/commands', leader, edit)]);
+  assert.deepEqual(races.map((response) => response.status).sort(), [200, 409]);
+  // 原分工转交后停止结转；接手人是新分工，不能冒充原人员历史。
+  const transferred = await write('assignments/commands', { action: 'transfer', assignmentId, version: (await assignment()).version, accountId: team.leaderId, groupId: group.id, content: '接手接口', reason: '交接验收', operationId: randomUUID() });
+  assert.notEqual(transferred, assignmentId);
+  await write('weekly-plans/commands', { action: 'carry_forward', teamId: team.id, week: '2026-11-16' });
+  const laterDraft = weeklyDraftResponseSchema.parse(await (await call(`weekly-plans?teamId=${team.id}&week=2026-11-16`, leader)).json()).draft;
+  assert.equal(laterDraft?.arrangements.some((entry) => entry.assignmentId === assignmentId), false);
+  assert.equal(JSON.stringify((await state(manager)).publications[1]), frozen);
+  console.log('PASS: two-week publication, idempotent publish, pending work, private isolation, merged/excluded regeneration, immutable revisions, late source prompt, tag changes and occurrence-date preservation');
+}

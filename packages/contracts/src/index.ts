@@ -25,3 +25,4 @@ export * from './milestones.js';
 export * from './tasks.js';
 export * from './splits.js';
 export * from './weekly-plans.js';
+export * from './reporting.js';

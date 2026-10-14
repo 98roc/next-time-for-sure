@@ -159,9 +159,13 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
       const rows: unknown = await manager.query('SELECT id FROM accounts WHERE login_name LIKE ?', [`${prefix}.%`]);
       const ids = z.array(z.object({ id: z.string() })).parse(rows).map((entry) => entry.id).filter((id) => !retainedAccounts.has(id));
       const teamNames = [retainTeam ? `${prefix}.none` : `${prefix}.team`, `${prefix}.foreign`];
+      for (const table of ['weekly_publications', 'weekly_events', 'report_drafts']) await manager.query(`DELETE w FROM ${table} w JOIN teams t ON t.id=w.team_id WHERE t.name IN (?, ?)`, teamNames);
+      await manager.query('DELETE w FROM weekly_pending w JOIN weekly_drafts d ON d.id=w.draft_id JOIN teams t ON t.id=d.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query("DELETE tags FROM work_tags tags JOIN team_tasks w ON w.id=tags.object_id JOIN projects p ON p.id=w.project_id JOIN teams t ON t.id=p.team_id WHERE tags.object_kind='task' AND t.name IN (?, ?)", teamNames);
       await manager.query('DELETE a FROM weekly_arrangements a JOIN weekly_drafts d ON d.id = a.draft_id JOIN teams t ON t.id = d.team_id WHERE t.name IN (?, ?)', teamNames);
       await manager.query('DELETE d FROM weekly_drafts d JOIN teams t ON t.id = d.team_id WHERE t.name IN (?, ?)', teamNames);
       for (const id of ids) {
+        await manager.query("DELETE tags FROM work_tags tags JOIN personal_items i ON i.id=tags.object_id WHERE tags.object_kind='personal' AND i.owner_id=?", [id]);
         await manager.query('DELETE pr FROM personal_progress pr JOIN personal_items i ON i.id = pr.item_id WHERE i.owner_id = ?', [id]);
         await manager.query('DELETE FROM personal_items WHERE owner_id = ?', [id]);
         await manager.query('DELETE FROM personal_categories WHERE owner_id = ?', [id]);

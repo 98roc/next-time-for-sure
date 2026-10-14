@@ -9,6 +9,8 @@ import { loadWorkAccess, projectAccess } from './work-access.js';
 import { WorkRepository } from './work.repository.js';
 import { TaskRepository } from './task.repository.js';
 import { AssignmentRepository } from './assignment.repository.js';
+import { ReportingRepository } from '../weekly-plans/reporting.repository.js';
+import { WeeklyPlansRepository } from '../weekly-plans/weekly-plans.repository.js';
 
 /** 子任务建立和当前安排迁移同事务完成，不允许留下仍承接执行的父任务。 */
 @Injectable()
@@ -53,6 +55,9 @@ export class SplitService {
       for (const child of command.children) {
         const id = await repository.child(parent, child);
         childIds.set(child.key, id);
+        // 普通拆分沿用人工标签，不能把拆分误判为计划内或计划外。
+        const tags = new ReportingRepository(manager);
+        for (const tag of await tags.tags(parent.id, 'task')) await tags.tag({ objectId: id, objectKind: 'task', dimension: tag.dimension, week: tag.week || null, marked: tag.marked, version: null });
         await history.event(parent.projectId, id, access.actor.id, 'task.child_created', { parentId: parent.id, after: await assignments.task(id) });
       }
       for (const move of command.moves) {
@@ -62,6 +67,7 @@ export class SplitService {
         await history.event(parent.projectId, move.assignmentId, access.actor.id, 'assignment.moved_to_child', { before: source.find((entry) => entry.id === move.assignmentId), after: await assignments.assignment(move.assignmentId), parentId: parent.id });
       }
       await repository.touch(parent.id);
+      await new WeeklyPlansRepository(manager).splitPending(parent.id, [...childIds.values()]);
       await history.event(parent.projectId, parent.id, access.actor.id, 'task.split', { before: parent, after: await assignments.task(parent.id), children: [...childIds.values()], moves: command.moves.map((move) => ({ assignmentId: move.assignmentId, childId: childIds.get(move.childKey) })) });
       await new IdentityRepository(manager).audit(access.actor.id, 'task.split', parent.id);
       await history.recordOperation(access.actor.id, command.operationId, hash, parent.id);

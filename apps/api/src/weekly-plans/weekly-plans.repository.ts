@@ -7,6 +7,25 @@ import type { WeeklyArrangement } from '@ntfs/contracts';
 /** 周计划持久化集中入口，调用方须已取得组织事务锁并校验权限。 */
 export class WeeklyPlansRepository {
   constructor(private readonly manager: EntityManager) {}
+  /** 父任务拆分后草稿待分配项展开到子任务，正式发布副本保持不变。 */
+  async splitPending(parent: string, children: string[]) {
+    const rows: unknown = await this.manager.query('SELECT id,draft_id AS draftId FROM weekly_pending WHERE task_id=?', [parent]);
+    for (const row of z.array(z.object({ id: z.string(), draftId: z.string() })).parse(rows)) {
+      await this.remove(row.draftId, row.id, true);
+      for (const child of children) await this.addPending(row.draftId, child);
+    }
+  }
+  /** 待分配项与人员安排分开，不能伪造执行人。 */
+  async pending(draft: string) { return z.array(z.object({ id: z.string(), taskId: z.string(), version: z.number() })).parse(await this.manager.query('SELECT id,task_id AS taskId,version FROM weekly_pending WHERE draft_id=?', [draft])); }
+  /** 添加待分配事项，重复加入返回原条目。 */
+  async addPending(draft: string, task: string) {
+    const previous = (await this.pending(draft)).find((entry) => entry.taskId === task); if (previous) return previous.id;
+    const id = randomUUID(); await this.manager.query('INSERT INTO weekly_pending (id,draft_id,task_id) VALUES (?,?,?)', [id, draft, task]); await this.touch(draft); return id;
+  }
+  /** 移出仅影响草稿，发布副本保持不变，操作历史由服务记录。 */
+  async remove(draft: string, id: string, pending: boolean) { await this.manager.query(`DELETE FROM ${pending ? 'weekly_pending' : 'weekly_arrangements'} WHERE id=? AND draft_id=?`, [id, draft]); await this.touch(draft); }
+  /** 草稿范围变化使发布确认失效。 */
+  async touch(id: string) { await this.manager.query('UPDATE weekly_drafts SET version=version+1 WHERE id=?', [id]); }
   /** 查询共享草稿；只读请求不会创建数据。 */
   async draft(teamId: string, week: string) {
     const rows: unknown = await this.manager.query("SELECT id, team_id AS teamId, DATE_FORMAT(week, '%Y-%m-%d') AS week, version FROM weekly_drafts WHERE team_id = ? AND week = ?", [teamId, week]);

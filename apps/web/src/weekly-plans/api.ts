@@ -1,4 +1,4 @@
-import { apiErrorSchema, weeklyCandidatesSchema, weeklyDraftResponseSchema } from '@ntfs/contracts';
+import { apiErrorSchema, weeklyCandidatesSchema, weeklyDraftResponseSchema, planPublicationsSchema } from '@ntfs/contracts';
 import type { WeeklyPlanCommand } from '@ntfs/contracts';
 
 /** 会话接口只传本次业务参数，不在浏览器持久化计划或凭据。 */
@@ -11,8 +11,10 @@ async function request(path: string, command?: WeeklyPlanCommand, csrf?: string)
 /** 同时读取共享草稿与当前可安排分工；服务端仍在保存时重新校验。 */
 export async function weeklySnapshot(teamId: string, week: string) {
   const query = new URLSearchParams({ teamId, week });
+  const published = planPublicationsSchema.parse(await request(`/publications?${query}`));
+  if (!published.canEdit) return { ...published, draft: null, candidates: [] };
   const [draft, candidates] = await Promise.all([request(`?${query}`), request(`/candidates?${query}`)]);
-  return { ...weeklyDraftResponseSchema.parse(draft), candidates: weeklyCandidatesSchema.parse(candidates).assignments };
+  return { ...published, ...weeklyDraftResponseSchema.parse(draft), candidates: weeklyCandidatesSchema.parse(candidates).assignments };
 }
 /** 周计划写入共用严格命令契约。 */
 export async function weeklyCommand(command: WeeklyPlanCommand, csrf: string) { await request('/commands', command, csrf); }

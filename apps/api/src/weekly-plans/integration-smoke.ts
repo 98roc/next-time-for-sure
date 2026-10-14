@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { organizationSnapshotSchema, weeklyCandidatesSchema, taskImpactSchema, weeklyDraftSchema } from '@ntfs/contracts';
 import { smoke } from '../organization/integration-smoke.js';
 import type { Session } from '../organization/integration-smoke.js';
+import { reportingSmoke } from './reporting-smoke.js';
 
 /** 周计划首个增量使用真实接口验证跨项目候选与负责小组权限，不宣称发布能力已完成。 */
 await smoke(async ({ call, developer, leader, manager, admin, projectId, otherProjectId, ownerId }) => {
@@ -69,3 +70,4 @@ await smoke(async ({ call, developer, leader, manager, admin, projectId, otherPr
   assert.equal((await draft('2026-10-12'))?.arrangements.length, 1);
   console.log('PASS: weekly candidate scope, cross-project group management, role rejection, Monday validation, stopped task exclusion and no multi-group duplication');
 });
+await smoke(reportingSmoke);

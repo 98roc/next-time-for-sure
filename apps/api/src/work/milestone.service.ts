@@ -8,6 +8,7 @@ import { hasPermission } from '../organization/policy.js';
 import { loadWorkAccess, projectAccess } from './work-access.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { WorkRepository } from './work.repository.js';
+import { ReportingRepository } from '../weekly-plans/reporting.repository.js';
 
 /** 规划操作只维护原团队任务的规划字段，不复制或删除个人执行数据。 */
 @Injectable()
@@ -39,6 +40,8 @@ export class MilestoneService {
         }
       }
       if ('version' in command && before?.version !== command.version) throw new ConflictException('任务或规划已变化，请刷新后核对再保存。');
+      const changesDate = before?.expectedOn && ((('expectedOn' in command) && command.expectedOn !== before.expectedOn) || command.action === 'remove_node');
+      if (before && changesDate && await new ReportingRepository(manager).publishedTask(project.teamId, before.id) && !access.organization.teams.some((team) => team.id === project.teamId && team.leaderId === access.actor.id)) throw new ForbiddenException('已发布工作明确交付日期变化须由团队负责人确认。');
       let objectId = before?.id ?? '';
 
       // 创建规划事项就是创建团队任务，主负责人必须是当前项目可用研发成员。

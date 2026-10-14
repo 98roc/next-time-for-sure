@@ -1,3 +1,4 @@
+import { TagsPanel } from '../weekly-plans/tags-panel';
 import { TaskEditor } from './task-editor';
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -67,7 +68,7 @@ export function MilestonePanel({ projectId, tasks, identity, organization, canMa
     {selected && <section className="milestone-detail" key={`${selected.id}:${selected.version}`} aria-label="选中节点详情"><h3>{selected.title}</h3><p>{statuses[selected.status]} · {selected.inMilestone ? selected.expectedOn ?? '未规划' : '已移出里程碑'}</p>{selected.description && <p>{selected.description}</p>}{selected.acceptance && <p>完成标准 · {selected.acceptance}</p>}<a href={`#task-${selected.id}`}>查看同一任务的人员分工与进展</a>
       {canManage && selected.inMilestone && <div className="milestone-editors"><form key={draft ? `${draft.taskId}:${draft.version}:${draft.expectedOn}` : 'date'} onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); send({ action: 'reschedule_node', taskId: selected.id, expectedOn: String(form.get('expectedOn')) || null, reason: String(form.get('reason')), version: draft?.version ?? selected.version }); }}><fieldset disabled={save.isPending}><legend>{draft ? '确认拖动调整' : '修改节点日期'}</legend><label>预计完成日期（清空移至未规划）<input type="date" name="expectedOn" defaultValue={(draft?.taskId === selected.id ? draft.expectedOn : selected.expectedOn) ?? ''} /></label><label>调整原因<textarea name="reason" required maxLength={20000} /></label><button>保存日期</button>{draft && <button type="button" onClick={() => setDraft(null)}>取消拖动</button>}</fieldset></form>
         <form onSubmit={(event) => { event.preventDefault(); send({ action: 'remove_node', taskId: selected.id, version: selected.version, reason: String(new FormData(event.currentTarget).get('reason')) }); }}><fieldset disabled={save.isPending}><legend>移出里程碑</legend><p>只移除图中节点，团队任务、分工、个人工作和历史均保留。</p><label>移出原因<textarea name="reason" required maxLength={20000} /></label><button>确认移出，保留任务</button></fieldset></form></div>}
-      <TaskEditor task={selected} identity={identity} />
+      <TagsPanel objectId={selected.id} objectKind="task" /><TaskEditor task={selected} identity={identity} />
     </section>}
   </section>;
 }

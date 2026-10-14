@@ -1,3 +1,4 @@
+import { TagsPanel } from '../weekly-plans/tags-panel';
 import { useState } from 'react';
 import { PersonalHistory } from './personal-history';
 import type { FormEvent } from 'react';
@@ -32,6 +33,7 @@ export function PersonalCard({ item, own, data, assignments, pending, send }: Pr
       <details><summary>添加进展或补记</summary><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); send({ ...base, action: 'personal_progress', occurredOn: String(form.get('occurredOn')), reportWeek: String(form.get('reportWeek')), content: String(form.get('content')), operationId: crypto.randomUUID() }); }}><label>实际发生日期<input type="date" name="occurredOn" required /></label><label>归属周（周一）<input type="date" name="reportWeek" required /></label><label>进展内容<textarea name="content" required maxLength={20000} /></label><button disabled={pending}>记录进展</button></form></details>
       <details><summary>修正实际时间</summary><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const time = (name: string) => { const value = String(form.get(name)); return value ? new Date(value).toISOString() : null; }; send({ ...base, action: 'personal_times', startedAt: time('startedAt'), endedAt: time('endedAt') }); }}><label>实际开始<input type="datetime-local" step="0.001" name="startedAt" defaultValue={localTime(item.startedAt)} /></label><label>实际结束<input type="datetime-local" step="0.001" name="endedAt" defaultValue={localTime(item.endedAt)} /></label><button disabled={pending}>保存本人时间</button></form></details>
     </>}
+    {item.kind === 'work' && <TagsPanel objectId={item.id} objectKind="personal" />}
     {own && <PersonalHistory item={item} />}
   </article>;
 }
