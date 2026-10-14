@@ -159,6 +159,8 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
       const rows: unknown = await manager.query('SELECT id FROM accounts WHERE login_name LIKE ?', [`${prefix}.%`]);
       const ids = z.array(z.object({ id: z.string() })).parse(rows).map((entry) => entry.id).filter((id) => !retainedAccounts.has(id));
       const teamNames = [retainTeam ? `${prefix}.none` : `${prefix}.team`, `${prefix}.foreign`];
+      await manager.query('DELETE a FROM weekly_arrangements a JOIN weekly_drafts d ON d.id = a.draft_id JOIN teams t ON t.id = d.team_id WHERE t.name IN (?, ?)', teamNames);
+      await manager.query('DELETE d FROM weekly_drafts d JOIN teams t ON t.id = d.team_id WHERE t.name IN (?, ?)', teamNames);
       for (const id of ids) {
         await manager.query('DELETE pr FROM personal_progress pr JOIN personal_items i ON i.id = pr.item_id WHERE i.owner_id = ?', [id]);
         await manager.query('DELETE FROM personal_items WHERE owner_id = ?', [id]);

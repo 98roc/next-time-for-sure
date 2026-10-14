@@ -1,42 +1,77 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { weeklyCandidatesSchema } from '@ntfs/contracts';
-import type { WeeklyCandidates } from '@ntfs/contracts';
+import { ConflictException, Injectable } from '@nestjs/common';
+import type { WeeklyPlanCommand } from '@ntfs/contracts';
 import { DatabaseService } from '../database/database.service.js';
 import { IdentityService } from '../identity/identity.service.js';
-import { hasPermission } from '../organization/policy.js';
+import { IdentityRepository } from '../identity/identity.repository.js';
 import { loadWorkAccess } from '../work/work-access.js';
+import { planningCandidates } from './planning-candidates.js';
+import { WeeklyPlansRepository } from './weekly-plans.repository.js';
 import { AssignmentRepository } from '../work/assignment.repository.js';
-import { WorkRepository } from '../work/work.repository.js';
+import { hasPermission } from '../organization/policy.js';
+import type { WeeklyArrangement } from '@ntfs/contracts';
 
-/** 共享周计划的候选来源，复用现有分工与权限；读取不生成草稿或修改执行事实。 */
+/** 周计划事务编排；共享草稿按负责小组编辑，个人执行事实保持独立。 */
 @Injectable()
 export class WeeklyPlansService {
   constructor(private readonly database: DatabaseService, private readonly identity: IdentityService) {}
 
-  /** 跨项目查找有安排权限的有效分工；按分工去重，不按成员所属组重复统计。 */
-  async candidates(token: string, teamId: string, week: string): Promise<WeeklyCandidates> {
+  /** 查询当前可安排分工，不隐式创建草稿。 */
+  async candidates(token: string, teamId: string, week: string) {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token);
-      if (access.actor.teamId !== teamId) throw new ForbiddenException('没有该团队的周计划权限。');
-      const groups = access.organization.groups.filter((group) => group.teamId === teamId && hasPermission(access.actor, access.organization, 'work.assign', { teamId, groupId: group.id }));
-      if (!groups.length && !hasPermission(access.actor, access.organization, 'work.assign', { teamId })) throw new ForbiddenException('没有周计划安排权限。');
-      const assignments: WeeklyCandidates['assignments'] = [];
+      return { teamId, week, assignments: await planningCandidates(manager, access, teamId) };
+    });
+  }
 
-      // 项目身份不替代负责小组权限；组长可以跨项目编排本组负责的分工。
-      for (const project of access.organization.projects.filter((entry) => entry.teamId === teamId)) {
-        const tasks = (await new WorkRepository(manager).snapshot(project.id)).tasks;
-        const state = await new AssignmentRepository(manager).snapshot(project.id);
-        for (const entry of state.assignments) {
-          if (entry.status !== 'not_started' && entry.status !== 'in_progress') continue;
-          const group = groups.find((item) => item.id === entry.groupId);
-          const account = access.organization.accounts.find((item) => item.id === entry.accountId && item.teamId === teamId && !item.disabled);
-          const task = tasks.find((item) => item.id === entry.taskId);
-          if (!group || !account || !task || ['completed', 'cancelled'].includes(task.status)) continue;
-          if (tasks.some((item) => item.parentId === task.id) || (task.parentId && tasks.some((item) => item.id === task.parentId && ['completed', 'cancelled'].includes(item.status)))) continue;
-          assignments.push({ assignmentId: entry.id, assignmentVersion: entry.version, taskId: task.id, taskVersion: task.version, projectId: project.id, projectName: project.name, taskTitle: task.title, accountId: account.id, displayName: account.displayName, groupId: group.id, groupName: group.name, content: entry.content, status: entry.status, blockedReason: entry.blockedReason || task.blockedReason });
+  /** 草稿按当前负责小组裁剪；已停止记录保留，后续发布时另行检查。 */
+  async draft(token: string, teamId: string, week: string) {
+    return this.database.transaction(async (manager) => {
+      const access = await loadWorkAccess(manager, this.identity, token);
+      await planningCandidates(manager, access, teamId);
+      const repository = new WeeklyPlansRepository(manager);
+      const draft = await repository.draft(teamId, week);
+      if (!draft) return null;
+      const arrangements: WeeklyArrangement[] = [];
+      for (const entry of await repository.arrangements(draft.id)) {
+        const assignment = await new AssignmentRepository(manager).assignment(entry.assignmentId);
+        if (assignment && hasPermission(access.actor, access.organization, 'work.assign', { teamId, groupId: assignment.groupId })) arrangements.push(entry);
+      }
+      return { ...draft, arrangements };
+    });
+  }
+
+  /** 逐条版本保护人工编辑；结转只补入缺失且仍有效的前周分工。 */
+  async execute(token: string, csrf: string, command: WeeklyPlanCommand): Promise<{ objectId: string }> {
+    return this.database.transaction(async (manager) => {
+      const access = await loadWorkAccess(manager, this.identity, token, csrf);
+      const candidates = await planningCandidates(manager, access, command.teamId);
+      const repository = new WeeklyPlansRepository(manager);
+      const draftId = await repository.ensure(command.teamId, command.week);
+      const existing = await repository.arrangements(draftId);
+      let objectId = draftId;
+
+      // 保存时重验分工及任务版本，避免把已停止或跨组调整后的责任继续安排。
+      if (command.action === 'save_arrangement') {
+        const candidate = candidates.find((entry) => entry.assignmentId === command.assignmentId);
+        if (!candidate) throw new ConflictException('分工不可安排或不在当前负责小组范围，请刷新。');
+        if (candidate.assignmentVersion !== command.assignmentVersion || candidate.taskVersion !== command.taskVersion) throw new ConflictException('任务或分工已变化，请刷新后安排。');
+        const previous = existing.find((entry) => entry.assignmentId === command.assignmentId);
+        if ((previous?.version ?? null) !== command.version) throw new ConflictException('周安排已变化，请刷新后编辑。');
+        objectId = await repository.save(draftId, command.assignmentId, command, previous);
+      } else if (command.action === 'carry_forward') {
+        const date = new Date(`${command.week}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() - 7);
+        const previousWeek = date.toISOString().slice(0, 10);
+        const previous = await repository.draft(command.teamId, previousWeek);
+
+        // 不带入上周目标和投入，不覆盖已经手工安排的本周记录。
+        if (previous) for (const entry of await repository.arrangements(previous.id)) {
+          if (existing.some((item) => item.assignmentId === entry.assignmentId) || !candidates.some((item) => item.assignmentId === entry.assignmentId)) continue;
+          await repository.save(draftId, entry.assignmentId, { goal: '', expectedProgress: null, plannedDays: null }, undefined, previousWeek);
         }
       }
-      return weeklyCandidatesSchema.parse({ teamId, week, assignments });
+      await new IdentityRepository(manager).audit(access.actor.id, `weekly.${command.action}`, objectId);
+      return { objectId };
     });
   }
 }

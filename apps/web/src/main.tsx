@@ -1,3 +1,4 @@
+import { WeeklyPage } from './weekly-plans/weekly-page';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
@@ -14,4 +15,4 @@ import './controls.css';
 const client = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 5000, refetchOnWindowFocus: false } } });
 const root = document.getElementById('root');
 if (!root) throw new Error('Application root is missing');
-createRoot(root).render(<StrictMode><QueryClientProvider client={client}><BrowserRouter><Routes><Route path="/personal" element={<PersonalPage />} /><Route path="/work" element={<WorkPage />} /><Route path="/organization" element={<OrganizationPage />} /><Route path="/account" element={<AccountPage />} /><Route path="*" element={<FoundationPage />} /></Routes></BrowserRouter></QueryClientProvider></StrictMode>);
+createRoot(root).render(<StrictMode><QueryClientProvider client={client}><BrowserRouter><Routes><Route path="/weekly-plans" element={<WeeklyPage />} /><Route path="/personal" element={<PersonalPage />} /><Route path="/work" element={<WorkPage />} /><Route path="/organization" element={<OrganizationPage />} /><Route path="/account" element={<AccountPage />} /><Route path="*" element={<FoundationPage />} /></Routes></BrowserRouter></QueryClientProvider></StrictMode>);

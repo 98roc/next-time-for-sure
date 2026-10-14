@@ -57,7 +57,7 @@ export function WorkPage() {
     send({ action: String(form.get('action')), projectId: project?.id, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), operationId: crypto.randomUUID() });
   }
   const data = state.isError ? undefined : state.data;
-  return <main className="org-layout"><header className="org-header"><div><p className="eyebrow">下次一定 · 工作空间</p><h1>需求与团队任务</h1><p className="subtitle">接收明确工作，保留每次补充与处理记录。</p></div><nav><a href="/personal">个人空间</a><a href="/organization">团队与项目</a><a href="/account">账号与安全</a></nav></header>
+  return <main className="org-layout"><header className="org-header"><div><p className="eyebrow">下次一定 · 工作空间</p><h1>需求与团队任务</h1><p className="subtitle">接收明确工作，保留每次补充与处理记录。</p></div><nav><a href="/weekly-plans">周计划草稿</a><a href="/personal">个人空间</a><a href="/organization">团队与项目</a><a href="/account">账号与安全</a></nav></header>
     {identity.isPending ? <p role="status">正在检查身份…</p> : !identity.data || identity.data.mustChangePassword ? <p>请先<a href="/account">登录并完成改密</a>。</p> : <>
       {organization.isError && <p role="alert">{organization.error.message}</p>}
       {organization.data && !project && <p>暂无可访问项目，请联系团队负责人。</p>}
