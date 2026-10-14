@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$CommandArguments
 )
@@ -22,6 +22,9 @@ try {
         & $nodeExecutable $npmEntry install --prefix $toolchainDirectory pnpm@10.28.2 --registry=https://registry.npmjs.org/ --cache (Join-Path $projectRoot '.cache\npm') --no-audit --no-fund
         if ($LASTEXITCODE -ne 0) { throw 'Could not install the pinned pnpm toolchain.' }
     }
+    # package.json 中的嵌套 pnpm 命令也须使用项目工具链，不能依赖全局安装。
+    $toolchainBin = Join-Path $toolchainDirectory 'node_modules\.bin'
+    $env:PATH = $runtimeDirectory + ';' + $toolchainBin + ';' + $originalPath
     Push-Location $projectRoot
     try {
         & $nodeExecutable $pnpmEntry @CommandArguments
