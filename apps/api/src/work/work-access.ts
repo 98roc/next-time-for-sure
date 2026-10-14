@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import type { OrganizationSnapshot } from '@ntfs/contracts';
 import { IdentityService } from '../identity/identity.service.js';
@@ -22,5 +22,12 @@ export function projectAccess(access: WorkAccess, id: string) {
   if (!project || project.teamId !== access.actor.teamId) throw new ForbiddenException('没有项目访问权限。');
   const leader = access.organization.teams.some((team) => team.id === project.teamId && team.leaderId === access.actor.id);
   if (!leader && !project.members.some((member) => member.accountId === access.actor.id)) throw new ForbiddenException('没有项目访问权限。');
+  return project;
+}
+/** 归档项目可读历史，但不能恢复或新增执行工作。 */
+export function activeProject(access: WorkAccess, id: string) {
+  const project = access.organization.projects.find((entry) => entry.id === id && entry.teamId === access.actor.teamId);
+  if (!project) throw new ForbiddenException('没有当前团队项目权限。');
+  if (project.archived) throw new ConflictException('项目已归档，请先恢复项目。');
   return project;
 }

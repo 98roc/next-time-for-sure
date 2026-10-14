@@ -20,6 +20,7 @@
     "identity:smoke": "pnpm --filter @ntfs/api identity:smoke",
     "organization:smoke": "pnpm --filter @ntfs/api organization:smoke",
     "work:smoke": "pnpm --filter @ntfs/api work:smoke",
+    "lifecycle:smoke": "pnpm --filter @ntfs/api lifecycle:smoke",
     "weekly:smoke": "pnpm --filter @ntfs/api weekly:smoke"
   },
   "devDependencies": {

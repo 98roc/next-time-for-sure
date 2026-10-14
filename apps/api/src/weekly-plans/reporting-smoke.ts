@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { notificationsSchema, lifecyclePreviewSchema } from '@ntfs/contracts';
 import { z } from 'zod';
 import { assignmentSnapshotSchema, organizationSnapshotSchema, personalSnapshotSchema, planPublicationsSchema, publicationPreviewSchema, reportStateSchema, tagStateSchema, weeklyCandidatesSchema, workSnapshotSchema, weeklyDraftResponseSchema } from '@ntfs/contracts';
 import type { WorkFixture, Session } from '../organization/integration-smoke.js';
@@ -56,7 +57,12 @@ export async function reportingSmoke({ call, developer, leader, manager, admin, 
   const publicState = await state(manager); assert.equal(publicState.draft, null); assert.equal(publicState.sources.length, 0); assert.equal(publicState.publications.length, 1); assert.equal(publicState.publications[0]?.next.length, 1);
   assert.equal((await call(`reports?teamId=${team.id}&week=${week}`, admin)).status, 403);
   const frozen = JSON.stringify(publicState.publications[0]);
+  const deletion = lifecyclePreviewSchema.parse(await (await call('lifecycle/preview', leader, { action: 'delete_task', objectId: pending })).json());
+  assert.ok(deletion.blockers.some((text) => text.includes('正式计划')));
   await addProgress('发布后补记'); report = await state(); assert.ok(report.draft); assert.equal(report.draft.newCount, 1);
+  const lateNotices = notificationsSchema.parse(await (await call('notifications', leader)).json()).filter((entry) => entry.title.includes('周报发布后'));
+  assert.equal(lateNotices.length, 1);
+  assert.equal(notificationsSchema.parse(await (await call('notifications', leader)).json()).filter((entry) => entry.title.includes('周报发布后')).length, 1);
   assert.equal(JSON.stringify((await state(manager)).publications[0]), frozen);
   await write('reports/commands', { action: 'generate', ...base });
   await write('work-tags/commands', { ...mark, marked: false, version: 0 }, developer);

@@ -5,7 +5,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { IdentityRepository } from '../identity/identity.repository.js';
 import { digest } from '../identity/password.js';
-import { loadWorkAccess, projectAccess } from './work-access.js';
+import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 import type { WorkAccess } from './work-access.js';
 import { PersonalRepository } from './personal.repository.js';
 import { canViewPersonal } from './personal-policy.js';
@@ -13,6 +13,7 @@ import { AssignmentRepository } from './assignment.repository.js';
 import { WorkRepository } from './work.repository.js';
 import { ensureParentActive } from './task.service.js';
 import { hasPermission } from '../organization/policy.js';
+import { notifyLateProgress } from '../notifications/progress-notifications.js';
 
 /** 个人任务内容及实际执行只由本人维护，角色配置不能突破此边界。 */
 @Injectable()
@@ -38,7 +39,7 @@ export class PersonalService {
       const access = await loadWorkAccess(manager, this.identity, token);
       const repository = new PersonalRepository(manager);
       const item = await repository.item(itemId);
-      if (!item || item.ownerId !== access.actor.id) throw new ForbiddenException('仅本人可查看个人事项历史。');
+      if (!item || item.ownerId !== access.actor.id || !canViewPersonal(access, item)) throw new ForbiddenException('仅本人可查看当前有权访问的个人事项历史。');
       return repository.history(access.actor.id, itemId);
     });
   }
@@ -74,7 +75,7 @@ export class PersonalService {
         await new IdentityRepository(manager).audit(access.actor.id, 'personal.link_managed', item.id);
         return { objectId: item.id };
       }
-      if ('itemId' in command && (!item || item.ownerId !== access.actor.id)) throw new ForbiddenException('仅本人可修改个人事项。');
+      if ('itemId' in command && (!item || item.ownerId !== access.actor.id || !canViewPersonal(access, item))) throw new ForbiddenException('仅本人可修改当前有权访问的个人事项。');
       const categories = await repository.categories(access.actor.id);
       const category = 'categoryId' in command && command.categoryId ? categories.find((entry) => entry.id === command.categoryId) : undefined;
       if ('categoryId' in command && command.categoryId && !category) throw new ForbiddenException('只能使用本人的分类。');
@@ -92,6 +93,7 @@ export class PersonalService {
         } else {
           if (!command.projectId) throw new BadRequestException('工作事项必须选择项目。');
           projectAccess(access, command.projectId);
+          activeProject(access, command.projectId);
           if (command.assignmentId) await validateLink(manager, access, command.projectId, command.assignmentId, true);
         }
         objectId = await repository.create(access.actor.id, command);
@@ -115,6 +117,7 @@ export class PersonalService {
             if (item.status === 'in_progress' && !stopped) throw new ConflictException('事项已在进行中。');
             if (item.kind === 'work' && item.projectId) {
               projectAccess(access, item.projectId);
+              activeProject(access, item.projectId);
               if (item.assignmentId) await validateLink(manager, access, item.projectId, item.assignmentId, true);
             }
             await repository.transition(item.id, 'in_progress'); break;
@@ -127,7 +130,7 @@ export class PersonalService {
             await repository.times(item.id, command.startedAt, command.endedAt); break;
           case 'move_personal': await repository.move(item.id, command.categoryId, command.position); break;
           case 'insert_personal': {
-            const column = (await repository.candidates(access.actor.id, null)).filter((entry) => entry.categoryId === command.categoryId && entry.id !== item.id);
+            const column = (await repository.candidates(access.actor.id, null)).filter((entry) => canViewPersonal(access, entry) && entry.categoryId === command.categoryId && entry.id !== item.id);
             if (column.length !== command.order.length || column.some((entry, index) => entry.id !== command.order[index]?.id || entry.version !== command.order[index]?.version)) throw new ConflictException('目标分类已变化，请刷新后重新排序。');
             if (command.beforeId && !column.some((entry) => entry.id === command.beforeId)) throw new BadRequestException('插入目标必须是该分类内的其他事项。');
             const ordered = [...column];
@@ -141,6 +144,7 @@ export class PersonalService {
       const after = await repository.item(target);
       await repository.event(access.actor.id, target, command.action, { ...command, resultId: objectId, before: item ?? category ?? null, after: after ?? null });
       await new IdentityRepository(manager).audit(access.actor.id, command.action, target);
+      if (command.action === 'personal_progress' && item?.kind === 'work' && item.projectId) await notifyLateProgress(manager, item.projectId, command.reportWeek, objectId);
       if ('operationId' in command) await history.recordOperation(access.actor.id, command.operationId, hash, objectId);
       return { objectId };
     });
@@ -149,6 +153,7 @@ export class PersonalService {
 
 /** 停止执行是派生提示，不改写本人状态或伪造完成时间。 */
 async function stopReason(manager: EntityManager, item: PersonalItem): Promise<string | null> {
+  if (item.projectId && await new PersonalRepository(manager).archived(item.projectId)) return '所属项目已归档';
   if (!item.assignmentId) return null;
   const repository = new AssignmentRepository(manager);
   const assignment = await repository.assignment(item.assignmentId);

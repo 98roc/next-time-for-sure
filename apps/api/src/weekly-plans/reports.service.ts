@@ -9,6 +9,7 @@ import { ReportingRepository } from './reporting.repository.js';
 import { assertTeam, canEditSource, canPublish } from './reporting-policy.js';
 import { reportSources } from './report-sources.js';
 import { planRows } from './plan-publication.js';
+import { notifyLateProgress } from '../notifications/progress-notifications.js';
 
 /** 周报人工整理与原始执行记录隔离；重生成只纳入新来源。 */
 @Injectable()
@@ -57,6 +58,7 @@ export class ReportsService {
         if (!source || (!editable(source) && source.ownerId !== access.actor.id)) throw new ForbiddenException('无权调整来源归属周。');
         if (source.hash !== command.sourceHash) throw new ConflictException('来源已变化，请重新读取。');
         await repository.reassign(command.sourceKind, command.sourceId, command.targetWeek);
+        if (command.targetWeek !== command.week) await notifyLateProgress(manager, source.projectId, command.targetWeek, randomUUID());
         await repository.event(command.teamId, access.actor.id, command.action, { before: source, targetWeek: command.targetWeek });
         return { objectId: command.sourceId };
       } else if (command.action === 'publish') {
@@ -115,6 +117,8 @@ async function sourceEditor(repository: ReportingRepository, access: import('../
   for (const source of new Map(sources.map((entry) => [entry.key, entry])).values()) {
     const scope = await repository.authority(source);
     if (scope?.teamId === team && canEditSource(access, team, scope)) allowed.add(source.key);
+    // 已删除来源仍需允许原团队负责人整理或排除历史条目，不能卡死共享草稿。
+    if (!scope && canPublish(access, team) && access.organization.projects.some((project) => project.id === source.projectId && project.teamId === team)) allowed.add(source.key);
   }
   return (source: ReportSource) => allowed.has(source.key);
 }

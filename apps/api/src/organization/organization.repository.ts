@@ -17,19 +17,19 @@ export class OrganizationRepository {
     const teams: unknown = await this.manager.query('SELECT id, name, leader_id AS leaderId, version FROM teams');
     const groups: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, leader_id AS leaderId, version FROM work_groups');
     const memberships: unknown = await this.manager.query('SELECT group_id AS groupId, account_id AS accountId FROM group_members');
-    const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version FROM projects');
+    const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version, archived FROM projects');
     const projectMemberships: unknown = await this.manager.query('SELECT project_id AS projectId, account_id AS accountId, roles_json FROM project_members');
     const policies: unknown = await this.manager.query('SELECT role_name AS role, permissions_json, version FROM role_policies');
     const gm = z.array(z.object({ groupId: z.string(), accountId: z.string() })).parse(memberships);
     const pm = z.array(z.object({ projectId: z.string(), accountId: z.string(), roles_json: z.unknown() })).parse(projectMemberships);
     const policyRows = z.array(z.object({ role: z.string(), permissions_json: z.unknown(), version: z.number() })).parse(policies);
     const groupRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), leaderId: z.string(), version: z.number() })).parse(groups);
-    const projectRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), version: z.number() })).parse(projects);
+    const projectRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), version: z.number(), archived: z.number() })).parse(projects);
     const accountRows = z.array(z.object({ id: z.string(), loginName: z.string(), displayName: z.string(), teamId: z.string().nullable(), disabled: z.number(), version: z.number() })).parse(accounts);
     return organizationSnapshotSchema.parse({
       accounts: accountRows.map((row) => ({ ...row, disabled: Boolean(row.disabled) })), teams,
       groups: groupRows.map((row) => ({ ...row, memberIds: gm.filter((member) => member.groupId === row.id).map((member) => member.accountId) })),
-      projects: projectRows.map((row) => ({ ...row, members: pm.filter((member) => member.projectId === row.id).map((member) => ({ accountId: member.accountId, roles: z.array(projectRoleSchema).parse(decodeJson(member.roles_json)) })) })),
+      projects: projectRows.map((row) => ({ ...row, archived: Boolean(row.archived), members: pm.filter((member) => member.projectId === row.id).map((member) => ({ accountId: member.accountId, roles: z.array(projectRoleSchema).parse(decodeJson(member.roles_json)) })) })),
       policies: policyRows.map((row) => rolePolicySchema.parse({ role: row.role, version: row.version, permissions: decodeJson(row.permissions_json) })),
     });
   }

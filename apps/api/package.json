@@ -14,6 +14,7 @@
     "identity:smoke": "tsc -p tsconfig.json && node dist/identity/integration-smoke.js",
     "organization:smoke": "tsc -p tsconfig.json && node dist/organization/integration-smoke.js",
     "work:smoke": "tsc -p tsconfig.json && node dist/work/integration-smoke.js",
+    "lifecycle:smoke": "tsc -p tsconfig.json && node dist/lifecycle/integration-smoke.js",
     "weekly:smoke": "tsc -p tsconfig.json && node dist/weekly-plans/integration-smoke.js"
   },
   "dependencies": {

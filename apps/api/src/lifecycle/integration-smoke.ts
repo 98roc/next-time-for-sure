@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { lifecyclePreviewSchema, notificationsSchema, organizationSnapshotSchema, personalSnapshotSchema, workSnapshotSchema, handoffSchema, overviewSchema, lifecycleHistorySchema } from '@ntfs/contracts';
+import { createDataSource } from '../database/data-source.js';
+import { loadEnvironment } from '../config/environment.js';
+import { NotificationRepository } from '../notifications/notification.repository.js';
+import type { LifecycleIntent } from '@ntfs/contracts';
+import { smoke } from '../organization/integration-smoke.js';
+import type { Session } from '../organization/integration-smoke.js';
+
+/** 真实事务验证归档、删除、转移及成员撤权，不以静态接口存在代替运行。 */
+await smoke(async ({ call, developer, leader, manager, projectId, otherProjectId, ownerId }) => {
+  const org = organizationSnapshotSchema.parse(await (await call('organization', leader)).json()); const team = org.teams[0]; const group = org.groups.find((entry) => entry.leaderId === ownerId); assert.ok(team && group);
+  const write = async (path: string, body: unknown, auth: Session = leader) => { const response = await call(path, auth, body); const value: unknown = await response.json(); assert.equal(response.status, 200, JSON.stringify(value)); return z.object({ objectId: z.string() }).parse(value).objectId; };
+  const preview = async (intent: LifecycleIntent, auth = leader) => { const response = await call('lifecycle/preview', auth, intent); assert.equal(response.status, 200); return lifecyclePreviewSchema.parse(await response.json()); };
+  const execute = async (intent: LifecycleIntent, auth = leader) => { const review = await preview(intent, auth); assert.deepEqual(review.blockers, []); return write('lifecycle/commands', { intent, confirmation: review.confirmation, reason: '生命周期验收', operationId: randomUUID() }, auth); };
+  const create = (title: string) => write('work/commands', { action: 'create_task', projectId, title, description: '', acceptance: '', operationId: randomUUID() }, developer);
+  const task = await create('转移验收'); const assignmentId = await write('assignments/commands', { action: 'assign', taskId: task, accountId: ownerId, groupId: group.id, content: '', operationId: randomUUID() });
+  const personal = await write('personal/commands', { action: 'create_personal', kind: 'work', projectId, assignmentId, title: '关联个人事项', description: '', acceptance: '', categoryId: null, operationId: randomUUID() }, developer);
+  const notice = async () => notificationsSchema.parse(await (await call('notifications', developer)).json());
+  // 模拟投递完成但提交前断线：通知及投递标记共同回滚，下次真实HTTP读取重试。
+  const database = createDataSource(loadEnvironment()); await database.initialize();
+  try {
+    await assert.rejects(database.transaction(async (manager) => { await new NotificationRepository(manager).deliver(); throw new Error('simulated_delivery_interruption'); }), /simulated_delivery_interruption/);
+    const rows: unknown = await database.query('SELECT COUNT(*) AS count FROM notifications n JOIN notification_outbox o ON o.id=n.event_id WHERE o.team_id=?', [team.id]);
+    assert.equal(z.array(z.object({ count: z.coerce.number() })).parse(rows)[0]?.count, 0);
+  } finally { await database.destroy(); }
+  assert.equal((await notice()).length, 1); assert.equal((await notice()).length, 1);
+  const first = (await notice())[0]; assert.ok(first);
+  assert.equal((await call('notifications/read', manager, { id: first.id })).status, 403);
+  assert.equal((await call('notifications/read', developer, { id: first.id })).status, 200);
+  assert.ok((await notice())[0]?.readAt);
+  const week = '2026-10-12';
+  await write('weekly-plans/commands', { action: 'ensure_draft', teamId: team.id, week });
+  await write('weekly-plans/commands', { action: 'save_arrangement', teamId: team.id, week, assignmentId, assignmentVersion: 0, taskVersion: 0, version: null, goal: '总览验收', expectedProgress: null, plannedDays: '2.50' });
+  const overview = async (auth = leader) => overviewSchema.parse(await (await call(`lifecycle/overview?week=${week}`, auth)).json());
+  assert.equal((await overview()).people.find((person) => person.id === ownerId)?.plannedDays, '2.50');
+  assert.equal((await overview(manager)).projects.some((project) => project.id === otherProjectId), false);
+  assert.equal((await call('lifecycle/overview?week=2026-10-13', leader)).status, 400);
+  assert.ok((await preview({ action: 'archive_project', objectId: projectId }, developer)).blockers.length);
+  assert.ok((await preview({ action: 'delete_task', objectId: task }, developer)).blockers.length);
+  assert.equal((await call('lifecycle/preview', developer, { action: 'transfer_task', objectId: task, targetProjectId: otherProjectId })).status, 403);
+  await execute({ action: 'transfer_task', objectId: task, targetProjectId: otherProjectId });
+  const moved = personalSnapshotSchema.parse(await (await call('personal', developer)).json()).items.find((entry) => entry.id === personal); assert.equal(moved?.projectId, otherProjectId); assert.equal(moved?.status, 'not_started');
+  const target = workSnapshotSchema.parse(await (await call(`work?projectId=${otherProjectId}`, developer)).json()); assert.ok(target.tasks.some((entry) => entry.id === task));
+  const independent = await write('personal/commands', { action: 'create_personal', kind: 'work', projectId, assignmentId: null, title: '归档前独立工作', description: '', acceptance: '', categoryId: null, operationId: randomUUID() }, developer);
+  assert.ok((await preview({ action: 'archive_project', objectId: projectId }, developer)).blockers.some((text) => text.includes('独立工作')));
+  assert.equal((await call('lifecycle/preview', developer, { action: 'transfer_personal', objectId: independent, targetProjectId: otherProjectId })).status, 403);
+  await write('personal/commands', { action: 'complete_personal', itemId: independent, version: 0 }, developer);
+  await execute({ action: 'archive_project', objectId: projectId }, developer);
+  assert.equal((await call('personal/commands', developer, { action: 'start_personal', itemId: independent, version: 1 })).status, 409);
+  assert.equal((await call('work/commands', developer, { action: 'create_task', projectId, title: '不能新增', description: '', acceptance: '', operationId: randomUUID() })).status, 409);
+  await execute({ action: 'restore_project', objectId: projectId }, developer);
+  const changed = await create('确认范围竞争'); const staleReview = await preview({ action: 'delete_task', objectId: changed }, developer);
+  await write('assignments/commands', { action: 'assign', taskId: changed, accountId: ownerId, groupId: group.id, content: '', operationId: randomUUID() });
+  assert.equal((await call('lifecycle/commands', developer, { intent: { action: 'delete_task', objectId: changed }, confirmation: staleReview.confirmation, reason: '旧确认拒绝', operationId: randomUUID() })).status, 409);
+  await execute({ action: 'delete_task', objectId: changed }, developer);
+  const disposable = await create('未执行可删除');
+  const deletion = { intent: { action: 'delete_task' as const, objectId: disposable }, confirmation: (await preview({ action: 'delete_task', objectId: disposable }, developer)).confirmation, reason: '重复收据验证', operationId: randomUUID() };
+  assert.equal(await write('lifecycle/commands', deletion, developer), disposable);
+  assert.equal(await write('lifecycle/commands', deletion, developer), disposable);
+  assert.equal((await call('lifecycle/commands', developer, { ...deletion, reason: '不可复用为另一请求' })).status, 409);
+  assert.equal(workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, developer)).json()).tasks.some((entry) => entry.id === disposable), false);
+  const executedTask = await create('个人执行历史禁止删除');
+  const executedAssignment = await write('assignments/commands', { action: 'assign', taskId: executedTask, accountId: ownerId, groupId: group.id, content: '', operationId: randomUUID() });
+  const executedItem = await write('personal/commands', { action: 'create_personal', kind: 'work', projectId, assignmentId: executedAssignment, title: '删除后仍保留执行历史', description: '', acceptance: '', categoryId: null, operationId: randomUUID() }, developer);
+  await write('personal/commands', { action: 'personal_progress', itemId: executedItem, version: 0, occurredOn: '2026-10-14', reportWeek: week, content: '执行事实', operationId: randomUUID() }, developer);
+  await execute({ action: 'delete_personal', objectId: executedItem }, developer);
+  assert.ok((await preview({ action: 'delete_task', objectId: executedTask }, developer)).blockers.some((text) => text.includes('执行事实')));
+  const privateId = await write('personal/commands', { action: 'create_personal', kind: 'private', projectId: null, assignmentId: null, title: '私人保留', description: '', acceptance: '', categoryId: null, operationId: randomUUID() }, developer);
+  await execute({ action: 'remove_member', objectId: ownerId });
+  assert.ok((await preview({ action: 'remove_project_member', objectId: ownerId, projectId })).blockers.length);
+  await execute({ action: 'remove_project_member', objectId: ownerId, projectId: otherProjectId });
+  assert.equal((await call(`work?projectId=${otherProjectId}`, developer)).status, 403);
+  const own = personalSnapshotSchema.parse(await (await call('personal', developer)).json()); assert.equal(own.items.some((entry) => entry.id === personal), false); assert.equal(own.items.some((entry) => entry.id === privateId), true);
+  assert.equal((await call('personal/commands', developer, { action: 'personal_progress', itemId: personal, version: moved?.version, occurredOn: '2026-10-14', reportWeek: '2026-10-12', content: '禁止旧团队写入', operationId: randomUUID() })).status, 403);
+  assert.equal((await notice()).length, 0);
+  const handoff = handoffSchema.parse(await (await call('lifecycle/handoff', leader)).json()); assert.ok(handoff.some((entry) => entry.accountId === ownerId && entry.tasks.some((item) => item.id === task)));
+  await execute({ action: 'delete_personal', objectId: privateId }, developer);
+  const audit = lifecycleHistorySchema.parse(await (await call('lifecycle/history', leader)).json());
+  assert.ok(audit.some((entry) => entry.objectId === disposable)); assert.equal(audit.some((entry) => entry.objectId === privateId), false);
+  assert.equal((await call('lifecycle/history', developer)).status, 403);
+  // 夹具后续组织回归需要恢复成员；使用现有授权账号关联流程。
+  const account = org.accounts.find((entry) => entry.id === ownerId); assert.ok(account);
+  assert.equal((await call('organization/commands', leader, { action: 'link_member', teamId: team.id, loginName: account.loginName })).status, 204);
+  console.log('PASS: transfer preserves personal facts, archive guards, restricted deletion, immediate member revocation/private retention, handoff and notification dedup/read isolation');
+});

@@ -16,12 +16,12 @@ export async function planRows(manager: EntityManager, access: WorkAccess, team:
   for (const entry of await repository.arrangements(draft.id)) {
     const assignment = await work.assignment(entry.assignmentId); if (!assignment) continue;
     const task = await work.task(assignment.taskId); if (!task) continue;
-    const project = access.organization.projects.find((item) => item.id === task.projectId && item.teamId === team); if (!project) continue;
+    const project = access.organization.projects.find((item) => item.id === task.projectId && item.teamId === team && !item.archived); if (!project) continue;
     rows.push({ projectId: project.id, projectName: project.name, taskId: task.id, title: task.title, accountId: assignment.accountId, person: access.organization.accounts.find((item) => item.id === assignment.accountId)?.displayName ?? '历史成员', groupId: assignment.groupId, text: `${entry.goal || '目标未填写'}${entry.expectedProgress === null ? '' : `；预计新增${entry.expectedProgress}%`}`, plannedDays: entry.plannedDays, status: `${task.status}/${assignment.status}`, sourceIds: [assignment.id] });
   }
   for (const entry of await repository.pending(draft.id)) {
     const task = await work.task(entry.taskId); if (!task) continue;
-    const project = access.organization.projects.find((item) => item.id === task.projectId && item.teamId === team); if (!project) continue;
+    const project = access.organization.projects.find((item) => item.id === task.projectId && item.teamId === team && !item.archived); if (!project) continue;
     rows.push({ projectId: project.id, projectName: project.name, taskId: task.id, title: task.title, accountId: null, person: '待分配', groupId: null, text: '尚未落实执行人员', plannedDays: null, status: task.status, sourceIds: [entry.id] });
   }
   return rows;
@@ -55,7 +55,7 @@ export async function planSpecial(manager: EntityManager, access: WorkAccess, co
       await repository.remove(draftId, row.id, true); return row.id;
     }
     const task = await new AssignmentRepository(manager).task(command.taskId);
-    if (!task || task.version !== command.taskVersion || !access.organization.projects.some((entry) => entry.id === task.projectId && entry.teamId === command.teamId) || ['completed', 'cancelled'].includes(task.status) || await new AssignmentRepository(manager).hasChildren(task.id)) throw new ConflictException('只能安排当前团队有效叶子任务。');
+    if (!task || task.version !== command.taskVersion || !access.organization.projects.some((entry) => entry.id === task.projectId && entry.teamId === command.teamId && !entry.archived) || ['completed', 'cancelled'].includes(task.status) || await new AssignmentRepository(manager).hasChildren(task.id)) throw new ConflictException('只能安排当前团队未归档项目的有效叶子任务。');
     return repository.addPending(draftId, task.id);
   }
   return null;

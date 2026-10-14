@@ -5,7 +5,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { IdentityRepository } from '../identity/identity.repository.js';
 import { digest } from '../identity/password.js';
 import { hasPermission } from '../organization/policy.js';
-import { loadWorkAccess, projectAccess } from './work-access.js';
+import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 import { WorkRepository } from './work.repository.js';
 import { TaskRepository } from './task.repository.js';
 import { AssignmentRepository } from './assignment.repository.js';
@@ -25,6 +25,7 @@ export class SplitService {
       const parent = await assignments.task(command.taskId);
       if (!parent) throw new NotFoundException('父任务不存在。');
       const project = projectAccess(access, parent.projectId);
+      activeProject(access, project.id);
       const teamLead = access.organization.teams.some((entry) => entry.id === project.teamId && entry.leaderId === access.actor.id);
       const projectLead = project.members.some((entry) => entry.accountId === access.actor.id && entry.roles.includes('project_lead'));
       if (parent.ownerId !== access.actor.id && !teamLead && !projectLead) throw new ForbiddenException('只有父任务主负责人、项目研发负责人或团队负责人可拆分。');

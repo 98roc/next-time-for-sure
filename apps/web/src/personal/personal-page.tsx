@@ -1,4 +1,5 @@
 import { ManageLink } from './manage-link';
+import { PersonalLifecycle } from '../lifecycle/personal-lifecycle';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { personalCommandSchema } from '@ntfs/contracts';
@@ -57,5 +58,5 @@ export function PersonalPage() {
 function Item({ item, identity, data, pending, send }: { item: PersonalItem; identity: Identity | null | undefined; data: PersonalSnapshot; pending: boolean; send: (input: unknown) => void }) {
   const own = item.ownerId === identity?.id;
   const assignments = useQuery({ queryKey: ['assignments', identity?.id, item.projectId], queryFn: () => assignmentSnapshot(item.projectId ?? ''), enabled: Boolean(own && item.projectId), retry: false });
-  return <><PersonalCard item={item} own={own} data={data} assignments={assignments.data} pending={pending} send={send} />{identity && item.kind === 'work' && <ManageLink item={item} identity={identity} pending={pending} send={send} />}</>;
+  return <><PersonalCard item={item} own={own} data={data} assignments={assignments.data} pending={pending} send={send} />{identity && <PersonalLifecycle item={item} identity={identity} />}{identity && item.kind === 'work' && <ManageLink item={item} identity={identity} pending={pending} send={send} />}</>;
 }

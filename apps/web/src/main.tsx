@@ -1,3 +1,5 @@
+import { CollaborationPage } from './lifecycle/collaboration-page';
+import { NotificationIndicator } from './lifecycle/notification-indicator';
 import { WeeklyPage } from './weekly-plans/weekly-page';
 import { ReportsPage } from './weekly-plans/reports-page';
 import { StrictMode } from 'react';
@@ -16,4 +18,4 @@ import './controls.css';
 const client = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 5000, refetchOnWindowFocus: false } } });
 const root = document.getElementById('root');
 if (!root) throw new Error('Application root is missing');
-createRoot(root).render(<StrictMode><QueryClientProvider client={client}><BrowserRouter><Routes><Route path="/reports" element={<ReportsPage />} /><Route path="/weekly-plans" element={<WeeklyPage />} /><Route path="/personal" element={<PersonalPage />} /><Route path="/work" element={<WorkPage />} /><Route path="/organization" element={<OrganizationPage />} /><Route path="/account" element={<AccountPage />} /><Route path="*" element={<FoundationPage />} /></Routes></BrowserRouter></QueryClientProvider></StrictMode>);
+createRoot(root).render(<StrictMode><QueryClientProvider client={client}><BrowserRouter><NotificationIndicator /><Routes><Route path="/collaboration" element={<CollaborationPage />} /><Route path="/reports" element={<ReportsPage />} /><Route path="/weekly-plans" element={<WeeklyPage />} /><Route path="/personal" element={<PersonalPage />} /><Route path="/work" element={<WorkPage />} /><Route path="/organization" element={<OrganizationPage />} /><Route path="/account" element={<AccountPage />} /><Route path="*" element={<FoundationPage />} /></Routes></BrowserRouter></QueryClientProvider></StrictMode>);

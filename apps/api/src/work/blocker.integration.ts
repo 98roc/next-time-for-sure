@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { notificationsSchema } from '@ntfs/contracts';
 import { z } from 'zod';
 import { assignmentSnapshotSchema, organizationSnapshotSchema, personalSnapshotSchema, taskImpactSchema, workSnapshotSchema } from '@ntfs/contracts';
 import type { WorkFixture, Session } from '../organization/integration-smoke.js';
@@ -28,6 +29,8 @@ export async function verifyBlockers(fixture: WorkFixture): Promise<void> {
   await write('tasks/commands', { action: 'start_task', taskId: id, version: (await task(id)).version });
   const preview = taskImpactSchema.parse(await (await call(`tasks/impact?taskId=${waiting}&intent=complete_task`, developer)).json());
   await write('tasks/commands', { action: 'complete_task', taskId: waiting, version: preview.version, confirmation: preview.confirmation });
+  const notifications = notificationsSchema.parse(await (await call('notifications', developer)).json());
+  assert.equal(notifications.filter((entry) => entry.title.includes('等待的关联工作')).length, 1);
   assert.equal((await task(id)).blockedReason, '等待环境');
   await write('tasks/commands', { action: 'task_blocker', taskId: id, version: (await task(id)).version, blockedReason: '', waitingFor: '应清空', waitingTaskId: waiting });
   assert.equal((await task(id)).waitingTaskId, null);
@@ -41,6 +44,7 @@ export async function verifyBlockers(fixture: WorkFixture): Promise<void> {
   await write('personal/commands', { action: 'manage_link', itemId, assignmentId, version: 0 }, leader);
   await write('personal/commands', { action: 'manage_link', itemId, assignmentId: secondAssignment, version: 1 }, developer, 403);
   await write('personal/commands', { action: 'manage_link', itemId, assignmentId: secondAssignment, version: 1 }, leader);
+  assert.equal(notificationsSchema.parse(await (await call('notifications', developer)).json()).filter((entry) => entry.title.includes('管理者调整')).length, 2);
   const after = (await items()).items.find((entry) => entry.id === itemId); assert.ok(after);
   assert.deepEqual({ ...after, assignmentId: before.assignmentId, version: before.version }, before);
   assert.equal((await call('work?projectId=' + otherProjectId, developer)).status, 403);

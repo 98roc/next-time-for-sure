@@ -34,7 +34,7 @@ export type OrganizationCommand = z.infer<typeof organizationCommandSchema>;
 export const directoryAccountSchema = z.object({ id, loginName: loginNameSchema, displayName: name, teamId: id.nullable(), disabled: z.boolean(), version });
 export const teamSchema = z.object({ id, name, leaderId: id, version });
 export const groupSchema = z.object({ id, teamId: id, name, leaderId: id, memberIds: z.array(id), version });
-export const projectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })) });
+export const projectSchema = z.object({ id, teamId: id, name, version, archived: z.boolean().default(false), members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })) });
 export const rolePolicySchema = z.object({ role: roleSchema, permissions: z.array(permissionSchema), version });
 export const organizationSnapshotSchema = z.object({
   accounts: z.array(directoryAccountSchema), teams: z.array(teamSchema), groups: z.array(groupSchema), projects: z.array(projectSchema), policies: z.array(rolePolicySchema),

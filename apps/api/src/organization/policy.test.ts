@@ -10,8 +10,8 @@ test('role union stays within team, group and project scope', () => {
     accounts: [], teams: [{ id: 'team', name: '团队', leaderId: 'leader', version: 0 }],
     groups: [{ id: 'group', teamId: 'team', name: '小组', leaderId: 'member', memberIds: ['member'], version: 0 }],
     projects: [
-      { id: 'project', teamId: 'team', name: '项目', version: 0, members: [{ accountId: 'member', roles: ['project_manager', 'project_lead', 'developer'] }] },
-      { id: 'other', teamId: 'team', name: '其他项目', version: 0, members: [] },
+      { id: 'project', teamId: 'team', name: '项目', version: 0, archived: false, members: [{ accountId: 'member', roles: ['project_manager', 'project_lead', 'developer'] }] },
+      { id: 'other', teamId: 'team', name: '其他项目', version: 0, archived: false, members: [] },
     ],
     policies: [
       { role: 'team_leader', permissions: defaultPermissions.team_leader, version: 0 },

@@ -3,6 +3,7 @@ import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
 import { workRequestSchema, workSnapshotSchema } from '@ntfs/contracts';
 import type { WorkSnapshot } from '@ntfs/contracts';
+import { notifyWork } from '../notifications/work-notifications.js';
 
 const requestSelect = 'SELECT id, project_id AS projectId, submitter_id AS submitterId, title, description, acceptance, status, version FROM work_requests';
 
@@ -61,7 +62,9 @@ export class WorkRepository {
 
   /** 业务历史保存输入快照，追加说明不会隐式改写团队任务。 */
   async event(project: string, object: string, actor: string, action: string, payload: unknown): Promise<void> {
-    await this.manager.query('INSERT INTO work_events (id, project_id, object_id, actor_id, action, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3))', [randomUUID(), project, object, actor, action, JSON.stringify(payload)]);
+    const id = randomUUID();
+    await this.manager.query('INSERT INTO work_events (id, project_id, object_id, actor_id, action, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3))', [id, project, object, actor, action, JSON.stringify(payload)]);
+    await notifyWork(this.manager, id, project, object, action, payload);
   }
 
   /** 幂等键仅在当前身份内有效，匹配内容由服务验证。 */

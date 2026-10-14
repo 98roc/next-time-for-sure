@@ -24,3 +24,4 @@ h2 { font-size: 18px; font-weight: 600; margin: 0; }
 .footnote { color: var(--muted); font-size: 12px; line-height: 1.9; margin-top: 24px; }
 @media (max-width: 800px) { .sidebar { width: 190px; padding: 24px 16px; } main { padding: 40px 24px; } .status-grid { grid-template-columns: 1fr; } }
 @media (max-width: 540px) { .shell { display: block; } .sidebar { width: 100%; padding: 18px 22px; border-right: 0; border-bottom: 1px solid var(--line); } .brand { margin: 0; } nav, .sidebar-note { display: none; } main { padding: 32px 20px; } header { flex-direction: column; margin-bottom: 28px; } .panel { padding: 22px; } .roadmap { flex-direction: column; } }
+.notification-indicator { padding: 0.65rem 1.25rem; text-align: right; border-bottom: 1px solid var(--line); font-size: 0.875rem; }

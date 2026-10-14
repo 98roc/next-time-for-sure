@@ -1,0 +1,27 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { handoffSchema, notificationsSchema, lifecycleHistorySchema } from '@ntfs/contracts';
+import { currentIdentity } from '../identity/api';
+import { organizationSnapshot } from '../organization/api';
+import { reportingRequest } from '../weekly-plans/reporting-api';
+import { LifecyclePanel } from './lifecycle-panel';
+import { OverviewPanel } from './overview-panel';
+import '../organization/organization.css';
+import '../weekly-plans/weekly.css';
+
+/** 项目归档恢复、成员交接及站内通知入口；当前身份变化后重新查询授权范围。 */
+export function CollaborationPage() {
+  const identity = useQuery({ queryKey: ['identity'], queryFn: currentIdentity, retry: false });
+  const organization = useQuery({ queryKey: ['organization', identity.data?.id], queryFn: organizationSnapshot, enabled: Boolean(identity.data), retry: false });
+  const lead = organization.data?.teams.some((team) => team.leaderId === identity.data?.id) ?? false;
+  const handoff = useQuery({ queryKey: ['handoff', identity.data?.id], queryFn: async () => handoffSchema.parse(await reportingRequest('lifecycle/handoff')), enabled: lead, retry: false });
+  const notifications = useQuery({ queryKey: ['notifications', identity.data?.id], queryFn: async () => notificationsSchema.parse(await reportingRequest('notifications')), enabled: Boolean(identity.data), refetchInterval: 10000, retry: false });
+  const history = useQuery({ queryKey: ['lifecycle-history', identity.data?.id], queryFn: async () => lifecycleHistorySchema.parse(await reportingRequest('lifecycle/history')), enabled: lead, retry: false });
+  const client = useQueryClient(); const read = useMutation({ mutationFn: (id: string) => reportingRequest('notifications/read', { id }, identity.data?.csrfToken), onSuccess: async () => { await client.invalidateQueries({ queryKey: ['notifications'] }); } });
+  return <main className="org-layout weekly-page"><header className="org-header"><div><h1>协作与通知</h1><p>项目生命周期、成员职责与多端共用的站内消息。</p></div><nav><a href="/work">团队工作</a><a href="/weekly-plans">周计划</a><a href="/reports">周报</a><a href="/organization">组织管理</a></nav></header>{!identity.data && <a href="/account">请先登录</a>}
+    {identity.data && <OverviewPanel accountId={identity.data.id} />}{(organization.error || notifications.error || handoff.error || read.error || history.error) && <p role="alert" className="form-error">{organization.error?.message || notifications.error?.message || handoff.error?.message || read.error?.message || history.error?.message}</p>}
+    <section className="panel weekly-section"><h2>站内通知</h2><p>每10秒同步已读；展示通知不等于已读，重连不重复生成。</p><button onClick={() => { void notifications.refetch(); }}>刷新通知</button>{notifications.data?.length === 0 && <p>暂无通知。</p>}{notifications.data?.map((entry) => <article className="weekly-entry" key={entry.id}><h3>{entry.title}</h3><p>{new Date(entry.createdAt).toLocaleString('zh-CN')} · {entry.readAt ? '已读' : '未读'}</p><a href={entry.path}>查看相关工作</a>{!entry.readAt && <button disabled={read.isPending} onClick={() => read.mutate(entry.id)}>标为已读</button>}</article>)}</section>
+    {identity.data && organization.data && <section className="panel weekly-section"><h2>项目生命周期</h2>{organization.data.projects.map((project) => <article className="weekly-entry" key={`${project.id}:${project.version}`}><h3>{project.name} · {project.archived ? '已归档' : '活跃'}</h3><a href={`/work?projectId=${project.id}`}>查看项目历史</a>{(lead || project.members.some((entry) => entry.accountId === identity.data?.id && entry.roles.includes('project_lead'))) && identity.data && <LifecyclePanel identity={identity.data} options={[{ label: project.archived ? '恢复项目' : '归档项目', intent: { action: project.archived ? 'restore_project' : 'archive_project', objectId: project.id } }, ...(lead ? project.members.map((member) => ({ label: '移出项目成员：' + (organization.data?.accounts.find((account) => account.id === member.accountId)?.displayName ?? handoff.data?.find((entry) => entry.accountId === member.accountId)?.displayName ?? ('历史成员 ' + member.accountId.slice(0, 8))), intent: { action: 'remove_project_member' as const, objectId: member.accountId, projectId: project.id } })) : [])]} />}</article>)}</section>}
+    {lead && identity.data && <section className="panel weekly-section"><h2>成员移出与职责交接</h2><p>移出允许先进行；未处理工作和管理职责持续列出，通过现有分工和组织入口手动交接。</p>{organization.data?.accounts.map((account) => <article className="weekly-entry" key={account.id}><h3>{account.displayName}</h3>{identity.data && <LifecyclePanel identity={identity.data} options={[{ label: '移出成员', intent: { action: 'remove_member', objectId: account.id } }]} />}</article>)}<h3>尚未处理的职责</h3>{handoff.data?.length === 0 && <p>当前没有离队或禁用成员的待处理职责。</p>}{handoff.data?.map((entry) => <article className="weekly-entry" key={entry.accountId}><h3>{entry.displayName}</h3><ul>{entry.tasks.map((task) => <li key={task.id}><a href={`/work?projectId=${task.projectId}#task-${task.id}`}>主责任务：{task.title}</a></li>)}{entry.assignments.map((assignment) => <li key={assignment.id}><a href={`/work?projectId=${assignment.projectId}#task-${assignment.taskId}`}>未完成分工</a></li>)}{entry.duties.map((duty) => <li key={duty}>{duty}，请到组织管理替换负责人或角色</li>)}</ul></article>)}</section>}
+    {lead && <section className="panel weekly-section"><h2>生命周期记录</h2>{history.data?.map((entry) => <article className="weekly-entry" key={entry.id}><h3>{entry.title}</h3><p>{entry.reason} · {new Date(entry.createdAt).toLocaleString('zh-CN')}</p></article>)}</section>}
+  </main>;
+}

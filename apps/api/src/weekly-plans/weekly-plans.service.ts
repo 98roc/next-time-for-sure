@@ -24,7 +24,7 @@ export class WeeklyPlansService {
       const access = await loadWorkAccess(manager, this.identity, token); assertTeam(access, team);
       const publish = canPublish(access, team);
       const pendingCandidates = [];
-      if (publish) for (const project of access.organization.projects.filter((entry) => entry.teamId === team)) {
+      if (publish) for (const project of access.organization.projects.filter((entry) => entry.teamId === team && !entry.archived)) {
         const tasks = (await new WorkRepository(manager).snapshot(project.id)).tasks;
         for (const task of tasks.filter((entry) => !['completed', 'cancelled'].includes(entry.status) && !tasks.some((child) => child.parentId === entry.id))) pendingCandidates.push({ id: task.id, version: task.version, title: `${project.name} · ${task.title}` });
       }

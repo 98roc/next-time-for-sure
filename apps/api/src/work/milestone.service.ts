@@ -5,7 +5,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { IdentityRepository } from '../identity/identity.repository.js';
 import { digest } from '../identity/password.js';
 import { hasPermission } from '../organization/policy.js';
-import { loadWorkAccess, projectAccess } from './work-access.js';
+import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { WorkRepository } from './work.repository.js';
 import { ReportingRepository } from '../weekly-plans/reporting.repository.js';
@@ -26,6 +26,7 @@ export class MilestoneService {
       const projectId = command.action === 'create_node' ? command.projectId : before?.projectId;
       if (!projectId) throw new NotFoundException('项目不存在。');
       const project = projectAccess(access, projectId);
+      if (command.action !== 'edit_task') activeProject(access, projectId);
 
       // 内容由主负责人维护；规划权限不隐式允许代改任务范围。
       if (command.action === 'edit_task') {

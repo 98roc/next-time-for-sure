@@ -7,7 +7,7 @@ import { digest } from '../identity/password.js';
 import { hasPermission } from '../organization/policy.js';
 import { WorkRepository } from './work.repository.js';
 
-import { loadWorkAccess, projectAccess } from './work-access.js';
+import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 
 /** 需求接收与团队任务建立共用事务；不产生人员执行事实或排期承诺。 */
 @Injectable()
@@ -32,6 +32,7 @@ export class WorkService {
       const projectId = 'projectId' in command ? command.projectId : request?.projectId;
       if (!projectId) throw new NotFoundException('项目不存在。');
       const project = projectAccess(access, projectId);
+      activeProject(access, projectId);
       const requirePermission = (permission: Permission) => {
         if (!hasPermission(access.actor, access.organization, permission, { teamId: project.teamId, projectId })) throw new ForbiddenException('没有本项目的操作权限。');
       };

@@ -5,7 +5,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { IdentityRepository } from '../identity/identity.repository.js';
 import { digest } from '../identity/password.js';
-import { loadWorkAccess, projectAccess } from './work-access.js';
+import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 import type { WorkAccess } from './work-access.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { WorkRepository } from './work.repository.js';
@@ -37,6 +37,7 @@ export class TaskService {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token, csrf);
       const task = await requireTask(manager, command.taskId);
+      if (['start_task', 'reopen_task', 'task_progress'].includes(command.action)) activeProject(access, task.projectId);
       if (command.action === 'task_blocker') {
         projectAccess(access, task.projectId);
         const participating = (await new AssignmentRepository(manager).snapshot(task.projectId)).assignments.some((entry) => entry.taskId === task.id && entry.accountId === access.actor.id && !['exited', 'transferred'].includes(entry.status));

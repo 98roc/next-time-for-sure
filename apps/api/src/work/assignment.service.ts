@@ -1,4 +1,5 @@
 import { ReportingRepository } from '../weekly-plans/reporting.repository.js';
+import { notifyLateProgress } from '../notifications/progress-notifications.js';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { AssignmentCommand, AssignmentSnapshot, Assignment, PersonalItem } from '@ntfs/contracts';
 import { DatabaseService } from '../database/database.service.js';
@@ -7,7 +8,7 @@ import { IdentityRepository } from '../identity/identity.repository.js';
 import { digest } from '../identity/password.js';
 import { OrganizationRepository } from '../organization/organization.repository.js';
 import { hasPermission } from '../organization/policy.js';
-import { loadWorkAccess, projectAccess } from './work-access.js';
+import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 import { WorkRepository } from './work.repository.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { PersonalRepository } from './personal.repository.js';
@@ -94,7 +95,7 @@ export class AssignmentService {
       }
       if ('version' in command && assignment?.version !== command.version) throw new ConflictException('分工已变化，请刷新后操作。');
       const supplement = command.action === 'record_progress' || command.action === 'correct_times' || command.action === 'complete' || command.action === 'assignment_blocker';
-      if (!supplement) await ensureParentActive(manager, task);
+      if (!supplement) { activeProject(access, project.id); await ensureParentActive(manager, task); }
       if (!supplement && ['completed', 'cancelled'].includes(task.status)) throw new ConflictException('团队任务已停止执行，不能新增或继续工作。');
       if (!supplement && await repository.hasChildren(task.id)) throw new ConflictException('父任务已拆分，请在子任务安排执行。');
       if (assignment && (!supplement || command.action === 'complete') && ['exited', 'transferred'].includes(assignment.status)) throw new ConflictException('原分工已停止执行，仅允许补记与整理。');
@@ -143,6 +144,7 @@ export class AssignmentService {
       const originalAfter = command.action === 'transfer' && assignment ? await repository.assignment(assignment.id) : undefined;
       await history.event(project.id, assignment?.id ?? objectId, access.actor.id, `assignment.${command.action}`, { ...command, resultId: objectId, before: assignment ?? null, after, ...(originalAfter ? { originalAfter } : {}) });
       await new IdentityRepository(manager).audit(access.actor.id, `assignment.${command.action}`, objectId);
+      if (command.action === 'record_progress') await notifyLateProgress(manager, project.id, command.reportWeek, objectId);
       if ('operationId' in command) await history.recordOperation(access.actor.id, command.operationId, hash, objectId);
       return { objectId };
     });

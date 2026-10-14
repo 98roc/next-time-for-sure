@@ -14,7 +14,7 @@ export async function planningCandidates(manager: EntityManager, access: WorkAcc
   const assignments: WeeklyCandidates['assignments'] = [];
 
   // 项目身份不替代负责小组权限；组长可以跨项目编排本组负责的分工。
-  for (const project of access.organization.projects.filter((entry) => entry.teamId === teamId)) {
+  for (const project of access.organization.projects.filter((entry) => entry.teamId === teamId && !entry.archived)) {
     const tasks = (await new WorkRepository(manager).snapshot(project.id)).tasks;
     const state = await new AssignmentRepository(manager).snapshot(project.id);
     for (const entry of state.assignments) {

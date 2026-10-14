@@ -9,6 +9,8 @@ const selection = `SELECT i.id, i.owner_id AS ownerId, i.kind, i.project_id AS p
 /** 个人内容访问集中于仓储，私人数据不进入团队事件表。 */
 export class PersonalRepository {
   constructor(private readonly manager: EntityManager) {}
+  /** 归档状态用于派生停止提示，不改写本人执行事实。 */
+  async archived(project: string) { const rows: unknown = await this.manager.query('SELECT archived FROM projects WHERE id=?', [project]); return Boolean(z.array(z.object({ archived: z.number() })).parse(rows)[0]?.archived); }
 
   /** 数据库先排除他人的私人事项，工作事项再由服务按角色裁剪。 */
   async candidates(owner: string, team: string | null): Promise<PersonalItem[]> {
