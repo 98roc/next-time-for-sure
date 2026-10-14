@@ -8,7 +8,9 @@
 
 第4阶段已完成共享周计划、预计投入、结转、待分配发布、人工标签及周报整理／修订。入口 `/weekly-plans`、`/reports`；见[使用说明](docs/development/周计划与周报使用说明.md)和[验收记录](docs/development/第4阶段实施记录.md)。
 
-第五阶段入口 `/collaboration`，支持受限删除、项目转移／归档、成员移出与职责交接、总览和站内通知。见[使用说明](docs/development/生命周期与协作使用说明.md)及[验收记录](docs/development/第5阶段实施记录.md)。
+第五阶段能力包括受限删除、项目转移／归档、成员移出与职责交接、总览和站内通知。当前通知入口为 `/collaboration`，归档交接为 `/management`，总览在团队管理中。见[使用说明](docs/development/生命周期与协作使用说明.md)及[验收记录](docs/development/第5阶段实施记录.md)。
+
+2026-10-14已完成一轮[工作区体验改造](docs/development/工作区体验改造记录.md)：统一侧栏与品牌，项目视图分离，鱼骨图直接操作，任务详情侧栏，以及周次、编排和阅读流程整理。
 
 ## 想解决什么问题
 

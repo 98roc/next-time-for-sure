@@ -9,13 +9,16 @@ let stopNotifications: (() => void) | undefined;
 const configured = new URL(process.env.DESKTOP_WEB_URL ?? 'http://127.0.0.1:5174');
 if (configured.protocol !== 'http:' || configured.hostname !== '127.0.0.1' || configured.username || configured.password || configured.pathname !== '/' || configured.search || configured.hash) throw new Error('Only a local frontend origin is allowed');
 
-/** 代码绘制雾蓝图标，运行时不加载外部素材。 */
+/** 绘制与网页一致的错位方块标志，托盘在离线时仍可显示。 */
 function appIcon() {
   const size = 32; const pixels = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const index = (y * size + x) * 4;
-    const mark = y >= 8 && y <= 23 && ((x >= 8 && x <= 11) || (x >= 20 && x <= 23) || Math.abs(x - y) <= 2);
-    pixels[index] = mark ? 248 : 170; pixels[index + 1] = mark ? 250 : 130; pixels[index + 2] = mark ? 252 : 91; pixels[index + 3] = 255;
+    const back = x >= 5 && x <= 19 && y >= 14 && y <= 28 && (x <= 6 || x >= 18 || y <= 15 || y >= 27);
+    const clearance = x >= 12 && x <= 29 && y >= 2 && y <= 20;
+    const front = x >= 14 && x <= 27 && y >= 4 && y <= 18;
+    const mark = front || (back && !clearance);
+    pixels[index] = mark ? 48 : 249; pixels[index + 1] = mark ? 39 : 246; pixels[index + 2] = mark ? 36 : 245; pixels[index + 3] = 255;
   }
   return nativeImage.createFromBitmap(pixels, { width: size, height: size });
 }
