@@ -1,0 +1,82 @@
+{
+  "client": "codex-cli 0.149.0",
+  "date": "2026-10-14T02:43:02.619Z",
+  "skills": [
+    "ntfs-requirements",
+    "ntfs-team-tasks",
+    "ntfs-weekly-reports"
+  ],
+  "scope": "real Codex with explicit skill contents; writes blocked by client approval policy; not full business acceptance",
+  "calls": [
+    {
+      "tool": "business_query",
+      "status": "completed",
+      "path": "agent/me",
+      "action": null,
+      "error": null
+    },
+    {
+      "tool": "business_query",
+      "status": "completed",
+      "path": "organization",
+      "action": null,
+      "error": null
+    },
+    {
+      "tool": "business_query",
+      "status": "failed",
+      "path": "work",
+      "action": null,
+      "error": null
+    },
+    {
+      "tool": "business_query",
+      "status": "completed",
+      "path": "assignments",
+      "action": null,
+      "error": null
+    },
+    {
+      "tool": "business_query",
+      "status": "completed",
+      "path": "work",
+      "action": null,
+      "error": null
+    },
+    {
+      "tool": "business_command",
+      "status": "failed",
+      "path": "work/commands",
+      "action": "submit_request",
+      "error": "MCP tool call requires approval, but approval policy is never"
+    },
+    {
+      "tool": "business_command",
+      "status": "failed",
+      "path": "work/commands",
+      "action": "create_task",
+      "error": "MCP tool call requires approval, but approval policy is never"
+    },
+    {
+      "tool": "business_query",
+      "status": "completed",
+      "path": "weekly-plans",
+      "action": null,
+      "error": null
+    },
+    {
+      "tool": "business_query",
+      "status": "completed",
+      "path": "work",
+      "action": null,
+      "error": null
+    },
+    {
+      "tool": "business_query",
+      "status": "completed",
+      "path": "reports",
+      "action": null,
+      "error": null
+    }
+  ]
+}

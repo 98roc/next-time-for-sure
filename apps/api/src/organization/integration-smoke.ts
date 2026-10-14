@@ -16,8 +16,8 @@ import { IdentityService } from '../identity/identity.service.js';
 import { digest, hashPassword } from '../identity/password.js';
 import { SafeExceptionFilter } from '../safe-exception.filter.js';
 
-export type Session = { cookie: string; csrf: string };
-export type WorkFixture = { call: (path: string, auth?: Session, body?: unknown) => Promise<Response>; leader: Session; developer: Session; admin: Session; manager: Session; projectId: string; otherProjectId: string; ownerId: string };
+export type Session = { cookie: string; csrf: string; bearer?: string };
+export type WorkFixture = { base: string; call: (path: string, auth?: Session, body?: unknown) => Promise<Response>; leader: Session; developer: Session; admin: Session; manager: Session; projectId: string; otherProjectId: string; ownerId: string };
 
 /** 真实数据库及HTTP组织验收；测试数据有唯一前缀，仅清理本次创建的记录。 */
 export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>): Promise<void> {
@@ -43,7 +43,7 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
     return { cookie: `ntfs_session=${token}`, csrf };
   }
   async function call(path: string, auth?: Session, body?: unknown) {
-    return fetch(`${base}/api/v1/${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { Origin: base, 'Content-Type': 'application/json', Cookie: auth?.cookie ?? '', 'X-CSRF-Token': auth?.csrf ?? '' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(15000) });
+    return fetch(`${base}/api/v1/${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { ...(auth?.bearer ? { Authorization: `Bearer ${auth.bearer}` } : { Origin: base }), 'Content-Type': 'application/json', Cookie: auth?.cookie ?? '', 'X-CSRF-Token': auth?.csrf ?? '' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(15000) });
   }
   async function command(auth: Session, body: OrganizationCommand, expected = 204) {
     const response = await call('organization/commands', auth, body);
@@ -105,7 +105,7 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
       const managerId = randomUUID();
       await source.query('INSERT INTO accounts (id, login_name, display_name, password_hash, team_id, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [managerId, `${prefix}.manager`, '仅项目经理验收账号', await hashPassword(password), team.id]);
       await command(leader, { action: 'set_project_member', projectId: project.id, accountId: managerId, roles: ['project_manager'], version: project.version });
-      await verifyWork({ call, leader, developer, admin, manager: await session(managerId), projectId: project.id, otherProjectId: other.id, ownerId: member.id });
+      await verifyWork({ base, call, leader, developer, admin, manager: await session(managerId), projectId: project.id, otherProjectId: other.id, ownerId: member.id });
       if (inspect) {
         // 临时浏览器夹具只写忽略文件；输入回车后按原流程撤销会话并清理全部随机数据。
         await writeFile(inspectPath, JSON.stringify({ loginName: `${prefix}.member`, password: replacement, projectId: project.id, base }), { flag: 'wx', mode: 0o600 });
@@ -188,6 +188,7 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
         await manager.query('DELETE FROM work_operations WHERE actor_id = ?', [id]);
         await manager.query('UPDATE accounts SET team_id = NULL WHERE id = ?', [id]);
         await manager.query('DELETE FROM login_sessions WHERE account_id = ?', [id]);
+        await manager.query('DELETE FROM personal_tokens WHERE account_id = ?', [id]);
         await manager.query('DELETE FROM audit_events WHERE actor_id = ?', [id]);
       }
       await manager.query('DELETE FROM teams WHERE name IN (?, ?)', teamNames);

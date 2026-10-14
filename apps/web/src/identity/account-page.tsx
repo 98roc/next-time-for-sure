@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { changePassword, currentIdentity, login, logout } from './api';
 import './identity.css';
+import { TokenPanel } from './token-panel';
 
 /** 身份入口：未登录时展示登录表单，已登录时提供本人改密与退出。 */
 export function AccountPage() {
@@ -46,6 +47,7 @@ export function AccountPage() {
       {!identity.data && <p className="footnote">账号由管理员创建，不开放自行注册。首次初始化方式见本地开发说明。</p>}
     </>}
     <a className="status-link" href="/organization">进入团队与项目</a>
+    {identity.data && !identity.data.mustChangePassword && <TokenPanel key={identity.data.id} identity={identity.data} />}
     <a className="status-link" href="/">查看工程状态</a>
   </main></div>;
 }

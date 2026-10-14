@@ -1,14 +1,19 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { healthSchema, readinessSchema } from '@ntfs/contracts';
+import { registerBusinessTools } from './business-tools.js';
 
-/** 工程探针仅连接本机；未来业务工具必须使用独立认证与权限校验。 */
-export function createServer(baseUrl: string): McpServer {
+/** 仅连接本机；配置个人Token后启用共用权限规则的业务工具。 */
+export function createServer(baseUrl: string, token?: string): McpServer {
   let url: URL;
   try { url = new URL(baseUrl); } catch { throw new Error('MCP_API_URL must be a valid loopback HTTP origin'); }
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
     throw new Error('MCP_API_URL must be a loopback HTTP origin');
   }
   const server = new McpServer({ name: 'next-time-for-sure', version: '0.1.0' });
+  if (token !== undefined) {
+    if (!/^ntfs_[a-f0-9]{64}$/.test(token)) throw new Error('Invalid personal access token configuration');
+    registerBusinessTools(server, url, token);
+  }
   server.registerTool('system_health', {
     title: '检查下次一定工程状态',
     description: '仅查询公开的本机服务及数据库就绪状态；不访问业务数据，不验证用户身份，不代表业务已交付。',

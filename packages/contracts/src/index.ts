@@ -29,3 +29,5 @@ export * from './reporting.js';
 export * from './lifecycle.js';
 export * from './notifications.js';
 export * from './overview.js';
+export * from './tokens.js';
+export * from './agent.js';

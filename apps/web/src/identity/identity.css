@@ -14,4 +14,7 @@ main.identity-card { width: min(440px, 100%); margin: 0 auto; padding: 32px; }
 .status-link { display: block; color: var(--accent); font-size: 13px; margin-top: 26px; }
 .identity-card .form-error { color: #bc5353; margin: 0; }
 .identity-card .notice { color: var(--accent); }
+.identity-card input[type=checkbox] { min-height: 18px; padding: 0; }
+.identity-card section { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+.identity-card section article { padding: 12px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 @media (max-width: 540px) { main.identity-card { padding: 24px; } }

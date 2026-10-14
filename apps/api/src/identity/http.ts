@@ -4,7 +4,25 @@ import type { z } from 'zod';
 
 /** 从HttpOnly Cookie中提取会话，绝不把Bearer Token当登录会话。 */
 export function sessionToken(request: IncomingMessage): string {
-  return request.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('ntfs_session='))?.slice('ntfs_session='.length) ?? '';
+  const value = request.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('ntfs_session='))?.slice('ntfs_session='.length) ?? '';
+  return /^[a-f0-9]{64}$/.test(value) ? value : '';
+}
+
+/** 业务端显式支持Bearer；有Authorization时不降级为Cookie，防止认证混淆。 */
+export function businessToken(request: IncomingMessage): string {
+  const header = request.headers.authorization;
+  if (header !== undefined) return `bearer:${header.startsWith('Bearer ') ? header.slice(7) : ''}`;
+  return sessionToken(request);
+}
+
+/** Bearer业务写入不使用Cookie或CSRF；浏览器会话仍要求同源及CSRF。 */
+export function assertBusinessOrigin(request: IncomingMessage): void {
+  if (request.headers.authorization !== undefined) {
+    if (request.headers.origin || request.headers['sec-fetch-site'] === 'cross-site') throw new ForbiddenException('Agent凭据不接受浏览器跨站调用。');
+    if (!request.headers['content-type']?.startsWith('application/json')) throw new BadRequestException('仅接受JSON请求。');
+    return;
+  }
+  assertSameOrigin(request);
 }
 
 /** 写操作必须为同站JSON请求，拒绝跨站表单及缺失来源的会话调用。 */

@@ -6,16 +6,26 @@ import { DatabaseService } from '../database/database.service.js';
 import { IdentityRepository } from './identity.repository.js';
 import type { AccountRow } from './identity.repository.js';
 import { digest, hashPassword, verifyPassword } from './password.js';
+import { TokenRepository } from './token.repository.js';
 
 export type Authenticated = { account: AccountRow; csrf: string; hash: string };
 
-/** 会话身份和个人Token分开；本阶段只接受登录会话，不接受Bearer替代。 */
+/** 会话与Token认证分开，最终都返回当前账号，由业务服务重验权限。 */
 @Injectable()
 export class IdentityService {
   constructor(private readonly database: DatabaseService) {}
 
   /** Cookie不能替代当前账号状态检查；锁定账号后再次核对会话撤销。 */
   async authenticate(manager: EntityManager, token: string, csrf?: string): Promise<Authenticated> {
+    if (token.startsWith('bearer:')) {
+      const value = token.slice(7);
+      if (!/^ntfs_[a-f0-9]{64}$/.test(value)) throw new UnauthorizedException('访问Token无效。');
+      const hash = digest(value); const tokens = new TokenRepository(manager); const active = await tokens.active(hash);
+      if (!active) throw new UnauthorizedException('访问Token已失效。');
+      const account = await new IdentityRepository(manager).accountById(active.accountId);
+      if (!account || account.disabled || account.must_change_password || !await tokens.active(hash, true)) throw new UnauthorizedException('访问Token已失效或账号不可用。');
+      return { account, hash, csrf: '' };
+    }
     if (!/^[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException('请先登录。');
     const repository = new IdentityRepository(manager);
     const hash = digest(token);

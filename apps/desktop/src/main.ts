@@ -1,17 +1,55 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, session, Tray } from 'electron';
+import { join } from 'node:path';
+import { startNotifications } from './notifications.js';
 
-/** 第1阶段只提供安全窗口底座；安装包、托盘及系统通知在第6阶段验收。 */
-async function openWindow(): Promise<void> {
-  const url = new URL(process.env.DESKTOP_WEB_URL ?? 'http://127.0.0.1:5174');
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password) throw new Error('Only the local frontend is allowed');
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  const window = new BrowserWindow({ width: 1200, height: 820, minWidth: 420, title: '下次一定', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } });
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  window.webContents.on('will-navigate', (event, target) => {
-    if (new URL(target).origin !== url.origin) event.preventDefault();
-  });
-  await window.loadURL(url.href);
+let window: BrowserWindow | undefined;
+let tray: Tray | undefined;
+let quitting = false;
+let stopNotifications: (() => void) | undefined;
+const configured = new URL(process.env.DESKTOP_WEB_URL ?? 'http://127.0.0.1:5174');
+if (configured.protocol !== 'http:' || configured.hostname !== '127.0.0.1' || configured.username || configured.password || configured.pathname !== '/' || configured.search || configured.hash) throw new Error('Only a local frontend origin is allowed');
+
+/** 代码绘制雾蓝图标，运行时不加载外部素材。 */
+function appIcon() {
+  const size = 32; const pixels = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const index = (y * size + x) * 4;
+    const mark = y >= 8 && y <= 23 && ((x >= 8 && x <= 11) || (x >= 20 && x <= 23) || Math.abs(x - y) <= 2);
+    pixels[index] = mark ? 248 : 170; pixels[index + 1] = mark ? 250 : 130; pixels[index + 2] = mark ? 252 : 91; pixels[index + 3] = 255;
+  }
+  return nativeImage.createFromBitmap(pixels, { width: size, height: size });
 }
 
-void app.whenReady().then(openWindow).catch(() => { console.error('Desktop startup failed; verify the local frontend.'); app.quit(); });
-app.on('window-all-closed', () => app.quit());
+/** 通知与托盘只能打开当前本机业务站点，页面本身重新加载权限。 */
+function show(path?: string): void {
+  if (!window) return;
+  if (path) void window.loadURL(new URL(path, configured).href).catch(() => console.error('本机网页服务不可用。'));
+  if (window.isMinimized()) window.restore();
+  window.show(); window.focus();
+}
+
+/** 安全窗口复用网页；关闭隐藏到托盘，显式退出才终止应用。 */
+async function start(): Promise<void> {
+  app.setAppUserModelId('cn.nexttimeforsure.desktop');
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  window = new BrowserWindow({ width: 1200, height: 820, minWidth: 420, title: '下次一定', icon: appIcon(), webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  window.setMenu(null);
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, target) => { if (new URL(target).origin !== configured.origin) event.preventDefault(); });
+  window.webContents.on('will-redirect', (event, target) => { if (new URL(target).origin !== configured.origin) event.preventDefault(); });
+  window.on('close', (event) => { if (!quitting) { event.preventDefault(); window?.hide(); } });
+  tray = new Tray(appIcon()); tray.setToolTip('下次一定');
+  tray.setContextMenu(Menu.buildFromTemplate([{ label: '打开下次一定', click: () => show('/') }, { label: '查看通知', click: () => show('/collaboration') }, { type: 'separator' }, { label: '退出', click: () => app.quit() }]));
+  tray.on('double-click', () => show());
+  stopNotifications = await startNotifications(configured.origin, join(app.getPath('userData'), 'notification-ledger.json'), show);
+  await window.loadURL(configured.href).catch(() => console.error('本机网页服务不可用；启动服务后从托盘重新打开。'));
+}
+
+if (!app.requestSingleInstanceLock()) app.quit();
+else {
+  app.on('second-instance', () => show());
+  app.on('activate', () => show());
+  app.on('before-quit', () => { quitting = true; stopNotifications?.(); tray?.destroy(); });
+  void app.whenReady().then(start).catch(() => { console.error('桌面启动失败，请检查本机服务或通知记录文件。'); app.quit(); });
+}

@@ -6,9 +6,38 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsc -p tsconfig.json && electron ."
+    "dev": "tsc -p tsconfig.json && electron .",
+    "test": "tsc -p tsconfig.json && node --test dist/*.test.js",
+    "package": "tsc -p tsconfig.json && electron-builder --win nsis --x64"
   },
   "devDependencies": {
-    "electron": "44.7.0"
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3"
+  },
+  "description": "下次一定 Windows 桌面客户端",
+  "author": "Next Time, For Sure",
+  "build": {
+    "appId": "cn.nexttimeforsure.desktop",
+    "productName": "下次一定",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*.js",
+      "!dist/**/*.test.js"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": "nsis"
+    },
+    "nsis": {
+      "createDesktopShortcut": true,
+      "allowToChangeInstallationDirectory": true,
+      "createStartMenuShortcut": true,
+      "oneClick": false,
+      "perMachine": false
+    },
+    "artifactName": "NextTimeForSure-${version}-Setup.${ext}",
+    "electronDist": "node_modules/electron/dist"
   }
 }
