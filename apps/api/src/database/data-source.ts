@@ -1,3 +1,4 @@
+import { PersonalWorkflow1792022401000 } from './migrations/1792022401000-personal-workflow.js';
 import { TeamDirectAssignments1792022400000 } from './migrations/1792022400000-team-direct-assignments.js';
 import { IndependentMilestones1791936000000 } from './migrations/1791936000000-independent-milestones.js';
 import { PersonalTokens1791849615000 } from './migrations/1791849615000-personal-tokens.js';
@@ -21,7 +22,7 @@ import { Milestones1791849607000 } from './migrations/1791849607000-milestones.j
 import { Personal1791849606000 } from './migrations/1791849606000-personal.js';
 
 /** 已知迁移顺序，用于只读就绪检查，避免检查过程创建迁移表。 */
-export const requiredMigrationNames = ['Foundation1791849600000', 'Identity1791849601000', 'Organization1791849602000', 'SchemaComments1791849603000', 'WorkIntake1791849604000', 'Assignments1791849605000', 'Personal1791849606000', 'Milestones1791849607000', 'TaskLifecycle1791849608000', 'SplitOrigin1791849609000', 'BoardOrder1791849610000', 'Blockers1791849611000', 'WeeklyDrafts1791849612000', 'WeeklyPublications1791849613000', 'LifecycleNotifications1791849614000', 'PersonalTokens1791849615000', 'IndependentMilestones1791936000000', 'TeamDirectAssignments1792022400000'];
+export const requiredMigrationNames = ['Foundation1791849600000', 'Identity1791849601000', 'Organization1791849602000', 'SchemaComments1791849603000', 'WorkIntake1791849604000', 'Assignments1791849605000', 'Personal1791849606000', 'Milestones1791849607000', 'TaskLifecycle1791849608000', 'SplitOrigin1791849609000', 'BoardOrder1791849610000', 'Blockers1791849611000', 'WeeklyDrafts1791849612000', 'WeeklyPublications1791849613000', 'LifecycleNotifications1791849614000', 'PersonalTokens1791849615000', 'IndependentMilestones1791936000000', 'TeamDirectAssignments1792022400000', 'PersonalWorkflow1792022401000'];
 
 /** API与迁移工具使用同一配置；关闭结构同步、自动迁移及SQL日志。 */
 export function createDataSource(environment: Environment): DataSource {
@@ -40,7 +41,7 @@ export function createDataSource(environment: Environment): DataSource {
     migrationsRun: false,
     migrationsTransactionMode: 'none',
     migrationsTableName: 'schema_migrations',
-    migrations: [Foundation1791849600000, Identity1791849601000, Organization1791849602000, SchemaComments1791849603000, WorkIntake1791849604000, Assignments1791849605000, Personal1791849606000, Milestones1791849607000, TaskLifecycle1791849608000, SplitOrigin1791849609000, BoardOrder1791849610000, Blockers1791849611000, WeeklyDrafts1791849612000, WeeklyPublications1791849613000, LifecycleNotifications1791849614000, PersonalTokens1791849615000, IndependentMilestones1791936000000, TeamDirectAssignments1792022400000],
+    migrations: [Foundation1791849600000, Identity1791849601000, Organization1791849602000, SchemaComments1791849603000, WorkIntake1791849604000, Assignments1791849605000, Personal1791849606000, Milestones1791849607000, TaskLifecycle1791849608000, SplitOrigin1791849609000, BoardOrder1791849610000, Blockers1791849611000, WeeklyDrafts1791849612000, WeeklyPublications1791849613000, LifecycleNotifications1791849614000, PersonalTokens1791849615000, IndependentMilestones1791936000000, TeamDirectAssignments1792022400000, PersonalWorkflow1792022401000],
     entities: [],
     logging: false,
     extra: { connectionLimit: 5, connectTimeout: 5000 },

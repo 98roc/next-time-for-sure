@@ -18,7 +18,7 @@ export async function notifyWork(manager: EntityManager, event: string, project:
     const rows: unknown = await manager.query('SELECT submitter_id AS id FROM work_requests WHERE id=?', [object]);
     recipients = z.array(z.object({ id: z.string() })).parse(rows).map((row) => row.id); title = '你提交的需求有新的处理结果';
   } else if (action === 'task.from_request') { recipients = data.ownerId ? [data.ownerId] : []; title = '已接收的需求由你负责，请核对任务'; }
-  else if (['assignment.assign', 'assignment.transfer', 'assignment.adjust'].includes(action)) { recipients = [data.after?.accountId, data.before?.accountId].filter((id): id is string => Boolean(id)); title = '你的人员安排发生变化'; }
+  else if (['assignment.assign', 'assignment.transfer', 'assignment.adjust', 'assignment.remove'].includes(action)) { recipients = [data.after?.accountId, data.before?.accountId].filter((id): id is string => Boolean(id)); title = '你的人员安排发生变化'; }
   else if (action === 'task.change_owner') { recipients = [data.before?.ownerId, data.after?.ownerId].filter((id): id is string => Boolean(id)); title = '团队任务主负责人发生变化'; }
   else if (['assignment.complete', 'assignment.assignment_blocker', 'task.task_blocker'].includes(action) && task) { recipients = [task.ownerId]; title = action.includes('blocker') ? '任务协作阻塞发生变化，请核对' : '参与人已确认完成本人分工'; }
   else if (['assignment.claim', 'assignment.exit'].includes(action)) {

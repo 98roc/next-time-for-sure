@@ -1,26 +1,26 @@
 import { useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Assignment, Identity, WorkSnapshot } from '@ntfs/contracts';
-import { personalCommand } from '../personal/api';
+import { personalCommand, personalSnapshot } from '../personal/api';
 
-/** 将本人分工带入个人空间；保留来源关联，不复制分工事实或自动开始。 */
-export function AssignmentPersonal({ task, entry, identity }: { task: WorkSnapshot['tasks'][number]; entry: Assignment; identity: Identity }) {
+/** 团队详情与个人看板共用幂等加入，重复进入只定位已有事项。 */
+export function AssignmentPersonal({ entry, identity }: { task: WorkSnapshot['tasks'][number]; entry: Assignment; identity: Identity }) {
   const client = useQueryClient();
-  const operation = useRef<{ title: string; id: string } | null>(null);
-  const [created, setCreated] = useState(false);
-  const save = useMutation({ mutationFn: (title: string) => {
-    if (operation.current?.title !== title) operation.current = { title, id: crypto.randomUUID() };
-    return personalCommand({ action: 'create_personal', kind: 'work', projectId: task.projectId, assignmentId: entry.id, title, description: '', acceptance: '', categoryId: null, operationId: operation.current.id }, identity.csrfToken);
-  }, onSuccess: async () => {
-    setCreated(true);
-    await Promise.all(['personal', 'assignments', 'work'].map((key) => client.invalidateQueries({ queryKey: [key] })));
-  } });
-  return <details><summary>带入个人空间</summary>
-    {created ? <p role="status">已建立关联个人事项。<a href="/personal">进入个人空间</a>；未自动开始或复制分工进展。</p> : <form onSubmit={(event) => { event.preventDefault(); save.mutate(String(new FormData(event.currentTarget).get('title')).trim()); }}>
-      <label>个人事项标题<input name="title" required maxLength={200} defaultValue={task.title} /></label>
-      {entry.status === 'completed' && <p>新增未完成的关联工作将恢复本人分工为未完成。</p>}
-      {save.isError && <p role="alert" className="form-error">{save.error.message}</p>}
-      <button disabled={save.isPending}>建立关联个人事项</button>
+  const [open, setOpen] = useState(false);
+  const operation = useRef<{ category: string; id: string } | null>(null);
+  const personal = useQuery({ queryKey: ['personal', identity.id, 'mine'], queryFn: () => personalSnapshot('mine'), enabled: open });
+  const status = entry.status === 'completed' ? 'completed' : entry.status === 'in_progress' ? 'in_progress' : 'not_started';
+  const categories = personal.data?.categories.filter((category) => category.status === status) ?? [];
+  const linked = personal.data?.items.filter((item) => item.assignmentId === entry.id) ?? [];
+  const save = useMutation({ mutationFn: (category: string) => {
+    if (operation.current?.category !== category) operation.current = { category, id: crypto.randomUUID() };
+    return personalCommand({ action: 'import_assignment', assignmentId: entry.id, categoryId: category, split: false, operationId: operation.current.id }, identity.csrfToken);
+  }, onSuccess: async () => { operation.current = null; await Promise.all(['personal', 'assignments', 'work'].map((key) => client.invalidateQueries({ queryKey: [key] }))); } });
+  return <details onToggle={(event) => setOpen(event.currentTarget.open)}><summary>加入我的工作</summary>
+    {linked.length ? <p>已加入 {linked.length} 项。<a href="/personal">去我的工作继续安排与拆分 →</a></p> : <form onSubmit={(event) => { event.preventDefault(); const id = categories.length === 1 ? categories[0]?.id : String(new FormData(event.currentTarget).get('category')); if (id) save.mutate(id); }}>
+      {categories.length > 1 && <label>放入分类<select name="category" required defaultValue=""><option value="" disabled>请选择分类</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>}
+      {(save.isError || personal.isError) && <p role="alert">{save.error?.message || personal.error?.message}</p>}
+      <button disabled={save.isPending || !categories.length}>加入我的工作</button>
     </form>}
   </details>;
 }

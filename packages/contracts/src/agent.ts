@@ -24,6 +24,7 @@ export const agentQuerySchema = z.discriminatedUnion('path', [
   z.object({ path: z.literal('tasks/impact'), query: z.object({ taskId: id, intent: taskEndIntentSchema }).strict() }).strict(),
   z.object({ path: z.literal('personal'), query: z.object({ scope: z.enum(['mine', 'visible']) }).strict() }).strict(),
   z.object({ path: z.literal('personal/history'), query: z.object({ itemId: id }).strict() }).strict(),
+  z.object({ path: z.literal('personal/team-work'), query: empty }).strict(),
   ...['weekly-plans', 'weekly-plans/candidates', 'weekly-plans/preview', 'weekly-plans/publications', 'reports', 'reports/preview'].map((path) => z.object({ path: z.literal(path), query: weekly }).strict()),
   z.object({ path: z.literal('work-tags'), query: z.object({ objectId: id, objectKind: z.enum(['task', 'personal']) }).strict() }).strict(),
   ...['lifecycle/handoff', 'lifecycle/history', 'notifications'].map((path) => z.object({ path: z.literal(path), query: empty }).strict()),

@@ -96,6 +96,26 @@ export async function verifyTeamDirect({ call, leader, developer, manager, admin
   const replacement = await write('assignments/commands', transfer);
   assert.equal((await assignment(first)).status, 'transferred'); assert.equal((await assignment(replacement)).groupId, null);
 
+  // 管理者撤销责任保留发布副本、进展和个人状态；权限、旧版本及重复移除均不能绕过。
+  const beforeRemoval = await assignment(directMember);
+  const beforeProgress = (await assignments()).progress.filter((entry) => entry.assignmentId === directMember);
+  const beforePersonal = personalSnapshotSchema.parse(await (await call('personal?scope=mine', developer)).json()).items.find((entry) => entry.id === itemId);
+  const remove = { action: 'remove', assignmentId: directMember, version: beforeRemoval.version };
+  for (const auth of [developer, manager, admin]) assert.equal((await call('assignments/commands', auth, remove)).status, 403);
+  assert.equal((await call('assignments/commands', leader, { ...remove, version: remove.version - 1 })).status, 409);
+  await write('assignments/commands', remove, agentLeader);
+  assert.equal((await assignment(directMember)).status, 'exited');
+  assert.equal((await candidates()).some((entry) => entry.assignmentId === directMember), false);
+  assert.deepEqual((await assignments()).progress.filter((entry) => entry.assignmentId === directMember), beforeProgress);
+  assert.equal(personalSnapshotSchema.parse(await (await call('personal?scope=mine', developer)).json()).items.find((entry) => entry.id === itemId)?.status, beforePersonal?.status);
+  assert.equal(JSON.stringify(await publications()), frozen);
+  assert.ok((await draft())?.arrangements.some((entry) => entry.assignmentId === directMember));
+  assert.equal((await call('assignments/commands', leader, remove)).status, 409);
+  const readded = await write('assignments/commands', { ...assign, accountId: ownerId, operationId: randomUUID() });
+  assert.notEqual(readded, directMember);
+  await write('assignments/commands', { action: 'complete', assignmentId: readded, version: 0 }, developer);
+  assert.equal((await call('assignments/commands', leader, { action: 'remove', assignmentId: readded, version: 1 })).status, 409);
+
   // 未入组本人可认领直属工作；认领及退出通知团队负责人。
   const claimTask = await create('无小组认领');
   const claimed = await write('assignments/commands', { action: 'claim', taskId: claimTask, groupId: null, content: '', operationId: randomUUID() }, manager);

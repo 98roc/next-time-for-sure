@@ -1,3 +1,4 @@
+import { TaskTagFields, taskCreationTags } from './task-tag-fields';
 import { Dialog } from '../layout/dialog';
 import { TaskDetail } from './task-detail';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -89,7 +90,7 @@ export function WorkPage() {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     const submitter = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null;
     continueCreation.current = !(submitter instanceof HTMLButtonElement && submitter.value === 'only');
-    send({ action: String(form.get('action')), projectId: project?.id, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), ...(form.get('action') === 'create_task' ? { milestoneId: String(form.get('milestoneId')) || null } : {}), operationId: crypto.randomUUID() });
+    send({ action: String(form.get('action')), projectId: project?.id, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), ...(form.get('action') === 'create_task' ? { milestoneId: String(form.get('milestoneId')) || null, tags: taskCreationTags(form) } : {}), operationId: crypto.randomUUID() });
   }
   const data = state.isError ? undefined : state.data;
   const activeTask = data?.tasks.find((entry) => entry.id === taskId);
@@ -114,7 +115,7 @@ export function WorkPage() {
         {taskId && !activeTask && !state.isFetching && <p role="alert">该任务已移除或无权查看。<button onClick={() => openTask('')}>返回项目</button></p>}
         {activeRequest && <Dialog title="需求详情" drawer onClose={() => setRequestId('')} busy={save.isPending}><RequestCard key={`${activeRequest.id}:${activeRequest.version}`} request={activeRequest} own={activeRequest.submitterId === identity.data.id} review={can('requests.accept')} organization={organization.data} projectId={project.id} pending={save.isPending} send={send} />{(save.error || formError) && <p role="alert" className="form-error">{formError || save.error?.message}</p>}</Dialog>}
       </>}
-      {creating && <Dialog title={view === 'requests' ? '提交需求' : '新建任务'} onClose={() => setCreating(false)} busy={save.isPending}><form key={`${project.id}:${revision}`} onSubmit={create}><fieldset disabled={save.isPending}><input type="hidden" name="action" value={view === 'requests' ? 'submit_request' : 'create_task'} />{view === 'requests' ? <label>名称<input autoFocus name="title" required maxLength={200} /></label> : <TaskCreationFields milestones={data?.milestones.filter((entry) => entry.status !== 'removed') ?? []} />}<details><summary>补充说明与完成标准（选填）</summary><label>说明<textarea name="description" maxLength={20000} /></label><label>完成标准<textarea name="acceptance" maxLength={20000} /></label></details>{(save.error || formError) && <p role="alert" className="form-error">{formError || save.error?.message}</p>}<div className="workflow-footer"><button className="primary-button workflow-primary" name="next" value="assign">{save.isPending ? '正在保存…' : view === 'requests' ? '创建' : '创建并分配人员 →'}</button>{view !== 'requests' && <button name="next" value="only">仅创建</button>}</div></fieldset></form></Dialog>}
+      {creating && <Dialog title={view === 'requests' ? '提交需求' : '新建任务'} onClose={() => setCreating(false)} busy={save.isPending}><form key={`${project.id}:${revision}`} onSubmit={create}><fieldset disabled={save.isPending}><input type="hidden" name="action" value={view === 'requests' ? 'submit_request' : 'create_task'} />{view === 'requests' ? <label>名称<input autoFocus name="title" required maxLength={200} /></label> : <TaskCreationFields milestones={data?.milestones.filter((entry) => entry.status !== 'removed') ?? []} />}{view !== 'requests' && organization.data && identity.data && <TaskTagFields identity={identity.data} organization={organization.data} projectId={project.id} />}<details><summary>补充说明与完成标准（选填）</summary><label>说明<textarea name="description" maxLength={20000} /></label><label>完成标准<textarea name="acceptance" maxLength={20000} /></label></details>{(save.error || formError) && <p role="alert" className="form-error">{formError || save.error?.message}</p>}<div className="workflow-footer"><button className="primary-button workflow-primary" name="next" value="assign">{save.isPending ? '正在保存…' : view === 'requests' ? '创建' : '创建并分配人员 →'}</button>{view !== 'requests' && <button name="next" value="only">仅创建</button>}</div></fieldset></form></Dialog>}
     </>}
   </main>;
 }

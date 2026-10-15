@@ -1,56 +1,75 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { weeklyPlanCommandSchema } from '@ntfs/contracts';
 import type { Identity, WeeklyPlanCommand, WorkSnapshot } from '@ntfs/contracts';
-import { shiftWeek, WeekPicker, weekLabel } from '../layout/week-picker';
+import { shiftWeek, weekStart, weekLabel } from '../layout/week-picker';
 import { selectedWeek } from '../weekly-plans/reporting-api';
 import { moveWeeklyArrangement, weeklyCommand, weeklySnapshot } from '../weekly-plans/api';
 import { ArrangementFields, arrangementValues } from '../weekly-plans/arrangement-fields';
 
-/** 项目任务内编排同一份共享草稿；保存、移出和移周都遵守周计划的权限及并发保护。 */
-export function TaskWeekPlan({ task, teamId, identity, onAssign }: { task: WorkSnapshot['tasks'][number]; teamId: string; identity: Identity; onAssign: () => void }) {
+type Snapshot = Awaited<ReturnType<typeof weeklySnapshot>>;
+type Editor = { week: string; assignmentId: string };
+type Row = { key: string; person: string; group: string };
+
+/** 两周共享人员列表；新增按周保存，编辑、移出和移周使用后端版本校验。 */
+export function TaskWeekPlan({ task, teamId, identity, onAssign, initialWeek }: { task: WorkSnapshot['tasks'][number]; teamId: string; identity: Identity; onAssign: () => void; initialWeek?: string | undefined }) {
   const client = useQueryClient();
-  const [week, setWeek] = useState(selectedWeek);
-  const [excluded, setExcluded] = useState<string[]>([]);
-  const [editing, setEditing] = useState('');
-  const [error, setError] = useState('');
+  const [week, setWeek] = useState(() => initialWeek ?? selectedWeek());
+  const [editing, setEditing] = useState<Editor | null>(null);
   const [notice, setNotice] = useState('');
-  const state = useQuery({ queryKey: ['weekly', identity.id, teamId, week], queryFn: () => weeklySnapshot(teamId, week), retry: false });
-  const data = state.isError ? undefined : state.data;
-  const save = useMutation({ mutationFn: (command: WeeklyPlanCommand) => weeklyCommand(command, identity.csrfToken), onSuccess: async () => {
-    setEditing(''); setExcluded([]); setNotice(`${weekLabel(week)}草稿已更新，由团队负责人确认发布。`);
-    await Promise.all(['weekly', 'reports', 'overview'].map((key) => client.invalidateQueries({ queryKey: [key] })));
-  } });
-  const moving = useMutation({ mutationFn: async (id: string) => {
-    const row = data?.draft?.arrangements.find((entry) => entry.id === id); if (!row) throw new Error('请刷新周安排。');
-    const targetWeek = shiftWeek(week, 1);
-    await moveWeeklyArrangement(teamId, week, targetWeek, row, identity.csrfToken);
-  }, onSuccess: async () => { setNotice('已移至后一周；若该周已有安排，保留其目标和投入。两周草稿均已同步，已发布版本保留。'); await Promise.all(['weekly', 'reports', 'overview'].map((key) => client.invalidateQueries({ queryKey: [key] }))); } });
-  function send(input: unknown) { const parsed = weeklyPlanCommandSchema.safeParse(input); if (!parsed.success) { setError('请核对进度与投入天数。'); return; } setError(''); setNotice(''); save.mutate(parsed.data); }
-  const candidates = data?.candidates.filter((entry) => entry.taskId === task.id) ?? [];
-  const unscheduled = candidates.filter((entry) => !data?.draft?.arrangements.some((row) => row.assignmentId === entry.assignmentId));
-  const selected = unscheduled.filter((entry) => !excluded.includes(entry.assignmentId));
-  const scheduled = data?.draft?.rows.filter((entry) => entry.taskId === task.id) ?? [];
-  const busy = save.isPending || moving.isPending;
-  return <section className="task-week-plan"><div className="section-heading"><div><h3>安排到哪一周</h3><p className="subtitle">先选执行人，再加入草稿；目标和投入可以稍后补充。</p></div></div>
-    <fieldset disabled={busy}><WeekPicker value={week} onChange={(value) => { setWeek(value); setExcluded([]); setEditing(''); setNotice(''); setError(''); save.reset(); moving.reset(); }} /></fieldset>
-    {(error || save.error || moving.error || state.error) && <p role="alert" className="form-error">{error || save.error?.message || moving.error?.message || state.error?.message}<button disabled={busy} onClick={() => { void state.refetch(); }}>刷新核对</button></p>}
-    {state.isPending && <p role="status">正在读取周安排…</p>}{notice && <p role="status">{notice}</p>}
-    {data && <><p className="detail-meta">{data.draft?.hasUnpublishedChanges ? '有未发布调整 · 已发布版本保持不变' : data.publications.length ? '已有发布版本，后续修改先保存为草稿' : '尚未发布'}<Link className="button-link" to={`/weekly-plans?week=${week}`}>查看完整周计划 →</Link></p>
-      {!data.canEdit && <><p>当前角色可查看已发布安排；人员和周安排由团队负责人或负责小组的组长维护。</p>{data.publications[0]?.rows.filter((row) => row.taskId === task.id).map((row) => <p key={row.sourceIds.join(':')}>{row.person} · {row.text}</p>)}</>}
-      {data.canEdit && <><div className="weekly-task-rows">{scheduled.map((row) => {
-        const arrangement = data.draft?.arrangements.find((entry) => row.sourceIds.includes(entry.assignmentId));
-        const pending = data.draft?.pending.find((entry) => row.sourceIds.includes(entry.id));
-        const candidate = candidates.find((entry) => entry.assignmentId === arrangement?.assignmentId);
-        return <article key={row.sourceIds.join(':')} className="weekly-task-row"><div className="section-heading"><strong>{row.person}</strong><span className="status-badge">{candidate ? '已安排' : pending ? '待落实人员' : '已停止或完成'}</span></div>{(row.text || row.plannedDays !== null) && <p>{[row.text, row.plannedDays === null ? '' : `${row.plannedDays} 天`].filter(Boolean).join(' · ')}</p>}<div className="assignment-actions">{candidate && arrangement && <><button disabled={busy} onClick={() => setEditing(editing === arrangement.id ? '' : arrangement.id)}>编辑周安排</button><button disabled={busy} onClick={() => { setNotice(''); moving.mutate(arrangement.id); }}>移至{weekLabel(shiftWeek(week, 1))}</button></>}{(arrangement || pending) && <button disabled={busy} onClick={() => { if (arrangement) send({ action: 'remove_arrangement', teamId, week, arrangementId: arrangement.id, version: arrangement.version }); else if (pending) send({ action: 'remove_pending', teamId, week, pendingId: pending.id, version: pending.version }); }}>移出{weekLabel(week)}</button>}</div>
-          {arrangement && candidate && editing === arrangement.id && <form key={`${arrangement.id}:${arrangement.version}`} onSubmit={(event) => { event.preventDefault(); send({ action: 'save_arrangement', teamId, week, assignmentId: candidate.assignmentId, assignmentVersion: candidate.assignmentVersion, taskVersion: candidate.taskVersion, version: arrangement.version, ...arrangementValues(event.currentTarget) }); }}><fieldset disabled={busy}><ArrangementFields week={week} arrangement={arrangement} /><div className="workflow-footer"><button type="button" onClick={() => setEditing('')}>取消</button><button className="primary-button">保存周安排</button></div></fieldset></form>}
-        </article>;
-      })}</div>
-      {unscheduled.length > 0 && <form key={week} onSubmit={(event) => { event.preventDefault(); const fields = arrangementValues(event.currentTarget); send({ action: 'save_arrangements', teamId, week, arrangements: selected.map((entry) => ({ assignmentId: entry.assignmentId, assignmentVersion: entry.assignmentVersion, taskVersion: entry.taskVersion, version: null, ...fields })) }); }}><fieldset disabled={busy}><h4>选择要加入的分工</h4>{unscheduled.map((entry) => <label className="week-person-choice" key={entry.assignmentId}><input type="checkbox" checked={!excluded.includes(entry.assignmentId)} onChange={(event) => setExcluded((ids) => event.target.checked ? ids.filter((id) => id !== entry.assignmentId) : [...ids, entry.assignmentId])} /><span>{entry.displayName} · {entry.groupName}<small>{entry.content || task.title}</small></span></label>)}<details><summary>补充目标与投入（选填，应用于每位所选成员）</summary><ArrangementFields week={week} /></details><div className="workflow-footer"><span>已选 {selected.length} 项</span><button className="primary-button" disabled={!selected.length || busy}>一键安排至{weekLabel(week)}</button></div></fieldset></form>}
-      {!unscheduled.length && !scheduled.length && <div className="inline-notice"><p>还没有可安排的分工，先为任务选择执行人。</p><button onClick={onAssign}>分配人员 →</button></div>}
-      {!!scheduled.length && !unscheduled.length && <p className="detail-meta">可安排分工均已加入所选周。调整人员请到“人员分工”。</p>}
-      </>}
-    </>}
+  const next = shiftWeek(week, 1);
+  const first = useQuery({ queryKey: ['weekly', identity.id, teamId, week], queryFn: () => weeklySnapshot(teamId, week), retry: false });
+  const second = useQuery({ queryKey: ['weekly', identity.id, teamId, next], queryFn: () => weeklySnapshot(teamId, next), retry: false });
+  const columns = [{ week, data: first.isError ? undefined : first.data }, { week: next, data: second.isError ? undefined : second.data }];
+  async function refresh() { await Promise.all(['weekly', 'reports', 'overview'].map((key) => client.invalidateQueries({ queryKey: [key] }))); }
+  const save = useMutation({ mutationFn: (command: WeeklyPlanCommand) => weeklyCommand(command, identity.csrfToken), onSuccess: async () => { setEditing(null); setNotice('周安排已保存。'); await refresh(); }, onError: refresh });
+  const move = useMutation({ mutationFn: async ({ data, id }: { data: Snapshot; id: string }) => {
+    const row = data.draft?.arrangements.find((item) => item.id === id);
+    if (!row) throw new Error('安排已变化，请刷新核对。');
+    await moveWeeklyArrangement(teamId, week, next, row, identity.csrfToken);
+  }, onSuccess: async () => { setEditing(null); setNotice('已移至后一周，已有目标和投入按移周规则保留。'); await refresh(); }, onError: refresh });
+  const busy = save.isPending || move.isPending;
+  const rows = new Map<string, Row>();
+
+  // 停止记录与待分配事项保留；只读角色仅使用发布副本。
+  for (const { data } of columns) for (const row of (data?.canEdit ? data.draft?.rows : data?.publications[0]?.rows) ?? []) {
+    const key = row.sourceIds[0];
+    if (row.taskId === task.id && key) rows.set(key, { key, person: row.person, group: '' });
+  }
+  for (const { data } of columns) for (const candidate of data?.candidates ?? []) {
+    if (candidate.taskId === task.id) rows.set(candidate.assignmentId, { key: candidate.assignmentId, person: candidate.displayName, group: candidate.groupName });
+  }
+  const error = first.error ?? second.error ?? save.error ?? move.error;
+  function changeWeek(value: string) { if (!value) return; setWeek(weekStart(value)); setEditing(null); setNotice(''); save.reset(); move.reset(); }
+  function add(data: Snapshot, target: string, assignmentId?: string) {
+    const candidates = data.candidates.filter((entry) => entry.taskId === task.id && (!assignmentId || entry.assignmentId === assignmentId) && !data.draft?.arrangements.some((row) => row.assignmentId === entry.assignmentId));
+    if (!candidates.length) return;
+    setNotice(''); save.mutate({ action: 'save_arrangements', teamId, week: target, arrangements: candidates.map((entry) => ({ assignmentId: entry.assignmentId, assignmentVersion: entry.assignmentVersion, taskVersion: entry.taskVersion, version: null, goal: '', expectedProgress: null, plannedDays: null })) });
+  }
+
+  return <section className="task-week-plan">
+    <div className="task-plan-toolbar"><label>起始周<input aria-label="周安排起始日期" type="date" value={week} disabled={busy} onChange={(event) => changeWeek(event.target.value)} /></label><button className="text-button" disabled={busy} onClick={() => changeWeek(selectedWeek())}>回到本周</button>{!initialWeek && <Link to={`/weekly-plans?week=${week}`}>完整周计划 →</Link>}</div>
+    {error && <p role="alert" className="form-error">{error.message} <button disabled={busy} onClick={() => { void first.refetch(); void second.refetch(); }}>刷新核对</button></p>}
+    {(first.isPending || second.isPending) && <p role="status">正在读取两周安排…</p>}{notice && <p role="status">{notice}</p>}
+    <div className="task-plan-matrix" role="table" aria-label="人员两周安排">
+      <div className="task-plan-line task-plan-head" role="row"><div role="columnheader">执行人</div>{columns.map((column) => <div role="columnheader" key={column.week}><strong>{weekLabel(column.week)}</strong><small>{column.week} 起</small><span className="detail-meta">{column.data?.draft?.hasUnpublishedChanges ? '有未发布调整' : column.data?.publications.length ? '已发布' : '草稿'}</span>{column.data?.canEdit && column.data.candidates.some((entry) => entry.taskId === task.id && !column.data?.draft?.arrangements.some((row) => row.assignmentId === entry.assignmentId)) && <button className="text-button" disabled={busy} onClick={() => { if (column.data) add(column.data, column.week); }}>安排全部未排人员</button>}</div>)}</div>
+      {[...rows.values()].map((person) => <div className="task-plan-line" role="row" key={person.key}><div className="task-plan-person" role="rowheader"><strong>{person.person}</strong><small>{person.group}</small></div>{columns.map(({ week: target, data }) => {
+        const arrangement = data?.draft?.arrangements.find((entry) => entry.assignmentId === person.key);
+        const candidate = data?.candidates.find((entry) => entry.assignmentId === person.key);
+        const row = (data?.canEdit ? data.draft?.rows : data?.publications[0]?.rows)?.find((entry) => entry.taskId === task.id && entry.sourceIds.includes(person.key));
+        const pending = data?.draft?.pending.find((entry) => row?.sourceIds.includes(entry.id));
+        return <div className="task-plan-cell" role="cell" key={target}>
+          {!data ? <span>暂不可用</span> : row ? <><div className="task-plan-cell-actions">{candidate && arrangement ? <button className="text-button" disabled={busy} onClick={() => { setEditing({ week: target, assignmentId: person.key }); save.reset(); }}>已安排 · 编辑</button> : <span className="detail-meta">{pending ? '待分配' : data.canEdit ? '已停止／完成' : '已发布'}</span>}{data.canEdit && (arrangement || pending) && <details className="task-plan-more"><summary>更多</summary><div>{target === week && candidate && arrangement && <button disabled={busy} onClick={() => move.mutate({ data, id: arrangement.id })}>移至{weekLabel(next)}</button>}<button disabled={busy} onClick={() => { if (arrangement) save.mutate({ action: 'remove_arrangement', teamId, week: target, arrangementId: arrangement.id, version: arrangement.version }); else if (pending) save.mutate({ action: 'remove_pending', teamId, week: target, pendingId: pending.id, version: pending.version }); }}>移出该周</button></div></details>}</div>{row.text && <p>{row.text}</p>}{row.plannedDays !== null && <small>投入 {row.plannedDays} 天</small>}</> : candidate ? <button className="text-button" disabled={busy} onClick={() => add(data, target, person.key)}>＋ 安排</button> : <span className="detail-meta">未安排</span>}
+        </div>;
+      })}</div>)}
+    </div>
+    {!rows.size && !first.isPending && !second.isPending && <p className="empty-state">暂无可见安排。<button className="text-button" onClick={onAssign}>查看人员分工</button></p>}
+    {columns.map(({ week: target, data }) => {
+      if (editing?.week !== target) return null;
+      const row = data?.draft?.arrangements.find((entry) => entry.assignmentId === editing.assignmentId);
+      const candidate = data?.candidates.find((entry) => entry.assignmentId === editing.assignmentId);
+      if (!row || !candidate) return null;
+      return <form className="task-plan-editor" key={`${target}:${row.id}:${row.version}`} onSubmit={(event) => { event.preventDefault(); save.mutate({ action: 'save_arrangement', teamId, week: target, assignmentId: candidate.assignmentId, assignmentVersion: candidate.assignmentVersion, taskVersion: candidate.taskVersion, version: row.version, ...arrangementValues(event.currentTarget) }); }}><fieldset disabled={busy}><h4>{candidate.displayName} · {weekLabel(target)}</h4><ArrangementFields week={target} arrangement={row} /><div className="workflow-footer"><button type="button" onClick={() => setEditing(null)}>取消</button><button className="primary-button">保存</button></div></fieldset></form>;
+    })}
   </section>;
 }

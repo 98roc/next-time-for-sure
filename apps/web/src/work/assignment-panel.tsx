@@ -17,14 +17,15 @@ function localTime(value: string | null): string {
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 23);
 }
-type Props = { task: WorkSnapshot['tasks'][number]; organization: OrganizationSnapshot; identity: Identity; hasChildren: boolean; onArrange: () => void };
+type Props = { task: WorkSnapshot['tasks'][number]; organization: OrganizationSnapshot; identity: Identity; hasChildren: boolean };
 
 /** 分工独立显示来源、负责小组与本人事实，不用任务整体状态覆盖个人状态。 */
-export function AssignmentPanel({ task, organization, identity, hasChildren, onArrange }: Props) {
+export function AssignmentPanel({ task, organization, identity, hasChildren }: Props) {
   const client = useQueryClient();
   const state = useQuery({ queryKey: ['assignments', identity.id, task.projectId], queryFn: () => assignmentSnapshot(task.projectId), retry: false });
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [adding, setAdding] = useState(false);
   const [revision, setRevision] = useState(0);
   const operation = useRef<{ content: string; id: string } | null>(null);
   const save = useMutation({
@@ -57,35 +58,41 @@ export function AssignmentPanel({ task, organization, identity, hasChildren, onA
     event.preventDefault(); const form = new FormData(event.currentTarget);
     send({ action: 'claim', taskId: task.id, groupId: String(form.get('groupId') ?? '') || null, content: String(form.get('content')), operationId: crypto.randomUUID() });
   }
-  return <section className="assignment-panel"><h3>人员分工 · {entries.filter((entry) => !['exited', 'transferred'].includes(entry.status)).length} 项</h3>
-    {hasChildren && <p>父任务只汇总和整体结束，请在子任务安排执行；这里保留原分工历史。</p>}{state.isPending && <p role="status">正在加载分工…</p>}{(state.isError || save.isError || error) && <p role="alert" className="form-error">{error || save.error?.message || state.error?.message} <button onClick={() => { void state.refetch(); }}>刷新分工</button></p>}{notice && <p role="status">{notice}</p>}
-    {executable && state.data && !state.isError && entries.length === 0 && <div className="inline-notice"><p>{canAssign ? '还没有执行分工，在下方选择执行人；不指定小组时由团队负责人统筹。' : '你可以认领自己的工作，也可由团队负责人安排执行人员。'}</p></div>}
-    {entries.map((entry) => <details className="assignment-entry" key={`${entry.id}:${entry.version}`}><summary><strong>{person(entry.accountId)}</strong><span>{organization.groups.find((group) => group.id === entry.groupId)?.name ?? '团队直属'} · {statuses[entry.status]}</span><small>{entry.content || '查看分工、进展与责任调整'}</small></summary>{entry.blockedReason && <p>分工受阻：{entry.blockedReason}</p>}{entry.originTaskId && <p>拆分迁移自<a href={`#task-${entry.originTaskId}`}>原任务</a>，进展与实际时间保留原记录。</p>}<p>实际开始：{entry.startedAt ? new Date(entry.startedAt).toLocaleString('zh-CN') : '未记录'}<br />实际结束：{entry.endedAt ? new Date(entry.endedAt).toLocaleString('zh-CN') : '未记录'}</p>{entry.transferredAt && <p>转交时间：{new Date(entry.transferredAt).toLocaleString('zh-CN')}</p>}
+  const renderEntry = (entry: Assignment) => <details className="assignment-entry" key={`${entry.id}:${entry.version}`}><summary><strong>{person(entry.accountId)}</strong><span>{organization.groups.find((group) => group.id === entry.groupId)?.name ?? '团队直属'} · {statuses[entry.status]}</span><small>{entry.content || '查看分工、进展与责任调整'}</small></summary>{entry.blockedReason && <p>分工受阻：{entry.blockedReason}</p>}{entry.originTaskId && <p>拆分迁移自<a href={`#task-${entry.originTaskId}`}>原任务</a>，进展与实际时间保留原记录。</p>}<p>实际开始：{entry.startedAt ? new Date(entry.startedAt).toLocaleString('zh-CN') : '未记录'}<br />实际结束：{entry.endedAt ? new Date(entry.endedAt).toLocaleString('zh-CN') : '未记录'}</p>{entry.transferredAt && <p>转交时间：{new Date(entry.transferredAt).toLocaleString('zh-CN')}</p>}
       {state.data?.progress.filter((progress) => progress.assignmentId === entry.id).map((progress) => <p key={progress.id}>{progress.occurredOn} · 归属周 {progress.reportWeek}<br />{progress.content}</p>)}
+      {state.data?.linkedProgress.filter((progress) => progress.assignmentId === entry.id).map((progress) => <p key={progress.id}>{progress.occurredOn} · 归属周 {progress.reportWeek} · 来自关联个人事项<br />{progress.content}</p>)}
+
+      {executable && !['exited', 'transferred'].includes(entry.status) && (entry.groupId === null ? canAssignDirect : managedGroups.some((group) => group.id === entry.groupId)) && <ResponsibilityEditor canAssignDirect={canAssignDirect} entry={entry} groups={managedGroups} organization={organization} pending={save.isPending} send={send} />}
       {entry.accountId === identity.id && executable && !['exited', 'transferred'].includes(entry.status) && <AssignmentPersonal task={task} entry={entry} identity={identity} />}
       {entry.accountId === identity.id && <BlockerForm projectId={task.projectId} taskId={task.id} value={entry} pending={save.isPending} send={(fields) => send({ action: 'assignment_blocker', assignmentId: entry.id, version: entry.version, ...fields })} />}{entry.accountId === identity.id && <OwnExecution entry={entry} executable={executable} pending={save.isPending} send={send} />}
-      {executable && !['exited', 'transferred'].includes(entry.status) && (entry.groupId === null ? canAssignDirect : managedGroups.some((group) => group.id === entry.groupId)) && <ResponsibilityEditor canAssignDirect={canAssignDirect} entry={entry} groups={managedGroups} organization={organization} pending={save.isPending} send={send} />}
-    </details>)}
+    </details>;
+  return <section className="assignment-panel"><div className="section-heading"><h3>人员分工 · {entries.filter((entry) => !['exited', 'transferred'].includes(entry.status)).length} 项</h3>{executable && canAssign && !adding && <button disabled={save.isPending} onClick={() => setAdding(true)}>＋ 添加人员</button>}</div>
+    {hasChildren && <p>父任务只汇总和整体结束，请在子任务安排执行；这里保留原分工历史。</p>}{state.isPending && <p role="status">正在加载分工…</p>}{(state.isError || save.isError || error) && <p role="alert" className="form-error">{error || save.error?.message || state.error?.message} <button onClick={() => { void state.refetch(); }}>刷新分工</button></p>}{notice && <p role="status">{notice}</p>}
+    {executable && state.data && !state.isError && entries.length === 0 && <div className="inline-notice"><p>{canAssign ? '还没有执行分工，在下方选择执行人；不指定小组时由团队负责人统筹。' : '你可以认领自己的工作，也可由团队负责人安排执行人员。'}</p></div>}
+    {entries.filter((entry) => !['exited', 'transferred'].includes(entry.status)).map(renderEntry)}
+    {entries.some((entry) => ['exited', 'transferred'].includes(entry.status)) && <details className="assignment-history"><summary>已移除／退出／转交的分工</summary>{entries.filter((entry) => ['exited', 'transferred'].includes(entry.status)).map(renderEntry)}</details>}
     {executable && <div key={revision}>
       {!entries.some((entry) => entry.accountId === identity.id && !['exited', 'transferred'].includes(entry.status)) && !canAssignDirect && <form className="assignment-picker" onSubmit={claimWork}><h4>我来做</h4><label>负责小组<select name="groupId" defaultValue={ownGroups[0]?.id ?? ''}><option value="">团队直属</option>{ownGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label><label>工作内容（选填）<input name="content" maxLength={20000} /></label><button disabled={save.isPending}>认领本人工作</button></form>}
-      {canAssign && project && state.data && !state.isError && <AssignmentPicker key={task.id} taskId={task.id} ownerId={task.ownerId} teamId={project.teamId} identity={identity} organization={organization} groups={managedGroups} entries={entries} onAssigned={onArrange} />}
+      {adding && canAssign && project && state.data && !state.isError && <AssignmentPicker key={task.id} taskId={task.id} ownerId={task.ownerId} teamId={project.teamId} identity={identity} organization={organization} groups={managedGroups} entries={entries} onClose={() => setAdding(false)} onAssigned={() => { setAdding(false); setNotice('人员已添加，可在周安排中排期。'); }} />}
     </div>}
-    {canAssign && entries.some((entry) => ['not_started', 'in_progress'].includes(entry.status)) && <div className="workflow-footer"><button onClick={onArrange}>下一步：安排本周或下周 →</button></div>}
 
   </section>;
 }
 
 /** 责任调整只展示当前动作所需字段；接手人跟随小组筛选，周安排影响在提交前说明。 */
 function ResponsibilityEditor({ entry, groups, organization, pending, send, canAssignDirect }: { canAssignDirect: boolean; entry: Assignment; groups: OrganizationSnapshot['groups']; organization: OrganizationSnapshot; pending: boolean; send: (input: unknown) => void }) {
+  const [removing, setRemoving] = useState(false);
   const [action, setAction] = useState<'adjust' | 'transfer'>('adjust');
   const [groupId, setGroupId] = useState(entry.groupId ?? '');
   const group = groups.find((item) => item.id === groupId);
-  return <details><summary>调整或转交责任</summary><form onSubmit={(event) => {
+  return <><div className="assignment-manage-actions">{entry.status !== 'completed' && <button className="text-button" disabled={pending} onClick={() => setRemoving(true)}>移除人员分工</button>}</div>
+    {removing && <div className="inline-notice" role="alert"><p>移除后此人停止参与该任务。已有进展、个人工作及发布历史保留，周安排作为停止记录保留；其他人员不受影响。</p><button disabled={pending} onClick={() => send({ action: 'remove', assignmentId: entry.id, version: entry.version })}>确认移除分工</button><button disabled={pending} onClick={() => setRemoving(false)}>取消</button></div>}
+    <details><summary>调整或转交责任</summary><form onSubmit={(event) => {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     send({ action, assignmentId: entry.id, groupId: groupId || null, content: String(form.get('content')), version: entry.version, ...(action === 'transfer' ? { accountId: String(form.get('accountId')), reason: String(form.get('reason')), operationId: crypto.randomUUID() } : {}) });
   }}><fieldset disabled={pending}><label>操作<select value={action} onChange={(event) => setAction(event.target.value === 'transfer' ? 'transfer' : 'adjust')}><option value="adjust">调整负责小组与内容</option><option value="transfer">转交给其他成员</option></select></label><label>负责小组<select value={groupId} onChange={(event) => setGroupId(event.target.value)}>{canAssignDirect && <option value="">团队直属</option>}{groups.filter((item) => action === 'transfer' || item.memberIds.includes(entry.accountId)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>工作内容<textarea name="content" defaultValue={entry.content} maxLength={20000} /></label>
     {action === 'transfer' && <><label>接手人<select name="accountId" key={groupId} required><option value="">请选择接手人</option>{organization.accounts.filter((account) => !account.disabled && account.id !== entry.accountId && (group ? group.memberIds.includes(account.id) : canAssignDirect && account.teamId === organization.accounts.find((person) => person.id === entry.accountId)?.teamId)).map((account) => <option key={account.id} value={account.id}>{account.displayName}</option>)}</select></label><label>转交原因<textarea name="reason" required maxLength={20000} /></label><p className="inline-notice">转交后原分工停止执行，其周安排与历史记录保留。保存后请进入“周安排”为接手人安排本周或下周。</p></>}
-    <button disabled={pending}>保存责任调整</button></fieldset></form></details>;
+    <button disabled={pending}>保存责任调整</button></fieldset></form></details></>;
 }
 
 /** 本人执行入口保留已停止分工的补记能力，不让管理者代为操作。 */

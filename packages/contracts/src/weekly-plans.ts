@@ -24,7 +24,7 @@ const arrangementFields = { assignmentId: id, assignmentVersion: version, taskVe
 export const weeklyPlanCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('save_arrangements'), teamId: id, week: reportWeekSchema, arrangements: z.array(z.object(arrangementFields).strict()).min(1).max(100).refine((rows) => new Set(rows.map((row) => row.assignmentId)).size === rows.length, '分工不能重复') }).strict(),
   z.object({ action: z.literal('move_arrangement'), teamId: id, week: reportWeekSchema, arrangementId: id, version, targetWeek: reportWeekSchema, targetVersion: version.nullable() }).strict(),
-  z.object({ action: z.literal('publish_plan'), teamId: id, week: reportWeekSchema, confirmation: z.string(), reason: z.string().trim().min(1).max(2000) }).strict(),
+  z.object({ action: z.literal('publish_plan'), teamId: id, week: reportWeekSchema, confirmation: z.string(), reason: z.string().trim().max(2000).default('') }).strict(),
   z.object({ action: z.literal('remove_arrangement'), teamId: id, week: reportWeekSchema, arrangementId: id, version }).strict(),
   z.object({ action: z.literal('add_pending'), teamId: id, week: reportWeekSchema, taskId: id, taskVersion: version }).strict(),
   z.object({ action: z.literal('remove_pending'), teamId: id, week: reportWeekSchema, pendingId: id, version }).strict(),

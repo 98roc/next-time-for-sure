@@ -1,4 +1,5 @@
-import { apiErrorSchema, personalSnapshotSchema, personalHistorySchema } from '@ntfs/contracts';
+import { apiErrorSchema, personalSnapshotSchema, personalHistorySchema, personalTeamWorkSchema } from '@ntfs/contracts';
+import { z } from 'zod';
 import type { PersonalCommand } from '@ntfs/contracts';
 import { IdentityApiError } from '../identity/api';
 
@@ -13,6 +14,8 @@ async function request(path: string, command?: PersonalCommand, csrf?: string): 
 /** 返回本人空间或服务端裁剪后的可见工作事项。 */
 export async function personalSnapshot(scope: 'mine' | 'visible') { return personalSnapshotSchema.parse(await request(`?scope=${scope}`)); }
 /** 写入须携带版本和必要的幂等标识。 */
-export async function personalCommand(command: PersonalCommand, csrf: string): Promise<void> { await request('/commands', command, csrf); }
+export async function personalCommand(command: PersonalCommand, csrf: string) { return z.object({ objectId: z.string().uuid() }).parse(await request('/commands', command, csrf)); }
+/** 团队工作与个人事项分开读取，复用服务端项目访问边界。 */
+export async function personalTeamWork() { return personalTeamWorkSchema.parse(await request('/team-work')); }
 /** 个人历史由服务端限制为本人，不能经此接口读取其他成员的源内容。 */
 export async function personalHistory(itemId: string) { return personalHistorySchema.parse(await request(`/history?itemId=${encodeURIComponent(itemId)}`)); }

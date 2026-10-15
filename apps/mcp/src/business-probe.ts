@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { workSnapshotSchema, lifecyclePreviewSchema } from '@ntfs/contracts';
+import { workSnapshotSchema, lifecyclePreviewSchema, personalSnapshotSchema, personalTeamWorkSchema } from '@ntfs/contracts';
 import { z } from 'zod';
 
 /** 使用真实API夹具启动stdio进程，不把协议通过误报为Codex兼容验收。 */
@@ -39,5 +39,18 @@ try {
   await call('business_command', { request: { path: 'lifecycle/commands', body: { intent, confirmation: preview.confirmation, reason: '验收清理', operationId: randomUUID() } } });
   const remaining = workSnapshotSchema.parse(await call('business_query', { request: { path: 'work', query: { projectId: body.projectId } } }));
   assert.equal(remaining.tasks.some((entry) => entry.id === task.id), false);
+  // 新个人工作流沿用同一个MCP命令契约，不经过网页也必须执行相同联动。
+  const personalTask = z.object({ objectId: z.string() }).parse(await call('business_command', { request: { path: 'work/commands', body: { ...body, title: 'MCP个人联动验收', operationId: randomUUID() } } }));
+  const claimed = z.object({ objectId: z.string() }).parse(await call('business_command', { request: { path: 'assignments/commands', body: { action: 'claim', taskId: personalTask.objectId, groupId: null, content: '', operationId: randomUUID() } } }));
+  const catalog = personalTeamWorkSchema.parse(await call('business_query', { request: { path: 'personal/team-work', query: {} } }));
+  assert.ok(catalog.tasks.some((entry) => entry.id === personalTask.objectId));
+  const imported = z.object({ objectId: z.string() }).parse(await call('business_command', { request: { path: 'personal/commands', body: { action: 'import_assignment', assignmentId: claimed.objectId, categoryId: null, split: false, operationId: randomUUID() } } }));
+  const personal = personalSnapshotSchema.parse(await call('business_query', { request: { path: 'personal', query: { scope: 'mine' } } }));
+  const item = personal.items.find((entry) => entry.id === imported.objectId); assert.ok(item);
+  await call('business_command', { request: { path: 'personal/commands', body: { action: 'complete_personal', itemId: item.id, version: item.version } } });
+  const completed = personalTeamWorkSchema.parse(await call('business_query', { request: { path: 'personal/team-work', query: {} } }));
+  assert.equal(completed.assignments.find((entry) => entry.id === claimed.objectId)?.status, 'completed');
+  assert.equal(completed.tasks.find((entry) => entry.id === personalTask.objectId)?.status, 'not_started');
+  console.log('PASS: MCP team catalog, import and personal completion automatically finish only the own assignment');
   console.log('PASS: authenticated MCP stdio list/query/write, permissions, idempotency and confirmation rejection/execution');
 } finally { await client.close(); }

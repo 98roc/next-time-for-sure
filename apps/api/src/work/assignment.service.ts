@@ -12,6 +12,7 @@ import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 import { WorkRepository } from './work.repository.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { PersonalRepository } from './personal.repository.js';
+import { canViewPersonal } from './personal-policy.js';
 import { ensureParentActive, validateWaiting } from './task.service.js';
 
 /** 人员责任与本人执行分离，管理者不能通过分配命令代改执行事实。 */
@@ -28,12 +29,15 @@ export class AssignmentService {
       const full = target.members.some((member) => member.accountId === access.actor.id) || access.organization.teams.some((team) => team.id === target.teamId && team.leaderId === access.actor.id);
       const groups = access.organization.groups.filter((group) => group.teamId === target.teamId && group.leaderId === access.actor.id);
       if (!full && !groups.length) throw new ForbiddenException('没有项目或本组工作访问权限。');
-      const state = await new AssignmentRepository(manager).snapshot(project);
+      // 关联进展沿用个人工作可见范围，纯项目经理不能借团队目录读取源记录。
+      const personal = await new PersonalRepository(manager).candidates(access.actor.id, access.actor.teamId);
+      const visiblePersonalIds = personal.filter((item) => item.projectId === project && canViewPersonal(access, item)).map((item) => item.id);
+      const state = await new AssignmentRepository(manager).snapshot(project, visiblePersonalIds);
       if (full) return state;
 
       // 非项目成员的组长只能看到本组成员分工，不借此开放整个项目。
       const assignments = state.assignments.filter((entry) => groups.some((group) => group.memberIds.includes(entry.accountId)));
-      return { assignments, progress: state.progress.filter((entry) => assignments.some((assignment) => assignment.id === entry.assignmentId)) };
+      return { assignments, progress: state.progress.filter((entry) => assignments.some((assignment) => assignment.id === entry.assignmentId)), linkedProgress: state.linkedProgress.filter((entry) => assignments.some((assignment) => assignment.id === entry.assignmentId)) };
     });
   }
 
@@ -79,6 +83,8 @@ export class AssignmentService {
         if (!assignment) throw new NotFoundException('分工不存在。');
         manage(assignment.groupId); manage(command.groupId);
         if (assignment.groupId !== command.groupId && await new ReportingRepository(manager).publishedTask(project.teamId, task.id) && !access.organization.teams.some((team) => team.id === project.teamId && team.leaderId === access.actor.id)) throw new ForbiddenException('已发布安排的跨组调整须由团队负责人确认。');
+      } else if (command.action === 'remove' && assignment) {
+        manage(assignment.groupId);
       } else {
         projectAccess(access, project.id);
         if (assignment && assignment.accountId !== access.actor.id) throw new ForbiddenException('仅本人可修改执行事实或退出认领。');
@@ -133,6 +139,10 @@ export class AssignmentService {
       } else {
         if (!assignment) throw new NotFoundException('分工不存在。');
         switch (command.action) {
+          // 撤销责任沿用停止态，保留进展、个人关联和发布副本，不伪造完成事实。
+          case 'remove':
+            if (assignment.status === 'completed') throw new ConflictException('已完成分工不能移除，请保留完成记录。');
+            await repository.transition(assignment.id, 'exited'); break;
           case 'assignment_blocker': await validateWaiting(manager, task, command.waitingTaskId); await repository.blocker(assignment.id, command.blockedReason, command.waitingFor, command.waitingTaskId); break;
           case 'adjust': eligible(assignment.accountId, command.groupId); await repository.adjust(assignment.id, command.groupId, command.content); break;
           case 'exit':

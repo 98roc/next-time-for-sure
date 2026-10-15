@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { milestoneSchema } from './milestones.js';
+import { reportWeekSchema } from './assignments.js';
 
 const id = z.string().uuid();
 const version = z.number().int().nonnegative();
@@ -7,6 +8,9 @@ const title = z.string().trim().min(1).max(200);
 const details = z.string().trim().max(20000);
 export const requestStatusSchema = z.enum(['pending', 'supplement_required', 'deferred', 'rejected', 'withdrawn', 'accepted']);
 export const taskStatusSchema = z.enum(['not_started', 'in_progress', 'completed', 'cancelled']);
+
+/** 新建工作时显式选择的计划外标签；两个维度独立，周标签必须指定周一。 */
+export const workCreationTagsSchema = z.array(z.discriminatedUnion('dimension', [z.object({ dimension: z.literal('milestone'), week: z.null() }).strict(), z.object({ dimension: z.literal('weekly'), week: reportWeekSchema }).strict()])).max(2).refine((tags) => new Set(tags.map((tag) => tag.dimension)).size === tags.length, '标签维度不能重复');
 
 /** 需求与团队任务共用输入边界；说明、完成标准允许空白归一为空串。 */
 export const workCommandSchema = z.discriminatedUnion('action', [
@@ -17,7 +21,7 @@ export const workCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('resubmit_request'), requestId: id, version }).strict(),
   z.object({ action: z.literal('review_request'), requestId: id, decision: z.enum(['supplement_required', 'deferred', 'rejected', 'pending']), reason: details.min(1), version }).strict(),
   z.object({ action: z.literal('accept_request'), requestId: id, ownerId: id, version, operationId: id }).strict(),
-  z.object({ action: z.literal('create_task'), projectId: id, milestoneId: id.nullable().optional(), title, description: details, acceptance: details, operationId: id }).strict(),
+  z.object({ action: z.literal('create_task'), projectId: id, milestoneId: id.nullable().optional(), title, description: details, acceptance: details, operationId: id, tags: workCreationTagsSchema.optional() }).strict(),
 ]);
 export type WorkCommand = z.infer<typeof workCommandSchema>;
 export const workRequestSchema = z.object({ id, projectId: id, submitterId: id, title, description: details, acceptance: details, status: requestStatusSchema, version });

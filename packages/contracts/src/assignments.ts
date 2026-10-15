@@ -16,6 +16,7 @@ export const assignmentCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('adjust'), assignmentId: id, groupId: id.nullable(), content, version }).strict(),
   z.object({ action: z.literal('transfer'), assignmentId: id, accountId: id, groupId: id.nullable(), content, reason: content.min(1), version, operationId: id }).strict(),
   z.object({ action: z.literal('exit'), assignmentId: id, reason: content.min(1), version }).strict(),
+  z.object({ action: z.literal('remove'), assignmentId: id, version }).strict(),
   z.object({ action: z.literal('start'), assignmentId: id, version }).strict(),
   z.object({ action: z.literal('complete'), assignmentId: id, version, confirmation: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict(),
   z.object({ action: z.literal('record_progress'), assignmentId: id, occurredOn: date, reportWeek: reportWeekSchema, content: content.min(1), version, operationId: id }).strict(),
@@ -25,7 +26,8 @@ export type AssignmentCommand = z.infer<typeof assignmentCommandSchema>;
 export const assignmentSchema = z.object({ id, taskId: id, originTaskId: id.nullable(), accountId: id, groupId: id.nullable(), content, source: z.enum(['assigned', 'claimed']), status: assignmentStatusSchema, version, startedAt: z.string().nullable(), endedAt: z.string().nullable(), transferredAt: z.string().nullable(), blockedReason: z.string(), waitingFor: z.string(), waitingTaskId: id.nullable() });
 export type Assignment = z.infer<typeof assignmentSchema>;
 export const assignmentProgressSchema = z.object({ id, assignmentId: id, occurredOn: date, reportWeek: reportWeekSchema, content, createdAt: z.string() });
-export const assignmentSnapshotSchema = z.object({ assignments: z.array(assignmentSchema), progress: z.array(assignmentProgressSchema) });
+/** 关联个人进展独立返回，团队展示可合并，汇报仍按原来源统计一次。 */
+export const assignmentSnapshotSchema = z.object({ assignments: z.array(assignmentSchema), progress: z.array(assignmentProgressSchema), linkedProgress: z.array(assignmentProgressSchema).default([]) });
 export type AssignmentSnapshot = z.infer<typeof assignmentSnapshotSchema>;
 export const assignmentCompletionSchema = z.object({ confirmation: z.string(), assignmentVersion: version, unfinished: z.array(z.object({ id, title: z.string(), version })) });
 export type AssignmentCompletion = z.infer<typeof assignmentCompletionSchema>;

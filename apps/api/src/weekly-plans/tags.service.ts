@@ -27,15 +27,7 @@ export class TagsService {
   async execute(token: string, csrf: string, command: TagCommand) {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token, csrf);
-      const scope = await tagScope(manager, access, command.objectId, command.objectKind);
-      if (scope.id !== command.objectId || !scope[command.dimension]) throw new ForbiddenException('没有该维度的标签管理权限；关联事项请到团队任务修改。');
-      if ((command.dimension === 'weekly') !== (command.week !== null)) throw new ConflictException('周计划标签须指定周一；里程碑标签不带周次。');
-      const repository = new ReportingRepository(manager);
-      const old = (await repository.tags(scope.id, scope.kind)).find((entry) => entry.dimension === command.dimension && entry.week === (command.week ?? ''));
-      if ((old?.version ?? null) !== command.version) throw new ConflictException('标签已变化，请刷新。');
-      const objectId = await repository.tag(command, old?.id);
-      await repository.event(scope.team, access.actor.id, 'tag.change', { before: old ?? null, after: command });
-      return { objectId };
+      return saveTag(manager, access, command);
     });
   }
 }
@@ -61,4 +53,17 @@ async function tagScope(manager: EntityManager, access: WorkAccess, id: string, 
   const teamLead = access.organization.teams.some((team) => team.id === project.teamId && team.leaderId === access.actor.id);
   const projectLead = project.members.some((entry) => entry.accountId === access.actor.id && entry.roles.includes('project_lead'));
   return { id, kind, team: project.teamId, milestone: teamLead || projectLead, weekly: teamLead || managesGroup };
+}
+
+/** 新建任务与后续改标签共用权限、版本及审计规则；由调用者提供同一事务。 */
+export async function saveTag(manager: EntityManager, access: WorkAccess, command: TagCommand) {
+  const scope = await tagScope(manager, access, command.objectId, command.objectKind);
+  if (scope.id !== command.objectId || !scope[command.dimension]) throw new ForbiddenException('没有该维度的标签管理权限；关联事项请到团队任务修改。');
+  if ((command.dimension === 'weekly') !== (command.week !== null)) throw new ConflictException('周计划标签须指定周一；里程碑标签不带周次。');
+  const repository = new ReportingRepository(manager);
+  const old = (await repository.tags(scope.id, scope.kind)).find((entry) => entry.dimension === command.dimension && entry.week === (command.week ?? ''));
+  if ((old?.version ?? null) !== command.version) throw new ConflictException('标签已变化，请刷新。');
+  const objectId = await repository.tag(command, old?.id);
+  await repository.event(scope.team, access.actor.id, 'tag.change', { before: old ?? null, after: command });
+  return { objectId };
 }

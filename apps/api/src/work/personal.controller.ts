@@ -13,6 +13,9 @@ export class PersonalController {
   /** 查询本人空间，或当前角色有权查看的工作明细。 */
   @Get() @Header('Cache-Control', 'no-store') @ApiOperation({ summary: '查看个人事项' })
   snapshot(@Req() request: IncomingMessage, @Query('scope') scope: unknown) { return this.personal.snapshot(businessToken(request), parseBody(z.enum(['mine', 'visible']).default('mine'), scope)); }
+  /** 聚合权限内团队工作，供个人空间选择及拆分。 */
+  @Get('team-work') @Header('Cache-Control', 'no-store') @ApiOperation({ summary: '查看可加入个人空间的团队工作' })
+  teamWork(@Req() request: IncomingMessage) { return this.personal.teamWork(businessToken(request)); }
   /** 私人内容历史仅供本人查询。 */
   @Get('history') @Header('Cache-Control', 'no-store') @ApiOperation({ summary: '查看本人事项历史' })
   history(@Req() request: IncomingMessage, @Query('itemId') id: unknown) { return this.personal.history(businessToken(request), parseBody(z.string().uuid(), id)); }

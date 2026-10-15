@@ -17,13 +17,14 @@ export async function verifyOrder({ call, developer, manager, projectId }: WorkF
   assert.equal(reordered[0]?.id, last.id);
   for (const before of column) { const after = reordered.find((entry) => entry.id === before.id); assert.ok(after); assert.deepEqual({ ...after, position: before.position, version: before.version }, before); }
   for (const title of ['排序甲', '排序乙']) assert.equal((await call('personal/commands', developer, { action: 'create_personal', kind: 'private', projectId: null, assignmentId: null, title, description: '', acceptance: '', categoryId: null, operationId: randomUUID() })).status, 200);
-  const items = (await personal()).items.filter((entry) => entry.categoryId === null);
+  const categoryId = (await personal()).categories.find((entry) => entry.status === 'not_started')?.id; assert.ok(categoryId);
+  const items = (await personal()).items.filter((entry) => entry.categoryId === categoryId);
   const moving = items.at(-1); const target = items[0]; assert.ok(moving && target && moving.id !== target.id);
-  const insert = { action: 'insert_personal', itemId: moving.id, version: moving.version, categoryId: null, beforeId: target.id, order: items.filter((entry) => entry.id !== moving.id).map(({ id, version }) => ({ id, version })) };
+  const insert = { action: 'insert_personal', itemId: moving.id, version: moving.version, categoryId, beforeId: target.id, order: items.filter((entry) => entry.id !== moving.id).map(({ id, version }) => ({ id, version })) };
   assert.equal((await call('personal/commands', manager, insert)).status, 403);
   assert.equal((await call('personal/commands', developer, insert)).status, 200);
   assert.equal((await call('personal/commands', developer, insert)).status, 409);
-  const sorted = (await personal()).items.filter((entry) => entry.categoryId === null);
+  const sorted = (await personal()).items.filter((entry) => entry.categoryId === categoryId);
   assert.equal(sorted[0]?.id, moving.id);
   for (const before of items) { const after = sorted.find((entry) => entry.id === before.id); assert.ok(after); assert.deepEqual({ ...after, position: before.position, version: before.version }, before); }
   console.log('PASS: persisted team/personal insertion order, unauthorized sort rejection, stale/concurrent sort conflict and unchanged execution facts');

@@ -27,9 +27,10 @@ export async function verifyTasks(fixture: WorkFixture, taskId: string): Promise
   await execute({ action: 'complete_task', taskId, version: stale.version, confirmation: stale.confirmation }, developer, 409);
   const finalReview = await review();
   const beforePersonal = await personal();
+  const beforeCompletion = await assignments();
   await execute({ action: 'complete_task', taskId, version: finalReview.version, confirmation: finalReview.confirmation });
   current = await task(); assert.equal(current.status, 'completed'); assert.ok(current.endedAt); assert.equal(current.inMilestone, true);
-  assert.deepEqual(await assignments(), beforeAssignments);
+  assert.deepEqual(await assignments(), beforeCompletion);
   const afterPersonal = await personal();
   assert.deepEqual(afterPersonal.items.map((entry) => ({ ...entry, stopReason: null })), beforePersonal.items.map((entry) => ({ ...entry, stopReason: null })));
   const stoppedItem = afterPersonal.items.find((entry) => entry.id === item.id); assert.ok(stoppedItem?.stopReason);

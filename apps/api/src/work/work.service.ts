@@ -7,6 +7,7 @@ import { digest } from '../identity/password.js';
 import { hasPermission } from '../organization/policy.js';
 import { MilestoneRepository } from './milestone.repository.js';
 import { WorkRepository } from './work.repository.js';
+import { saveTag } from '../weekly-plans/tags.service.js';
 
 import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 
@@ -64,6 +65,8 @@ export class WorkService {
         }
         objectId = await repository.createTask(projectId, null, access.actor.id, command.title, command.description, command.acceptance);
         if (command.milestoneId) await milestones.link(objectId, command.milestoneId);
+        // 创建与标签在同一事务提交；任一标签越权时回滚任务，避免产生半成品。
+        for (const tag of command.tags ?? []) await saveTag(manager, access, { ...tag, objectId, objectKind: 'task', marked: true, version: null });
       } else {
         if (!request) throw new NotFoundException('需求不存在。');
         objectId = request.id;

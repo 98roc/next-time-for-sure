@@ -21,7 +21,6 @@
 .weekly-section > button, .weekly-section > form > button { justify-self: start; }
 .weekly-entry { background: var(--surface); }
 .weekly-entry > button { justify-self: start; }
-.plan-grid:empty { display: none; }
 .weekly-copy { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; padding: 18px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px; }
 .weekly-entry { display: grid; gap: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; }
 .weekly-entry h3, .weekly-entry p { margin: 0; }
@@ -38,27 +37,12 @@
   .week-navigation .week-picker > span { flex-basis: 100%; order: 1; }
   .week-navigation > .status-badge { margin-left: 0; }
 }
-.plan-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
-/* 编排页只有一层视图导航；周次与状态相邻，筛选跟随当前列表。 */
+/* 周次与状态相邻；内容切换和查看维度分开，筛选跟随当前列表。 */
 .weekly-page .week-navigation { align-items: center; gap: 12px; padding-bottom: 0; border: 0; }
 .weekly-page .week-navigation > .status-badge { margin-left: 0; }
 .weekly-page .collection-toolbar { margin-top: 20px; }
 .tab-count { display: inline-block; min-width: 20px; padding: 0 5px; margin-left: 3px; border-radius: 5px; background: var(--surface); font-size: 12px; }
-.weekly-page .plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
-.weekly-page .plan-card { display: flex; flex-direction: column; padding: 18px; gap: 16px; min-width: 0; }
-.plan-card-body { display: grid; align-content: start; gap: 10px; }
-.weekly-page .plan-card-body :is(h2, p) { margin: 0; }
-.weekly-page .plan-card-body h2 { font-size: 16px; line-height: 1.5; }
-.weekly-page .plan-card-body h2 > a { color: var(--text); text-decoration: none; }
-.weekly-page .plan-card-body h2 > a:hover { color: var(--accent); text-decoration: none; }
-.plan-card-project { color: var(--muted); font-size: 12px; }
-.plan-card-person { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font-size: 13px; }
-.plan-card-person span { color: var(--muted); }
-.weekly-page .plan-card-actions { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); flex-wrap: nowrap; gap: 8px; }
-.plan-card-actions > .detail-meta { flex: 1; font-size: 12px; }
-.weekly-page .plan-card-actions > button { min-height: 34px; padding: 6px 12px; font-size: 13px; }
-.weekly-page .plan-card-actions > .plan-edit-button { background: var(--selected); color: var(--accent); border-color: transparent; }
 .plan-more { position: relative; flex-shrink: 0; }
 .weekly-page .plan-more > summary { padding: 6px 8px; border-radius: 6px; list-style: none; cursor: pointer; font-size: 13px; color: var(--muted); }
 .plan-more > summary::-webkit-details-marker { display: none; }
@@ -67,11 +51,7 @@
 .plan-more > div { position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 3; min-width: 150px; padding: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 6px 20px #0003; }
 .weekly-page .plan-more button { display: block; width: 100%; min-height: 34px; border: 0; padding: 6px 10px; text-align: left; font-size: 13px; }
 .plan-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
-@media (max-width: 1100px) {
-  .weekly-page .plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @media (max-width: 600px) {
-  .weekly-page .plan-grid { grid-template-columns: minmax(0, 1fr); }
   .weekly-page .collection-toolbar { gap: 8px; }
   .weekly-page .collection-toolbar > .view-tabs { max-width: 100%; gap: 16px; }
 }
@@ -80,3 +60,71 @@
 .notification-entry h3 { font-size: 15px; }
 .notification-entry .detail-meta { margin-top: 6px; }
 .notification-entry .org-actions { gap: 14px; }
+
+/* 单周多维视图：任务标题只展示一次，执行分工使用紧凑行。 */
+.weekly-page .week-navigation > fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
+.plan-display-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.plan-grouping { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 9px; }
+.plan-grouping button { min-height: 32px; padding: 5px 12px; border: 0; background: transparent; font-size: 13px; }
+.plan-grouping button[aria-pressed="true"] { background: var(--selected); color: var(--accent); }
+.weekly-page > .plan-counts { margin: 0 0 16px; font-size: 13px; }
+.plan-groups { display: grid; gap: 20px; }
+.plan-group > .section-heading { margin-bottom: 10px; }
+.plan-group > .section-heading h2 { margin: 0; font-size: 16px; }
+.plan-task-list { display: grid; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.plan-task { display: grid; grid-template-columns: minmax(180px, .85fr) minmax(0, 2.6fr); min-width: 0; }
+.plan-task + .plan-task { border-top: 1px solid var(--line); }
+.weekly-page .plan-task-heading { display: flex; align-items: flex-start; padding: 10px 14px; margin: 0; }
+.plan-task-heading h3, .plan-task-heading p { margin: 0; }
+.plan-task-heading h3, .plan-task-heading h3 button { font-size: 14px; font-weight: 600; text-align: left; overflow-wrap: anywhere; line-height: 1.7; }
+.weekly-page .plan-task-heading h3 button { padding: 0; min-height: 24px; color: var(--text); }
+.plan-task-people { min-width: 0; border-left: 1px solid var(--line); }
+.plan-person-row { display: grid; grid-template-columns: minmax(100px, 145px) minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 12px; min-height: 44px; }
+.plan-person-row + .plan-person-row { border-top: 1px solid var(--line); }
+.plan-person-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; overflow-wrap: anywhere; }
+.plan-person-content { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; overflow-wrap: anywhere; }
+.plan-person-content p { margin: 0; font-size: 13px; }
+.plan-person-content .detail-meta, .plan-person-name .detail-meta { font-size: 12px; }
+.plan-person-actions { display: flex; align-items: center; gap: 8px; }
+.weekly-page .plan-person-actions > button { min-height: 28px; padding: 3px 8px; font-size: 12px; background: transparent; color: var(--accent); border-color: transparent; }
+.plan-stopped > summary { padding: 10px 18px; border-top: 1px solid var(--line); color: var(--muted); cursor: pointer; font-size: 13px; }
+.weekly-task-picker { display: grid; gap: 8px; max-height: 50vh; overflow-y: auto; }
+.weekly-task-picker > button { display: grid; gap: 5px; text-align: left; padding: 12px; }
+@media (max-width: 700px) {
+  .plan-task { grid-template-columns: minmax(0, 1fr); }
+  .plan-task-people { border-left: 0; }
+  .plan-person-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; padding: 8px 12px; }
+  .plan-person-content { grid-column: 1; }
+  .plan-person-actions { grid-column: 2; grid-row: 1 / span 2; }
+  .plan-person-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  .plan-person-actions { justify-content: flex-end; }
+  .plan-task-heading { padding: 12px; }
+  .plan-display-toolbar > .filter-toolbar { width: 100%; }
+  .plan-task-heading > div { min-width: 0; }
+}
+
+/* 汇总只保留阅读操作，发布和待分配在明确的独立弹层完成。 */
+.plan-review { margin-top: 18px; }
+.review-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.review-source { width: 160px; }
+.review-version { flex: 1 1 240px; max-width: 340px; }
+.review-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-left: auto; }
+.review-context, .review-reason { margin: 12px 0; font-size: 13px; }
+.review-effort { margin-top: 18px; font-size: 13px; }
+.plan-summary-search { width: min(280px, 100%); margin-left: auto; }
+.plan-summary .plan-display-toolbar { justify-content: flex-start; gap: 12px 18px; margin: 12px 0 18px; }
+.plan-summary .plan-counts { margin: 0; font-size: 12px; }
+.weekly-page .review-toolbar button, .weekly-page .review-toolbar select,
+.weekly-page .plan-summary-search input { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.weekly-page .review-actions .text-button { padding: 6px 0; color: var(--muted); }
+.weekly-page .review-actions .text-button:hover { color: var(--text); }
+.plan-summary .plan-grouping { border: 0; background: var(--surface); padding: 3px; gap: 2px; }
+.weekly-page .plan-summary .plan-grouping button { min-height: 30px; padding: 4px 10px; border: 0; background: transparent; font-size: 13px; }
+.weekly-page .plan-summary .plan-grouping button[aria-pressed="true"] { background: var(--selected); color: var(--accent); }
+.app-dialog.org-layout.plan-publication-dialog { width: min(1080px, calc(100vw - 32px)); }
+.plan-publication-dialog .plan-summary { margin-bottom: 20px; }
+@media (max-width: 700px) {
+  .review-actions { width: 100%; margin-left: 0; }
+  .review-actions { justify-content: flex-end; gap: 14px; }
+  .plan-summary-search { width: 100%; margin-left: 0; }
+}

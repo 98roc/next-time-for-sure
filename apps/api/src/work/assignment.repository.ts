@@ -20,10 +20,12 @@ export class AssignmentRepository {
   }
 
   /** 指定项目的团队侧分工和进展，返回前由服务校验项目访问权。 */
-  async snapshot(projectId: string): Promise<AssignmentSnapshot> {
+  async snapshot(projectId: string, visiblePersonalIds: string[] = []): Promise<AssignmentSnapshot> {
     const assignments: unknown = await this.manager.query(`${selectAssignments} JOIN team_tasks t ON t.id = a.task_id WHERE t.project_id = ? ORDER BY a.created_at`, [projectId]);
-    const progress: unknown = await this.manager.query(`SELECT p.id, p.assignment_id AS assignmentId, DATE_FORMAT(p.occurred_on, '%Y-%m-%d') AS occurredOn, DATE_FORMAT(p.report_week, '%Y-%m-%d') AS reportWeek, p.content, DATE_FORMAT(p.created_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS createdAt FROM assignment_progress p JOIN task_assignments a ON a.id = p.assignment_id JOIN team_tasks t ON t.id = a.task_id WHERE t.project_id = ? ORDER BY p.created_at`, [projectId]);
-    return assignmentSnapshotSchema.parse({ assignments, progress });
+    // 关联个人进展按原记录引用展示，不复制进展，周报仍按来源标识去重。
+    const progress: unknown = await this.manager.query(`SELECT p.id, p.assignment_id AS assignmentId, DATE_FORMAT(p.occurred_on, '%Y-%m-%d') AS occurredOn, DATE_FORMAT(p.report_week, '%Y-%m-%d') AS reportWeek, p.content, DATE_FORMAT(p.created_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS createdAt FROM assignment_progress p JOIN task_assignments a ON a.id = p.assignment_id JOIN team_tasks t ON t.id = a.task_id WHERE t.project_id = ? ORDER BY p.created_at, p.id`, [projectId]);
+    const linkedProgress: unknown = visiblePersonalIds.length ? await this.manager.query(`SELECT p.id, i.assignment_id AS assignmentId, DATE_FORMAT(p.occurred_on, '%Y-%m-%d') AS occurredOn, DATE_FORMAT(p.report_week, '%Y-%m-%d') AS reportWeek, p.content, DATE_FORMAT(p.created_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS createdAt FROM personal_progress p JOIN personal_items i ON i.id=p.item_id JOIN task_assignments a ON a.id=i.assignment_id JOIN team_tasks t ON t.id=a.task_id WHERE t.project_id=? AND i.kind='work' AND i.id IN (${visiblePersonalIds.map(() => '?').join(',')}) ORDER BY p.created_at, p.id`, [projectId, ...visiblePersonalIds]) : [];
+    return assignmentSnapshotSchema.parse({ assignments, progress, linkedProgress });
   }
 
   /** 锁定分工，版本检查在服务完成。 */

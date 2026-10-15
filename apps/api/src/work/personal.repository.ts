@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
-import { personalItemSchema, personalCategorySchema, personalProgressSchema, workEventSchema } from '@ntfs/contracts';
-import type { PersonalCommand, PersonalItem } from '@ntfs/contracts';
+import { personalItemSchema, personalCategorySchema, personalProgressSchema, personalStatusSchema, personalStatusLabels, workEventSchema } from '@ntfs/contracts';
+import type { PersonalCommand, PersonalItem, PersonalStatus } from '@ntfs/contracts';
 
 const selection = `SELECT i.id, i.owner_id AS ownerId, i.kind, i.project_id AS projectId, i.assignment_id AS assignmentId, i.title, i.description, i.acceptance, i.status, i.checklist_json, i.category_id AS categoryId, i.position, DATE_FORMAT(i.planned_on, '%Y-%m-%d') AS plannedOn, i.blocked_reason AS blockedReason, i.version, DATE_FORMAT(i.started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt, DATE_FORMAT(i.ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt FROM personal_items i`;
 
@@ -19,16 +19,24 @@ export class PersonalRepository {
   /** 锁定单条事项用于本人编辑及版本检查。 */
   async item(id: string): Promise<PersonalItem | undefined> { return decodeItems(await this.manager.query(`${selection} WHERE i.id = ? FOR UPDATE`, [id]))[0]; }
   /** 分类只返回本人内容，避免分类名称泄露私人安排。 */
-  async categories(owner: string) { return z.array(personalCategorySchema).parse(await this.manager.query('SELECT id, owner_id AS ownerId, name, version FROM personal_categories WHERE owner_id = ? ORDER BY name', [owner])); }
+  async categories(owner: string) { return z.array(personalCategorySchema).parse(await this.manager.query("SELECT id, owner_id AS ownerId, name, status, version FROM personal_categories WHERE owner_id = ? ORDER BY FIELD(status, 'not_started', 'in_progress', 'completed'), name, id", [owner])); }
+  /** 在组织锁内初始化新账号缺少的阶段，不覆盖用户已有分类。 */
+  async ensureCategories(owner: string): Promise<void> {
+    const categories = await this.categories(owner);
+    for (const status of personalStatusSchema.options) if (!categories.some((entry) => entry.status === status)) await this.createCategory(owner, personalStatusLabels[status], status);
+  }
+  /** 仅查询本人分工关联事项，供导入去重及完成联动判断。 */
+  async linked(assignment: string): Promise<PersonalItem[]> { return decodeItems(await this.manager.query(`${selection} WHERE i.assignment_id = ? ORDER BY i.created_at, i.id`, [assignment])); }
   /** 仅读取已通过服务授权的事项进展。 */
   async progressFor(ids: string[]) {
     if (!ids.length) return [];
     return z.array(personalProgressSchema).parse(await this.manager.query(`SELECT id, item_id AS itemId, DATE_FORMAT(occurred_on, '%Y-%m-%d') AS occurredOn, DATE_FORMAT(report_week, '%Y-%m-%d') AS reportWeek, content, DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS createdAt FROM personal_progress WHERE item_id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at`, ids));
   }
   /** 新任务不复制团队任务内容，保留本人独立标题与排序。 */
-  async create(owner: string, command: Extract<PersonalCommand, { action: 'create_personal' }>): Promise<string> {
+  async create(owner: string, command: Extract<PersonalCommand, { action: 'create_personal' }>, status: PersonalStatus = 'not_started'): Promise<string> {
     const id = randomUUID();
     await this.manager.query("INSERT INTO personal_items (id, owner_id, kind, project_id, assignment_id, title, description, acceptance, checklist_json, category_id, blocked_reason, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, '', UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))", [id, owner, command.kind, command.projectId, command.assignmentId, command.title, command.description, command.acceptance, command.categoryId]);
+    if (status !== 'not_started') await this.manager.query("UPDATE personal_items SET status=?, started_at=IF(?='in_progress', UTC_TIMESTAMP(3), NULL), ended_at=IF(?='completed', UTC_TIMESTAMP(3), NULL) WHERE id=?", [status, status, status, id]);
     return id;
   }
   /** 修改本人内容及一层清单，不产生团队状态联动。 */
@@ -37,10 +45,10 @@ export class PersonalRepository {
   }
   /** 关联归属独立于本人执行时间及状态。 */
   async link(id: string, assignment: string | null): Promise<void> { await this.manager.query('UPDATE personal_items SET assignment_id = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [assignment, id]); }
-  /** 本人开始保留首次时间，完成只记录本人结束，不自动完成分工。 */
-  async transition(id: string, status: 'in_progress' | 'completed'): Promise<void> {
-    const times = status === 'in_progress' ? 'started_at = COALESCE(started_at, UTC_TIMESTAMP(3)), ended_at = NULL' : 'ended_at = UTC_TIMESTAMP(3)';
-    await this.manager.query(`UPDATE personal_items SET status = ?, ${times}, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?`, [status, id]);
+  /** 状态和分类原子保存，回到未开始保留历史中的实际执行记录。 */
+  async transition(id: string, status: PersonalStatus, category: string, position?: number): Promise<void> {
+    const times = status === 'in_progress' ? 'started_at = COALESCE(started_at, UTC_TIMESTAMP(3)), ended_at = NULL' : status === 'completed' ? 'ended_at = UTC_TIMESTAMP(3)' : 'started_at = NULL, ended_at = NULL';
+    await this.manager.query(`UPDATE personal_items SET status = ?, category_id=?, position=COALESCE(?, position), ${times}, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?`, [status, category, position ?? null, id]);
   }
   /** 分类移动不修改执行状态。 */
   async move(id: string, category: string | null, position: number): Promise<void> { await this.manager.query('UPDATE personal_items SET category_id = ?, position = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [category, position, id]); }
@@ -54,12 +62,12 @@ export class PersonalRepository {
     return id;
   }
   /** 创建本人的独立分类。 */
-  async createCategory(owner: string, name: string): Promise<string> { const id = randomUUID(); await this.manager.query('INSERT INTO personal_categories (id, owner_id, name) VALUES (?, ?, ?)', [id, owner, name]); return id; }
+  async createCategory(owner: string, name: string, status: PersonalStatus): Promise<string> { const id = randomUUID(); await this.manager.query('INSERT INTO personal_categories (id, owner_id, name, status) VALUES (?, ?, ?, ?)', [id, owner, name, status]); return id; }
   /** 分类改名使用服务校验的版本。 */
   async renameCategory(id: string, name: string): Promise<void> { await this.manager.query('UPDATE personal_categories SET name = ?, version = version + 1 WHERE id = ?', [name, id]); }
-  /** 删除分类只将原事项移至未分类，不删除事项或改变状态。 */
-  async deleteCategory(id: string): Promise<void> {
-    await this.manager.query('UPDATE personal_items SET category_id = NULL, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE category_id = ?', [id]);
+  /** 删除分类时移入同阶段分类，不删除事项或触发完成联动。 */
+  async deleteCategory(id: string, target: string): Promise<void> {
+    await this.manager.query('UPDATE personal_items SET category_id = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE category_id = ?', [target, id]);
     await this.manager.query('DELETE FROM personal_categories WHERE id = ?', [id]);
   }
   /** 保存个人操作的精确前后快照，私人内容不写团队事件。 */

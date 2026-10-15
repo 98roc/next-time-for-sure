@@ -1,5 +1,6 @@
 import { apiErrorSchema, weeklyCandidatesSchema, weeklyDraftResponseSchema, planPublicationsSchema } from '@ntfs/contracts';
 import type { WeeklyArrangement, WeeklyPlanCommand } from '@ntfs/contracts';
+import { shiftWeek, weekLabel } from '../layout/week-picker';
 
 /** 会话接口只传本次业务参数，不在浏览器持久化计划或凭据。 */
 async function request(path: string, command?: WeeklyPlanCommand, csrf?: string): Promise<unknown> {
@@ -18,6 +19,25 @@ export async function weeklySnapshot(teamId: string, week: string) {
 }
 /** 周计划写入共用严格命令契约。 */
 export async function weeklyCommand(command: WeeklyPlanCommand, csrf: string) { await request('/commands', command, csrf); }
+
+/** 连续安排两周时各周沿用现有批量事务；后一周仅补缺，失败明确报告已经保存的前一周。 */
+export async function saveWeeklyBatch(command: WeeklyPlanCommand, csrf: string, alsoFollowingWeek: boolean) {
+  await weeklyCommand(command, csrf);
+  if (!alsoFollowingWeek || command.action !== 'save_arrangements') return;
+  const targetWeek = shiftWeek(command.week, 1);
+  try {
+    const target = await weeklySnapshot(command.teamId, targetWeek);
+    const existing = new Set(target.draft?.arrangements.map((entry) => entry.assignmentId));
+    const arrangements = command.arrangements.filter((entry) => !existing.has(entry.assignmentId)).map((entry) => {
+      const candidate = target.candidates.find((item) => item.assignmentId === entry.assignmentId);
+      if (!candidate) throw new Error('分工状态或权限已经变化，请刷新后核对。');
+      return { assignmentId: entry.assignmentId, assignmentVersion: candidate.assignmentVersion, taskVersion: candidate.taskVersion, version: null, goal: '', expectedProgress: null, plannedDays: null };
+    });
+    if (arrangements.length) await weeklyCommand({ action: 'save_arrangements', teamId: command.teamId, week: targetWeek, arrangements }, csrf);
+  } catch (error) {
+    throw new Error(`${weekLabel(command.week)}已保存，${weekLabel(targetWeek)}未完成确认。请切到目标周核对后补充；已有内容不会被覆盖。${error instanceof Error ? error.message : ''}`, { cause: error });
+  }
+}
 
 /** 先读取目标周版本再原子移周；目标已有安排时保留其人工内容，并发变化由服务端拒绝。 */
 export async function moveWeeklyArrangement(teamId: string, week: string, targetWeek: string, row: WeeklyArrangement, csrf: string) {

@@ -76,9 +76,6 @@
 
 .request-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
 .request-row > button { font-size: 15px; }
-.plan-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); margin: 20px 0; }
-.plan-card h2 { font-size: 16px; }
-.plan-grid .panel + .panel { margin-top: 0; }
 .report-text { white-space: pre-wrap; }
 .task-board-card h3 .text-button { font-size: 15px; color: var(--text); }
 .task-board-column > h3 { display: flex; align-items: center; justify-content: space-between; }

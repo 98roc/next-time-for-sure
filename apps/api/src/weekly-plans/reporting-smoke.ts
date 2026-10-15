@@ -11,6 +11,15 @@ export async function reportingSmoke({ call, developer, leader, manager, admin, 
   const team = org.teams[0]; const group = org.groups.find((entry) => entry.leaderId === ownerId); assert.ok(team && group);
   const week = '2026-11-02'; const next = '2026-11-09'; const base = { teamId: team.id, week };
   const write = async (path: string, body: unknown, auth: Session = leader) => { const response = await call(path, auth, body); const result: unknown = await response.json(); assert.equal(response.status, 200, JSON.stringify(result)); return z.object({ objectId: z.string() }).parse(result).objectId; };
+  // 创建与多标签一次提交；越权不遗留任务，重试不重复创建或标记。
+  const taggedCreate = { action: 'create_task', projectId, title: '创建时多标签验收', description: '', acceptance: '', operationId: randomUUID(), tags: [{ dimension: 'milestone', week: null }, { dimension: 'weekly', week }] };
+  assert.equal((await call('work/commands', developer, taggedCreate)).status, 403);
+  assert.equal(workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, leader)).json()).tasks.some((entry) => entry.title === taggedCreate.title), false);
+  const taggedId = await write('work/commands', taggedCreate);
+  assert.equal(await write('work/commands', taggedCreate), taggedId);
+  const createdTags = tagStateSchema.parse(await (await call(`work-tags?objectKind=task&objectId=${taggedId}`, leader)).json());
+  assert.equal(createdTags.tags.filter((tag) => tag.marked).length, 2);
+  assert.ok(createdTags.tags.some((tag) => tag.dimension === 'weekly' && tag.week === week));
   const task = await write('work/commands', { action: 'create_task', projectId, title: '两周演练任务', description: '', acceptance: '', operationId: randomUUID() }, developer);
   const assignmentId = await write('assignments/commands', { action: 'assign', taskId: task, accountId: ownerId, groupId: group.id, content: '接口开发', operationId: randomUUID() });
   const assignment = async () => { const state = assignmentSnapshotSchema.parse(await (await call(`assignments?projectId=${projectId}`, developer)).json()); const value = state.assignments.find((entry) => entry.id === assignmentId); assert.ok(value); return value; };
@@ -21,11 +30,12 @@ export async function reportingSmoke({ call, developer, leader, manager, admin, 
   await write('weekly-plans/commands', { action: 'add_pending', ...base, taskId: pending, taskVersion: 0 });
   const planPreview = publicationPreviewSchema.parse(await (await call(`weekly-plans/preview?teamId=${team.id}&week=${week}`, leader)).json());
   assert.equal(planPreview.rows.length, 2);
-  const publish = { action: 'publish_plan', ...base, confirmation: planPreview.confirmation, reason: '第一周基线' };
+  const publish = { action: 'publish_plan', ...base, confirmation: planPreview.confirmation };
   assert.equal((await call('weekly-plans/commands', developer, publish)).status, 403);
   const planId = await write('weekly-plans/commands', publish); assert.equal(await write('weekly-plans/commands', publish), planId);
   const plans = async () => planPublicationsSchema.parse(await (await call(`weekly-plans/publications?teamId=${team.id}&week=${week}`, manager)).json());
   assert.equal((await plans()).publications.length, 1); assert.equal((await plans()).canEdit, false);
+  assert.equal((await plans()).publications[0]?.reason, '');
   await write('weekly-plans/commands', { action: 'carry_forward', teamId: team.id, week: next });
 
   const mark = { objectId: task, objectKind: 'task', dimension: 'weekly', week, marked: true, version: null };

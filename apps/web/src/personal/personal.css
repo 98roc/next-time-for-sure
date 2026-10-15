@@ -1,5 +1,5 @@
-.personal-columns { display: flex; gap: 14px; overflow-x: auto; padding: 4px 0 16px; align-items: flex-start; }
-.personal-columns > section { flex: 0 0 320px; min-height: 180px; padding: 12px; background: var(--canvas); border-radius: 10px; border: 1px solid var(--line); }
+.personal-columns { display: flex; gap: 14px; overflow-x: auto; padding: 4px 3px 160px; align-items: stretch; scroll-snap-type: x proximity; }
+.personal-columns > section { flex: 1 0 270px; min-width: 0; min-height: 390px; padding: 12px; background: var(--canvas); border-radius: 12px; border: 1px solid var(--line); scroll-snap-align: start; }
 .personal-columns h2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 2px 12px; font-size: 14px; }
 .personal-columns h2 > span { font-size: 12px; color: var(--muted); font-weight: 400; }
 .personal-card-wrap + .personal-card-wrap { margin-top: 10px; }
@@ -40,6 +40,10 @@
 .personal-form .detail-meta { margin: -6px 0 0; font-size: 12px; }
 .personal-form-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
 .personal-form-actions button { min-height: 36px; padding: 7px 13px; font-size: 13px; }
+.dialog-body .personal-create-form { margin: 0; }
+.personal-create-form .task-tag-fields { margin: 0; }
+.personal-create-form .task-tag-fields .detail-meta { display: block; margin: 8px 0 0; }
+.dialog-body .personal-create-form details { margin-top: 0; }
 .personal-checklist-editor { display: grid; gap: 10px; }
 .personal-checklist-editor > button { justify-self: start; }
 .checklist-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
@@ -58,3 +62,110 @@
 .dialog-body .category-row form { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; margin: 0; }
 .category-row .inline-notice { margin-top: 12px; }
 .category-row .text-button.danger-button { padding-inline: 6px; }
+
+/* 看板拥有剩余宽度，团队库固定在旁；窄屏独立一行，避免挤压操作目标。 */
+.personal-workspace { max-width: none; min-width: 0; }
+.personal-workspace .org-header { margin-bottom: 24px; }
+.personal-toolbar, .personal-board-search { display: flex; align-items: center; gap: 12px; }
+.personal-toolbar { justify-content: space-between; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+.personal-toolbar > .assignment-actions { margin: 0; }
+.personal-board-search { flex: 1; max-width: 650px; }
+.org-layout .personal-board-search input { flex: 1; width: 100%; min-width: 130px; }
+.org-layout .personal-board-search select { width: 230px; max-width: 230px; flex: 0 1 230px; }
+.personal-toggle-active { background: var(--selected); border-color: var(--accent); }
+.personal-feedback { min-height: 30px; font-size: 13px; }
+.personal-feedback p { margin: 10px 0; }
+.personal-work-area { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+.personal-work-area.with-team { grid-template-columns: minmax(0, 1fr) 320px; }
+.personal-board { min-width: 0; }
+.personal-board .personal-columns { max-height: calc(100dvh - 310px); min-height: 320px; overflow: auto; overscroll-behavior: contain; }
+.personal-board-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.personal-board-heading h2 { margin: 0; font-size: 16px; }
+.personal-board-heading > span, .personal-board-heading h2 span { color: var(--muted); font-size: 12px; font-weight: 400; }
+.personal-board-heading h2 span { margin-left: 8px; }
+.personal-column-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 20px; min-height: 32px; }
+.personal-column-heading > div { min-width: 0; flex: 1; }
+.personal-columns .personal-column-heading h2 { justify-content: flex-start; margin: 0; overflow-wrap: anywhere; }
+.personal-column-heading h2 span { margin-left: auto; background: var(--surface); padding: 2px 7px; border-radius: 6px; }
+.personal-column-heading i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+[data-status=in_progress] .personal-column-heading i { background: var(--accent); }
+[data-status=completed] .personal-column-heading i { background: #55bda4; }
+.personal-column-heading small { display: block; margin: 5px 0 0 18px; color: var(--muted); font-size: 11px; }
+.personal-column-heading > button { padding: 4px 8px; min-height: 30px; }
+.personal-column-empty { padding: 45px 8px; color: var(--muted); text-align: center; font-size: 13px; line-height: 1.8; }
+.personal-column-empty span { display: block; font-size: 11px; opacity: .8; margin-top: 4px; }
+.personal-card { transition: border-color .15s, box-shadow .15s; }
+.personal-card:hover { border-color: var(--accent); }
+.personal-card-source { display: grid; gap: 5px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.personal-card-source button { padding: 0; min-height: 0; font-size: 11px; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.personal-highlight > .personal-card { border-color: var(--accent); box-shadow: 0 0 0 2px var(--selected); }
+.personal-insert-marker { height: 3px; background: var(--accent); margin: 6px 0; border-radius: 2px; }
+.personal-action { position: relative; }
+.personal-action-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 8; width: 220px; max-height: 270px; overflow-y: auto; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 26px #0004; }
+.personal-card-actions .personal-action-menu { left: auto; right: 0; }
+.personal-menu-heading { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; padding-left: 7px; }
+.personal-action-menu > button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; text-align: left; padding: 10px 8px; background: transparent; white-space: normal; overflow-wrap: anywhere; }
+.personal-action-menu > button:hover { background: var(--selected); }
+.personal-action-menu small { flex-shrink: 0; color: var(--muted); font-size: 10px; }
+.personal-team-panel { position: sticky; top: 24px; min-width: 0; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.org-layout .personal-team-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin: 0; }
+.personal-team-panel h2 { font-size: 16px; margin: 0; }
+.personal-team-panel h2 span { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 5px; }
+.personal-team-panel header p { margin: 8px 0 18px; color: var(--muted); font-size: 12px; }
+.personal-team-panel header button { padding: 0 6px; min-height: 24px; }
+.personal-team-panel .view-tabs { margin: 0 0 14px; }
+.personal-team-panel .view-tabs button { font-size: 13px; padding: 8px 10px; }
+.personal-team-filters { display: grid; gap: 10px; margin-bottom: 16px; }
+.personal-team-filters :is(input, select) { width: 100%; min-width: 0; min-height: 36px; font-size: 12px; }
+.personal-team-filters .personal-check-filter { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+.personal-team-filters input[type=checkbox] { width: 14px; min-height: 14px; margin: 0; }
+.personal-team-list { max-height: calc(100vh - 420px); min-height: 150px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.personal-team-card { background: var(--canvas); border: 1px solid var(--line); border-radius: 9px; padding: 13px; margin-bottom: 12px; }
+.personal-team-card[draggable=true] { cursor: grab; }
+.personal-source-label { margin: 0 0 7px; color: var(--muted); font-size: 11px; }
+.personal-team-card h3 { margin: 0; font-size: 14px; }
+.personal-team-card h3 button { font-size: 14px; padding: 0; min-height: 0; text-align: left; color: var(--text); line-height: 1.5; overflow-wrap: anywhere; }
+.personal-team-content { font-size: 12px; color: var(--muted); margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.personal-team-people { font-size: 11px; color: var(--muted); margin: 10px 0; }
+.personal-team-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.personal-team-actions button { font-size: 12px; padding: 5px 9px; min-height: 32px; }
+.personal-team-actions .personal-added { color: var(--muted); background: transparent; border-color: transparent; padding-left: 0; }
+.personal-team-tip { font-size: 11px; color: var(--muted); margin: 14px 0 0; line-height: 1.6; }
+.personal-panel-empty { display: grid; justify-items: center; gap: 12px; padding: 40px 8px; color: var(--muted); font-size: 13px; text-align: center; }
+.category-manager .category-create { grid-template-columns: minmax(0, 1fr) 120px auto; }
+.category-manager section + section { margin-top: 24px; }
+.category-manager h3 { font-size: 14px; color: var(--muted); }
+.dialog-body .category-row form.category-removal { grid-template-columns: 1fr auto auto; padding: 12px; margin: 8px 0; background: var(--selected); border-radius: 8px; }
+.category-removal p { grid-column: 1 / -1; margin: 0; font-size: 12px; }
+@media (max-width: 1350px) {
+  .personal-work-area.with-team { grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; }
+  .personal-columns > section { flex-basis: 260px; }
+}
+@media (max-width: 900px) {
+  .personal-work-area.with-team { grid-template-columns: minmax(0, 1fr); }
+  .personal-team-panel { position: static; grid-row: 1; }
+  .personal-team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; max-height: 300px; }
+  .personal-team-card { margin: 0; }
+  .personal-team-filters { grid-template-columns: 1fr 1fr; }
+  .personal-team-panel > header p { margin-bottom: 10px; }
+  .personal-columns { padding-bottom: 180px; }
+  .personal-board .personal-columns { max-height: 620px; }
+}
+@media (max-width: 540px) {
+  .personal-workspace .org-header { gap: 14px; margin-bottom: 18px; }
+  .personal-workspace .org-header .assignment-actions { width: 100%; justify-content: flex-end; }
+  .personal-workspace .org-header .subtitle { display: none; }
+  .personal-workspace .org-header .assignment-actions { margin: 12px 0 0; }
+  .personal-toolbar { padding-bottom: 12px; }
+  .personal-toolbar { gap: 10px; }
+  .personal-board-search { flex-basis: 100%; gap: 8px; }
+  .org-layout .personal-board-search select { width: 155px; max-width: 155px; flex-basis: 155px; }
+  .personal-toolbar > .assignment-actions { margin-left: auto; }
+  .personal-columns > section { flex: 0 0 calc(100vw - 62px); min-height: 330px; }
+  .personal-board-heading > span { font-size: 11px; }
+  .personal-team-panel { padding: 14px; }
+  .personal-team-list { max-height: 240px; }
+  .category-manager .category-create { grid-template-columns: minmax(0, 1fr) 110px; }
+  .category-create > button { grid-column: 1 / -1; }
+  .personal-workspace :is(button, input, select) { min-height: 38px; }
+}
