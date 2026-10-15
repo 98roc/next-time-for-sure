@@ -3,6 +3,7 @@ import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
 import { workRequestSchema, workSnapshotSchema } from '@ntfs/contracts';
 import type { WorkSnapshot } from '@ntfs/contracts';
+import { MilestoneRepository } from './milestone.repository.js';
 import { notifyWork } from '../notifications/work-notifications.js';
 
 const requestSelect = 'SELECT id, project_id AS projectId, submitter_id AS submitterId, title, description, acceptance, status, version FROM work_requests';
@@ -14,10 +15,10 @@ export class WorkRepository {
   /** 按项目读取对象及其历史，不读取个人或私人事项。 */
   async snapshot(project: string): Promise<WorkSnapshot> {
     const requests: unknown = await this.manager.query(`${requestSelect} WHERE project_id = ? ORDER BY created_at`, [project]);
-    const tasks: unknown = await this.manager.query(`SELECT id, project_id AS projectId, request_id AS requestId, parent_id AS parentId, owner_id AS ownerId, title, description, acceptance, status, version, in_milestone AS inMilestone, DATE_FORMAT(expected_on, '%Y-%m-%d') AS expectedOn, DATE_FORMAT(started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt, DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt, progress, position, blocked_reason AS blockedReason, waiting_for AS waitingFor, waiting_task_id AS waitingTaskId FROM team_tasks WHERE project_id = ? ORDER BY position, created_at, id`, [project]);
+    const tasks: unknown = await this.manager.query(`SELECT id, project_id AS projectId, request_id AS requestId, parent_id AS parentId, owner_id AS ownerId, title, description, acceptance, status, version, milestone_id AS milestoneId, in_milestone AS inMilestone, DATE_FORMAT(expected_on, '%Y-%m-%d') AS expectedOn, DATE_FORMAT(started_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS startedAt, DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS endedAt, progress, position, blocked_reason AS blockedReason, waiting_for AS waitingFor, waiting_task_id AS waitingTaskId FROM team_tasks WHERE project_id = ? ORDER BY position, created_at, id`, [project]);
     const events: unknown = await this.manager.query("SELECT id, object_id AS objectId, actor_id AS actorId, action, payload_json, DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS createdAt FROM work_events WHERE project_id = ? ORDER BY created_at, id", [project]);
     const rows = z.array(z.object({ id: z.string(), objectId: z.string(), actorId: z.string(), action: z.string(), payload_json: z.unknown(), createdAt: z.string() })).parse(events);
-    return workSnapshotSchema.parse({ requests, tasks, events: rows.map(({ payload_json, ...row }) => ({ ...row, payload: typeof payload_json === 'string' ? JSON.parse(payload_json) : payload_json })) });
+    return workSnapshotSchema.parse({ requests, tasks, milestones: await new MilestoneRepository(this.manager).list(project), events: rows.map(({ payload_json, ...row }) => ({ ...row, payload: typeof payload_json === 'string' ? JSON.parse(payload_json) : payload_json })) });
   }
 
   /** 锁定需求，使编辑、撤回及接收竞争在同一版本上裁决。 */
@@ -48,11 +49,6 @@ export class WorkRepository {
     const id = randomUUID();
     await this.manager.query('INSERT INTO team_tasks (id, project_id, request_id, owner_id, title, description, acceptance, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [id, project, request, owner, title, description, acceptance]);
     return id;
-  }
-
-  /** 维护任务的规划归属和日期，移出节点只清空当前规划。 */
-  async planTask(id: string, included: boolean, expectedOn: string | null): Promise<void> {
-    await this.manager.query('UPDATE team_tasks SET in_milestone = ?, expected_on = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [included ? 1 : 0, expectedOn, id]);
   }
 
   /** 内容修改与规划共用任务版本，避免两个视图静默覆盖。 */

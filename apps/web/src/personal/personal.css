@@ -1,13 +1,60 @@
-.personal-columns { display: flex; gap: 20px; overflow-x: auto; padding: 24px 0; align-items: flex-start; }
-.personal-columns > section { min-width: 300px; width: 360px; min-height: 240px; flex-shrink: 0; }
-.personal-columns h2 { padding: 8px 0 16px; }
-.personal-card { margin-bottom: 16px; }
-.personal-card fieldset { border: 0; padding: 0; display: grid; gap: 12px; min-width: 0; }
-.personal-card h3 { margin-top: 0; overflow-wrap: anywhere; }
-.personal-visible { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 18px; }
+.personal-columns { display: flex; gap: 14px; overflow-x: auto; padding: 4px 0 16px; align-items: flex-start; }
+.personal-columns > section { flex: 0 0 320px; min-height: 180px; padding: 12px; background: var(--canvas); border-radius: 10px; border: 1px solid var(--line); }
+.personal-columns h2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 2px 12px; font-size: 14px; }
+.personal-columns h2 > span { font-size: 12px; color: var(--muted); font-weight: 400; }
+.personal-card-wrap + .personal-card-wrap { margin-top: 10px; }
+.personal-card-wrap[draggable=true] > .personal-card { cursor: grab; }
+.personal-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.personal-card-heading { display: flex; align-items: start; gap: 8px; }
+.personal-card-heading h3 { flex: 1; min-width: 0; margin: 0; }
+.org-layout .personal-card-heading h3 button { padding: 0; min-height: 0; font-size: 14px; color: var(--text); line-height: 1.5; overflow-wrap: anywhere; }
+.org-layout .personal-card-heading .personal-card-more { border: 0; background: transparent; color: var(--muted); padding: 0 6px; min-height: 24px; }
+.personal-card-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+.personal-card-blocker { margin: 8px 0 0; color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
+.personal-card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.personal-card-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.org-layout .personal-card-actions button { min-height: 30px; padding: 4px 10px; font-size: 12px; }
+.personal-card-footer .status-badge { padding: 3px 8px; font-size: 11px; }
+.personal-visible { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 14px; margin-top: 18px; }
+.personal-drop-active { outline: 2px dashed var(--accent); background: var(--selected); }
+.personal-drop-placeholder { padding: 10px; border: 1px dashed var(--accent); font-size: 12px; }
+.personal-detail-summary, .personal-detail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.personal-detail-summary { justify-content: space-between; }
+.personal-detail .view-tabs { margin: 18px 0 22px; }
+.personal-detail h3 { font-size: 15px; margin: 0; }
+.personal-detail .section-heading { margin-bottom: 16px; }
+.personal-detail .section-heading button, .personal-detail-actions button { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+.personal-detail :is(p, li) { font-size: 14px; }
+.personal-content-block { margin: 18px 0; }
+.personal-content-block h4 { color: var(--muted); font-size: 12px; font-weight: 400; margin: 0 0 6px; }
+.personal-content-block p, .personal-progress-list p { white-space: pre-wrap; margin: 6px 0 0; }
+.personal-checklist, .personal-progress-list { list-style: none; padding: 0; }
+.personal-checklist li { display: flex; gap: 10px; padding: 8px 0; }
+.personal-progress-list li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.personal-detail .personal-form, .personal-form > fieldset { display: grid; gap: 16px; min-width: 0; }
+.personal-detail .personal-form { margin: 0 0 24px; }
+.personal-form > fieldset { padding: 0; margin: 0; border: 0; }
+.personal-form label { display: grid; gap: 7px; font-size: 13px; min-width: 0; }
+.personal-form textarea { min-height: 90px; resize: vertical; }
+.personal-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.personal-form .detail-meta { margin: -6px 0 0; font-size: 12px; }
+.personal-form-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; }
+.personal-form-actions button { min-height: 36px; padding: 7px 13px; font-size: 13px; }
+.personal-checklist-editor { display: grid; gap: 10px; }
+.personal-checklist-editor > button { justify-self: start; }
 .checklist-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .checklist-row input[type=checkbox] { width: auto; }
-@media (max-width: 540px) { .personal-columns > section { min-width: 280px; width: calc(100vw - 52px); } }
-.personal-drop-active { outline: 2px dashed var(--accent); background: var(--selected); }
-.personal-drop-placeholder { padding: .75rem; border: 1px dashed var(--accent); }
-.personal-drag-handle { margin-top: .75rem; cursor: grab; }
+.personal-settings > details:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.personal-settings details > form { margin-top: 14px; }
+.personal-settings > .panel { border: 0; border-top: 1px solid var(--line); padding: 8px 0 0; background: transparent; border-radius: 0; }
+@media (max-width: 540px) {
+  .personal-columns > section { flex-basis: calc(100vw - 52px); }
+  .personal-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .personal-detail-summary { align-items: flex-start; }
+}
+.category-manager .category-create { grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding-bottom: 22px; border-bottom: 1px solid var(--line); margin: 0 0 22px; }
+.category-manager .section-heading { margin-bottom: 12px; }
+.category-row { padding: 8px 0; }
+.dialog-body .category-row form { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; margin: 0; }
+.category-row .inline-notice { margin-top: 12px; }
+.category-row .text-button.danger-button { padding-inline: 6px; }

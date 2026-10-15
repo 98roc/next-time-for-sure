@@ -57,7 +57,7 @@ export async function verifyBlockers(fixture: WorkFixture): Promise<void> {
   assert.ok(assignmentSnapshotSchema.parse(await scoped.json()).assignments.some((entry) => entry.id === externalAssignment));
   await write('personal/commands', { action: 'manage_link', itemId: externalItem, assignmentId: externalAssignment, version: 0 }, developer);
   assert.equal((await call(`work?projectId=${otherProjectId}`, developer)).status, 403);
-  await write('milestones/commands', { action: 'add_node', taskId: id, version: (await task(id)).version, expectedOn: '2026-11-01' }, leader);
-  await write('milestones/commands', { action: 'add_node', taskId: waiting, version: (await task(waiting)).version, expectedOn: null }, leader);
+  const milestoneId = await write('milestones/commands', { action: 'create_node', projectId, ownerId, title: '联调目标', expectedOn: '2026-11-01', operationId: randomUUID() }, leader);
+  for (const taskId of [id, waiting]) await write('milestones/commands', { action: 'link_task', taskId, milestoneId, version: (await task(taskId)).version }, leader);
   console.log('PASS: independent team/own blockers, manual clearing, dependency completion does not clear or restrict execution, managed link scope/private protection and unchanged personal facts');
 }

@@ -5,6 +5,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { IdentityRepository } from '../identity/identity.repository.js';
 import { digest } from '../identity/password.js';
 import { hasPermission } from '../organization/policy.js';
+import { MilestoneRepository } from './milestone.repository.js';
 import { WorkRepository } from './work.repository.js';
 
 import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
@@ -56,7 +57,13 @@ export class WorkService {
       if (command.action === 'submit_request') {
         objectId = await repository.createRequest(projectId, access.actor.id, command.title, command.description, command.acceptance);
       } else if (command.action === 'create_task') {
+        const milestones = new MilestoneRepository(manager);
+        if (command.milestoneId) {
+          const node = await milestones.get(command.milestoneId);
+          if (!node || node.projectId !== projectId || node.status === 'removed') throw new ConflictException('只能关联同项目有效里程碑。');
+        }
         objectId = await repository.createTask(projectId, null, access.actor.id, command.title, command.description, command.acceptance);
+        if (command.milestoneId) await milestones.link(objectId, command.milestoneId);
       } else {
         if (!request) throw new NotFoundException('需求不存在。');
         objectId = request.id;

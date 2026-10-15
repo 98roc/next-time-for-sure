@@ -1,4 +1,5 @@
 import { verifyBlockers } from './blocker.integration.js';
+import { verifyUndoStart } from './undo-start.integration.js';
 import { verifyOrder } from './order.integration.js';
 import { verifySplits } from './split.integration.js';
 import { verifyTasks } from './task.integration.js';
@@ -67,6 +68,7 @@ async function verify(fixture: WorkFixture): Promise<void> {
   await verifySplits(fixture);
   await verifyOrder(fixture);
   await verifyBlockers(fixture);
+  await verifyUndoStart(fixture);
   console.log('PASS: intake, latest-content acceptance, supplements, defer/resume/reject/resubmit, accept-versus-withdraw race, replay idempotency and direct task creation');
 }
 

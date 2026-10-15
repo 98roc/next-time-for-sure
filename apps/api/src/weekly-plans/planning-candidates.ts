@@ -22,9 +22,10 @@ export async function planningCandidates(manager: EntityManager, access: WorkAcc
       const group = groups.find((item) => item.id === entry.groupId);
       const account = access.organization.accounts.find((item) => item.id === entry.accountId && item.teamId === teamId && !item.disabled);
       const task = tasks.find((item) => item.id === entry.taskId);
-      if (!group || !account || !task || ['completed', 'cancelled'].includes(task.status)) continue;
+      const canArrange = entry.groupId === null ? hasPermission(access.actor, access.organization, 'work.assign', { teamId }) : Boolean(group);
+      if (!canArrange || !account || !task || ['completed', 'cancelled'].includes(task.status)) continue;
       if (tasks.some((item) => item.parentId === task.id) || (task.parentId && tasks.some((item) => item.id === task.parentId && ['completed', 'cancelled'].includes(item.status)))) continue;
-      assignments.push({ assignmentId: entry.id, assignmentVersion: entry.version, taskId: task.id, taskVersion: task.version, projectId: project.id, projectName: project.name, taskTitle: task.title, accountId: account.id, displayName: account.displayName, groupId: group.id, groupName: group.name, content: entry.content, status: entry.status, blockedReason: entry.blockedReason || task.blockedReason });
+      assignments.push({ assignmentId: entry.id, assignmentVersion: entry.version, taskId: task.id, taskVersion: task.version, projectId: project.id, projectName: project.name, taskTitle: task.title, accountId: account.id, displayName: account.displayName, groupId: entry.groupId, groupName: group?.name ?? '团队直属', content: entry.content, status: entry.status, blockedReason: entry.blockedReason || task.blockedReason });
     }
   }
   return assignments;

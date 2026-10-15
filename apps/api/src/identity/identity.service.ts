@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { ForbiddenException, HttpException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import type { Identity } from '@ntfs/contracts';
 import { DatabaseService } from '../database/database.service.js';
@@ -76,6 +76,7 @@ export class IdentityService {
     await this.database.transaction(async (manager) => {
       const auth = await this.authenticate(manager, token, csrf);
       if (!await verifyPassword(current, auth.account.password_hash)) throw new ForbiddenException('当前密码不正确。');
+      if (current === replacement) throw new BadRequestException('新密码不能与当前密码相同。');
       const repository = new IdentityRepository(manager);
       await repository.changePassword(auth.account.id, await hashPassword(replacement));
       await repository.audit(auth.account.id, 'account.password_changed');

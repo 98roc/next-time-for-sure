@@ -5,7 +5,7 @@ import { milestoneCommandSchema } from '@ntfs/contracts';
 import { assertBusinessOrigin, csrfHeader, parseBody, businessToken } from '../identity/http.js';
 import { MilestoneService } from './milestone.service.js';
 
-/** 里程碑写入入口；读取复用团队任务快照，保证跨视图一致。 */
+/** 里程碑写入入口；项目快照同时返回独立目标及其任务关联。 */
 @ApiTags('milestones') @Controller('milestones')
 export class MilestoneController {
   constructor(private readonly milestones: MilestoneService) {}

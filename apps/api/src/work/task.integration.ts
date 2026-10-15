@@ -67,5 +67,5 @@ export async function verifyTasks(fixture: WorkFixture, taskId: string): Promise
   await execute({ action: 'change_owner', taskId, version: current.version, ownerId }, leader);
   const state = workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, developer)).json());
   assert.ok(state.events.some((event) => event.action === 'task.reopen_task' && event.objectId === taskId));
-  console.log('PASS: task owner authority, explicit completion at 100 percent, stale impact rejection, milestone state sharing, independent personal facts/times, stopped-work rejection, own cleanup, reopening history and intent-bound cancellation');
+  console.log('PASS: task owner authority, explicit completion at 100 percent, stale impact rejection, milestone association preservation, independent personal facts/times, stopped-work rejection, own cleanup, reopening history and intent-bound cancellation');
 }

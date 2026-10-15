@@ -14,12 +14,12 @@ export class ReportingRepository {
   }
   /** 草稿旧来源按当前责任归属授权，不能凭历史小组继续编辑。 */
   async authority(source: ReportSource) {
-    const schema = z.array(z.object({ teamId: z.string(), groupId: z.string().nullable(), ownerId: z.string().nullable() }));
+    const schema = z.array(z.object({ teamId: z.string(), groupId: z.string().nullable(), ownerId: z.string().nullable(), taskId: z.string().nullable() }));
     let rows: unknown;
-    if (source.sourceKind === 'personal') rows = await this.manager.query("SELECT p.team_id AS teamId,a.group_id AS groupId,i.owner_id AS ownerId FROM personal_progress r JOIN personal_items i ON i.id=r.item_id JOIN projects p ON p.id=i.project_id LEFT JOIN task_assignments a ON a.id=i.assignment_id WHERE r.id=? AND i.kind='work'", [source.sourceId]);
-    else if (source.sourceKind === 'assignment') rows = await this.manager.query('SELECT p.team_id AS teamId,a.group_id AS groupId,a.account_id AS ownerId FROM assignment_progress r JOIN task_assignments a ON a.id=r.assignment_id JOIN team_tasks t ON t.id=a.task_id JOIN projects p ON p.id=t.project_id WHERE r.id=?', [source.sourceId]);
-    else if (source.accountId) rows = await this.manager.query('SELECT p.team_id AS teamId,a.group_id AS groupId,a.account_id AS ownerId FROM task_assignments a JOIN team_tasks t ON t.id=a.task_id JOIN projects p ON p.id=t.project_id WHERE a.id=?', [source.sourceId]);
-    else rows = await this.manager.query('SELECT p.team_id AS teamId,NULL AS groupId,NULL AS ownerId FROM team_tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?', [source.taskId]);
+    if (source.sourceKind === 'personal') rows = await this.manager.query("SELECT p.team_id AS teamId,a.group_id AS groupId,i.owner_id AS ownerId,a.task_id AS taskId FROM personal_progress r JOIN personal_items i ON i.id=r.item_id JOIN projects p ON p.id=i.project_id LEFT JOIN task_assignments a ON a.id=i.assignment_id WHERE r.id=? AND i.kind='work'", [source.sourceId]);
+    else if (source.sourceKind === 'assignment') rows = await this.manager.query('SELECT p.team_id AS teamId,a.group_id AS groupId,a.account_id AS ownerId,a.task_id AS taskId FROM assignment_progress r JOIN task_assignments a ON a.id=r.assignment_id JOIN team_tasks t ON t.id=a.task_id JOIN projects p ON p.id=t.project_id WHERE r.id=?', [source.sourceId]);
+    else if (source.accountId) rows = await this.manager.query('SELECT p.team_id AS teamId,a.group_id AS groupId,a.account_id AS ownerId,a.task_id AS taskId FROM task_assignments a JOIN team_tasks t ON t.id=a.task_id JOIN projects p ON p.id=t.project_id WHERE a.id=?', [source.sourceId]);
+    else rows = await this.manager.query('SELECT p.team_id AS teamId,NULL AS groupId,NULL AS ownerId,t.id AS taskId FROM team_tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?', [source.taskId]);
     return schema.parse(rows)[0];
   }
   /** 读取发布副本，后续不提供更新或覆盖接口。 */

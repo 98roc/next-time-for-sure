@@ -1,0 +1,16 @@
+.app-dialog.org-layout.lifecycle-dialog { width: min(440px, calc(100vw - 32px)); }
+.lifecycle-dialog .dialog-header { padding: 16px 20px; }
+.lifecycle-dialog .dialog-header h2 { margin: 0; font-size: 17px; }
+.lifecycle-dialog .dialog-header button { min-height: 32px; width: 32px; padding: 0; }
+.lifecycle-dialog .dialog-body { padding: 20px; }
+.org-layout form.lifecycle-confirmation { display: grid; gap: 14px; margin: 0; padding: 0; border: 0; background: none; min-width: 0; }
+.org-layout .lifecycle-confirmation p { margin: 0; line-height: 1.65; overflow-wrap: anywhere; }
+.lifecycle-subject { font-size: 15px; }
+.lifecycle-impacts { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+.lifecycle-blockers { padding: 12px 14px; border-left: 3px solid var(--danger); background: var(--canvas); font-size: 13px; }
+.lifecycle-blockers > p { font-weight: 600; }
+.lifecycle-blockers ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.65; }
+.lifecycle-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.org-layout .lifecycle-actions button { min-height: 36px; padding: 7px 16px; font-size: 14px; line-height: 20px; }
+.org-layout .lifecycle-actions .lifecycle-delete-button { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+.org-layout .lifecycle-actions .lifecycle-delete-button:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 18%, var(--surface)); }

@@ -10,6 +10,7 @@ export const taskCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('task_blocker'), taskId: id, version, blockedReason: z.string().trim().max(2000), waitingFor: z.string().trim().max(200), waitingTaskId: id.nullable() }).strict(),
   z.object({ action: z.literal('reorder_task'), taskId: id, version, beforeId: id.nullable(), order: z.array(z.object({ id, version }).strict()).max(5000) }).strict(),
   z.object({ action: z.literal('start_task'), taskId: id, version }).strict(),
+  z.object({ action: z.literal('undo_start_task'), taskId: id, version }).strict(),
   z.object({ action: z.literal('complete_task'), taskId: id, version, confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
   z.object({ action: z.literal('cancel_task'), taskId: id, version, confirmation: z.string().regex(/^[a-f0-9]{64}$/), reason }).strict(),
   z.object({ action: z.literal('reopen_task'), taskId: id, version, reason }).strict(),

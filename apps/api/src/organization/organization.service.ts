@@ -45,6 +45,7 @@ export class OrganizationService {
 async function executeCommand(repository: OrganizationRepository, actor: PolicyActor, snapshot: OrganizationSnapshot, command: OrganizationCommand): Promise<string> {
   const requireSuper = () => { if (!actor.isSuperAdmin) throw new ForbiddenException('仅超管可执行此操作。'); };
   const requirePermission = (teamId: string, permission: Permission) => {
+    if (actor.isSuperAdmin) throw new ForbiddenException('团队内部管理由团队管理员操作。');
     if (!snapshot.teams.some((team) => team.id === teamId)) throw new NotFoundException('团队不存在。');
     if (!hasPermission(actor, snapshot, permission, { teamId })) throw new ForbiddenException('没有本团队的操作权限。');
   };
@@ -54,16 +55,55 @@ async function executeCommand(repository: OrganizationRepository, actor: PolicyA
     return account;
   };
   const fresh = (actual: number, expected: number) => { if (actual !== expected) throw new ConflictException('数据已被修改，请刷新后重新操作。'); };
-  const uniqueLogin = (login: string) => { if (snapshot.accounts.some((account) => account.loginName.toLowerCase() === login.toLowerCase()) || login.toLowerCase() === 'admin') throw new ConflictException('账号已存在，请使用关联已有账号。'); };
+  const uniqueLogin = async (login: string, except?: string) => { if (await repository.loginExists(login, except)) throw new ConflictException('账号已存在，请使用其他登录名或关联已有账号。'); };
+  const accountById = (id: string) => {
+    const account = snapshot.accounts.find((item) => item.id === id);
+    if (!account) throw new NotFoundException('账号不存在或不可操作。');
+    return account;
+  };
 
   switch (command.action) {
+    case 'create_account':
+      requireSuper(); await uniqueLogin(command.loginName);
+      return repository.createAccount(command.loginName, command.displayName, await hashPassword(command.password), null);
+    case 'update_account': {
+      requireSuper();
+      const account = accountById(command.accountId);
+      fresh(account.version, command.version); await uniqueLogin(command.loginName, account.id);
+      await repository.updateAccount(account.id, command.loginName, command.displayName); return account.id;
+    }
+    case 'delete_account': {
+      requireSuper();
+      const account = accountById(command.accountId); fresh(account.version, command.version);
+      if (account.teamId || await repository.accountInUse(account.id)) throw new ConflictException('账号已有团队关联或工作记录，不能删除，请使用停用。');
+      await repository.deleteAccount(account.id); return account.id;
+    }
     case 'create_team': {
-      requireSuper(); uniqueLogin(command.leader.loginName);
-      const leaderId = await repository.createAccount(command.leader.loginName, command.leader.displayName, await hashPassword(command.leader.password), null);
-      return repository.createTeam(command.name, leaderId);
+      requireSuper();
+      const leader = accountById(command.leaderId);
+      if (leader.disabled || leader.teamId) throw new ConflictException('请选择已启用且尚未加入团队的账号作为团队管理员。');
+      return repository.createTeam(command.name, leader.id);
+    }
+    case 'update_team': {
+      requireSuper();
+      const team = snapshot.teams.find((item) => item.id === command.teamId);
+      if (!team) throw new NotFoundException('团队不存在。');
+      fresh(team.version, command.version);
+      const leader = accountById(command.leaderId);
+      if (leader.disabled || (leader.teamId !== null && leader.teamId !== team.id)) throw new ConflictException('团队管理员须为已启用的本团队成员或未入团队账号。');
+      if (!leader.teamId) await repository.assignTeam(leader.id, team.id);
+      await repository.updateTeam(team.id, command.name, leader.id); return team.id;
+    }
+    case 'delete_team': {
+      requireSuper();
+      const team = snapshot.teams.find((item) => item.id === command.teamId);
+      if (!team) throw new NotFoundException('团队不存在。');
+      fresh(team.version, command.version);
+      if (snapshot.accounts.some((account) => account.teamId === team.id && account.id !== team.leaderId) || await repository.teamInUse(team.id)) throw new ConflictException('团队仍有成员、小组、项目或业务历史，不能删除。');
+      await repository.deleteTeam(team.id); return team.id;
     }
     case 'create_member':
-      requirePermission(command.teamId, 'members.manage'); uniqueLogin(command.loginName);
+      requirePermission(command.teamId, 'members.manage'); await uniqueLogin(command.loginName);
       return repository.createAccount(command.loginName, command.displayName, await hashPassword(command.password), command.teamId);
     case 'link_member': {
       requirePermission(command.teamId, 'members.manage');
@@ -104,14 +144,20 @@ async function executeCommand(repository: OrganizationRepository, actor: PolicyA
       }
       return project;
     }
-    case 'set_project_member': {
+    case 'set_project_member':
+    case 'set_project_members': {
       const project = snapshot.projects.find((item) => item.id === command.projectId);
       if (!project) throw new NotFoundException('项目不存在。');
-      requirePermission(project.teamId, 'projects.manage'); member(command.accountId, project.teamId); fresh(project.version, command.version);
-      const remaining = project.members.filter((entry) => entry.accountId !== command.accountId).flatMap((entry) => entry.roles);
+      requirePermission(project.teamId, 'projects.manage'); fresh(project.version, command.version);
+      const changes = command.action === 'set_project_member' ? [{ accountId: command.accountId, roles: command.roles }] : command.members;
+      // 先校验整批成员及最终角色集合，再在同一事务写入；允许一次完成负责人交接。
+      for (const entry of changes) member(entry.accountId, project.teamId);
+      const changedIds = new Set(changes.map((entry) => entry.accountId));
+      const finalRoles = [...project.members.filter((entry) => !changedIds.has(entry.accountId)), ...changes].flatMap((entry) => entry.roles);
       const requiredRoles: Array<'project_manager' | 'project_lead'> = ['project_manager', 'project_lead'];
-      for (const role of requiredRoles) if (!remaining.includes(role) && !command.roles.includes(role)) throw new BadRequestException('项目必须保留项目经理和研发负责人。');
-      await repository.setProjectMember(project.id, command.accountId, command.roles); return project.id;
+      for (const role of requiredRoles) if (!finalRoles.includes(role)) throw new BadRequestException('项目必须保留项目经理和研发负责人。');
+      for (const entry of changes) await repository.setProjectMember(project.id, entry.accountId, entry.roles);
+      return project.id;
     }
     case 'reset_password':
     case 'set_disabled': {
@@ -125,13 +171,6 @@ async function executeCommand(repository: OrganizationRepository, actor: PolicyA
       if (command.action === 'reset_password') await repository.resetPassword(account.id, await hashPassword(command.password));
       else await repository.setDisabled(account.id, command.disabled);
       return account.id;
-    }
-    case 'set_role_permissions': {
-      requireSuper();
-      const policy = snapshot.policies.find((item) => item.role === command.role);
-      if (!policy) throw new BadRequestException('不支持新增角色。');
-      fresh(policy.version, command.version);
-      await repository.setPolicy(command.role, command.permissions); return command.role;
     }
   }
 }

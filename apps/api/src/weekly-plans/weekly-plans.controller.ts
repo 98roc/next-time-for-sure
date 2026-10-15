@@ -5,7 +5,7 @@ import { weeklyCandidatesQuerySchema, weeklyPlanCommandSchema } from '@ntfs/cont
 import { assertBusinessOrigin, csrfHeader, parseBody, businessToken } from '../identity/http.js';
 import { WeeklyPlansService } from './weekly-plans.service.js';
 
-/** 周计划协议入口，读取选择器不隐式生成草稿或形成周承诺。 */
+/** 周计划协议入口，选择器只读，草稿按已确认规则自动延续未完成工作。 */
 @ApiTags('weekly-plans') @Controller('weekly-plans')
 export class WeeklyPlansController {
   constructor(private readonly plans: WeeklyPlansService) {}
@@ -16,7 +16,7 @@ export class WeeklyPlansController {
   @Get('preview') @Header('Cache-Control', 'no-store')
   preview(@Req() request: IncomingMessage, @Query() query: unknown) { const input = parseBody(weeklyCandidatesQuerySchema, query); return this.plans.preview(businessToken(request), input.teamId, input.week); }
 
-  /** 查看有权编排的共享草稿内容，不自动创建。 */
+  /** 查看有权编排的共享草稿，本周及下周自动补入未完成工作。 */
   @Get() @Header('Cache-Control', 'no-store')
   async draft(@Req() request: IncomingMessage, @Query() query: unknown) {
     const input = parseBody(weeklyCandidatesQuerySchema, query);

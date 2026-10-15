@@ -62,6 +62,33 @@ await smoke(async ({ call, developer, leader, manager, projectId, otherProjectId
   assert.equal(await write('lifecycle/commands', deletion, developer), disposable);
   assert.equal((await call('lifecycle/commands', developer, { ...deletion, reason: '不可复用为另一请求' })).status, 409);
   assert.equal(workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, developer)).json()).tasks.some((entry) => entry.id === disposable), false);
+  // 多次误开始都已撤销时可以不填原因删除；旧确认仍必须失效。
+  const mistaken = await create('误开始撤销后可删除');
+  const mistakenIntent = { action: 'delete_task' as const, objectId: mistaken };
+  const beforeStart = await preview(mistakenIntent, developer);
+  for (let cycle = 0; cycle < 2; cycle++) {
+    await write('tasks/commands', { action: 'start_task', taskId: mistaken, version: cycle * 2 }, developer);
+    assert.ok((await preview(mistakenIntent, developer)).blockers.length);
+    await write('tasks/commands', { action: 'undo_start_task', taskId: mistaken, version: cycle * 2 + 1 }, developer);
+  }
+  const afterUndo = await preview(mistakenIntent, developer); assert.deepEqual(afterUndo.blockers, []);
+  assert.equal((await call('lifecycle/commands', developer, { intent: mistakenIntent, confirmation: beforeStart.confirmation, operationId: randomUUID() })).status, 409);
+  await write('lifecycle/commands', { intent: mistakenIntent, confirmation: afterUndo.confirmation, operationId: randomUUID() }, developer);
+  const afterDelete = workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, developer)).json());
+  assert.equal(afterDelete.tasks.some((entry) => entry.id === mistaken), false);
+  assert.equal(afterDelete.events.filter((entry) => entry.objectId === mistaken && entry.action === 'task.undo_start_task').length, 2);
+  assert.equal((await call('lifecycle/commands', leader, { intent: { action: 'archive_project', objectId: projectId }, confirmation: '0'.repeat(64), operationId: randomUUID() })).status, 400);
+
+  // 已撤销开始不能抹去后来填写再归零的进展，也不能抹去补记时间。
+  for (const kind of ['progress', 'times']) {
+    const factual = await create(`撤销后${kind}历史保留`);
+    await write('tasks/commands', { action: 'start_task', taskId: factual, version: 0 }, developer);
+    await write('tasks/commands', { action: 'undo_start_task', taskId: factual, version: 1 }, developer);
+    for (let step = 0; step < 2; step++) await write('tasks/commands', kind === 'progress'
+      ? { action: 'task_progress', taskId: factual, version: 2 + step, progress: step ? 0 : 10 }
+      : { action: 'task_times', taskId: factual, version: 2 + step, startedAt: step ? null : '2026-10-01T01:00:00.000Z', endedAt: null }, developer);
+    assert.ok((await preview({ action: 'delete_task', objectId: factual }, developer)).blockers.some((entry) => entry.includes('执行事实')));
+  }
   const executedTask = await create('个人执行历史禁止删除');
   const executedAssignment = await write('assignments/commands', { action: 'assign', taskId: executedTask, accountId: ownerId, groupId: group.id, content: '', operationId: randomUUID() });
   const executedItem = await write('personal/commands', { action: 'create_personal', kind: 'work', projectId, assignmentId: executedAssignment, title: '删除后仍保留执行历史', description: '', acceptance: '', categoryId: null, operationId: randomUUID() }, developer);
@@ -80,6 +107,7 @@ await smoke(async ({ call, developer, leader, manager, projectId, otherProjectId
   await execute({ action: 'delete_personal', objectId: privateId }, developer);
   const audit = lifecycleHistorySchema.parse(await (await call('lifecycle/history', leader)).json());
   assert.ok(audit.some((entry) => entry.objectId === disposable)); assert.equal(audit.some((entry) => entry.objectId === privateId), false);
+  assert.equal(audit.find((entry) => entry.objectId === mistaken)?.reason, '');
   assert.equal((await call('lifecycle/history', developer)).status, 403);
   // 夹具后续组织回归需要恢复成员；使用现有授权账号关联流程。
   const account = org.accounts.find((entry) => entry.id === ownerId); assert.ok(account);

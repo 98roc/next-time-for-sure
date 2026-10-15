@@ -27,8 +27,11 @@ test('role union stays within team, group and project scope', () => {
   assert.equal(hasPermission(actor, data, 'work.assign', { teamId: 'team', groupId: 'group' }), true);
   assert.equal(hasPermission(actor, data, 'work.assign', { teamId: 'team', groupId: 'another' }), false);
   assert.equal(hasPermission(actor, data, 'members.manage', { teamId: 'team' }), false);
+  assert.equal(hasPermission(actor, data, 'members.manage', { teamId: 'team', groupId: 'group' }), false);
   assert.equal(hasPermission(actor, data, 'work.assign', { teamId: 'foreign', groupId: 'group' }), false);
   assert.equal(hasPermission({ ...actor, isSuperAdmin: true, teamId: null }, data, 'work.assign', { teamId: 'team' }), false);
   assert.deepEqual(visibleOrganization(actor, data).projects.map((project) => project.id), ['project']);
   assert.equal(visibleOrganization({ ...actor, teamId: null }, data).projects.length, 0);
+  assert.equal(visibleOrganization({ ...actor, isSuperAdmin: true }, data).projects.length, 0);
+  assert.equal(visibleOrganization({ ...actor, isSuperAdmin: true }, data).groups.length, 0);
 });

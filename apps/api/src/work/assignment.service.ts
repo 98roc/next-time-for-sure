@@ -64,16 +64,17 @@ export class AssignmentService {
       const project = access.organization.projects.find((entry) => entry.id === task.projectId);
       if (!project || project.teamId !== access.actor.teamId) throw new ForbiddenException('没有本团队的操作权限。');
 
-      const manage = (groupId: string) => {
+      const manage = (groupId: string | null) => {
         const group = access.organization.groups.find((entry) => entry.id === groupId && entry.teamId === project.teamId);
-        if (!group || !hasPermission(access.actor, access.organization, 'work.assign', { teamId: project.teamId, groupId })) throw new ForbiddenException('只能调整本人有权限的负责小组分工。');
+        if ((groupId !== null && !group) || !hasPermission(access.actor, access.organization, 'work.assign', { teamId: project.teamId, groupId })) throw new ForbiddenException('只能管理有权限的小组分工；团队直属分工由团队负责人管理。');
       };
-      const eligible = (accountId: string, groupId: string) => {
+      const eligible = (accountId: string, groupId: string | null) => {
         const account = access.organization.accounts.find((entry) => entry.id === accountId && entry.teamId === project.teamId && !entry.disabled);
         const group = access.organization.groups.find((entry) => entry.id === groupId && entry.teamId === project.teamId && entry.memberIds.includes(accountId));
-        if (!account || !group) throw new BadRequestException('执行人必须是负责小组内的可用团队成员。');
+        if (!account || (groupId !== null && !group)) throw new BadRequestException('执行人须为可用团队成员；指定小组时须属于该小组。');
       };
-      if (command.action === 'assign') manage(command.groupId);
+      if (command.action === 'assign_many') command.members.forEach((member) => manage(member.groupId));
+      else if (command.action === 'assign') manage(command.groupId);
       else if (command.action === 'adjust' || command.action === 'transfer') {
         if (!assignment) throw new NotFoundException('分工不存在。');
         manage(assignment.groupId); manage(command.groupId);
@@ -101,6 +102,21 @@ export class AssignmentService {
       if (assignment && (!supplement || command.action === 'complete') && ['exited', 'transferred'].includes(assignment.status)) throw new ConflictException('原分工已停止执行，仅允许补记与整理。');
 
       let objectId = assignment?.id ?? '';
+      if (command.action === 'assign_many') {
+        // 先校验整批，再在同一事务落库；冲突时不能留下部分人员分配成功。
+        for (const member of command.members) {
+          eligible(member.accountId, member.groupId);
+          if (await repository.hasActive(task.id, member.accountId)) throw new ConflictException('所选成员已有有效分工，请刷新后调整原分工。');
+        }
+        for (const member of command.members) {
+          if (!project.members.some((entry) => entry.accountId === member.accountId)) await new OrganizationRepository(manager).setProjectMember(project.id, member.accountId, ['developer']);
+          const id = await repository.create(task.id, member.accountId, member.groupId, member.content, 'assigned');
+          await history.event(project.id, id, access.actor.id, 'assignment.assign', { ...member, taskId: task.id, resultId: id, before: null, after: await repository.assignment(id) });
+          await new IdentityRepository(manager).audit(access.actor.id, 'assignment.assign', id);
+        }
+        await history.recordOperation(access.actor.id, command.operationId, hash, task.id);
+        return { objectId: task.id };
+      }
       if (command.action === 'assign' || command.action === 'claim' || command.action === 'transfer') {
         const accountId = command.action === 'claim' ? access.actor.id : command.accountId;
         eligible(accountId, command.groupId);

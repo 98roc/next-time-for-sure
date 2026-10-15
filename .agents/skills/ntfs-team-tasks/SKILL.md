@@ -9,6 +9,7 @@ description: 在下次一定中查询、创建、维护和拆分团队任务，�
 
 - 创建走 `work/commands` 的 `create_task`；标题、描述、验收标准和项目按用户已授权内容填写，重试沿用 `operationId`。
 - 维护状态、进度、负责人、阻塞及时间走 `tasks/commands`；分工走 `assignments/commands`；里程碑增删改走 `milestones/commands`。参数和可执行范围以当前工具 Schema 和服务端检查为准，不以角色名称推断越权能力。
+- 里程碑是独立目标，create_node不创建任务。create_task可选milestoneId；已有任务通过link_task关联同项目一个目标。查询work返回独立milestones及任务milestoneId；complete_node仅由目标负责人确认，任务完成不自动完成目标。
 - 拆分走 `tasks/split`。先列出子任务与每条有效分工的唯一去向，让用户确认完整方案。不能复制执行事实、遗漏有效分工或把同一分工迁往多个子任务；使用查询返回的各版本和稳定幂等标识。
 - 完成或取消任务先读取 `tasks/impact`，展示受影响分工及后果；分工完成先读取 `assignments/completion`。用户确认后提交对应摘要。取消、重开等需填写真实原因。
 - 删除、归档、转移使用 `lifecycle_preview`，展示影响和阻止原因。存在阻止项时先解释；取得用户确认后才使用 `lifecycle/commands`，不自造摘要。

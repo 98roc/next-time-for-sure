@@ -55,11 +55,11 @@ export class PersonalService {
         const project = access.organization.projects.find((entry) => entry.id === item.projectId && entry.teamId === access.actor.teamId);
         if (!project) throw new ForbiddenException('无权管理其他团队的关联。');
         const assignments = new AssignmentRepository(manager);
-        const canManage = (groupId: string) => hasPermission(access.actor, access.organization, 'work.assign', { teamId: project.teamId, groupId });
+        const canManage = (groupId: string | null) => hasPermission(access.actor, access.organization, 'work.assign', { teamId: project.teamId, groupId });
         if (item.assignmentId) {
           const original = await assignments.assignment(item.assignmentId);
           if (!original || !canManage(original.groupId)) throw new ForbiddenException('没有原负责小组的安排权限。');
-        } else if (!access.organization.groups.some((group) => group.memberIds.includes(item.ownerId) && canManage(group.id))) throw new ForbiddenException('没有该成员所属小组的安排权限。');
+        } else if (!canManage(null) && !access.organization.groups.some((group) => group.memberIds.includes(item.ownerId) && canManage(group.id))) throw new ForbiddenException('没有该成员所属小组的安排权限。');
         if (item.version !== command.version) throw new ConflictException('个人关联已变化，请刷新。');
         if (await stopReason(manager, item)) throw new ConflictException('原工作已停止，不能通过更换关联绕过执行限制。');
         if (command.assignmentId) {

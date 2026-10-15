@@ -42,7 +42,7 @@ export async function reportSources(manager: EntityManager, access: WorkAccess, 
     if (task?.status === 'completed' || assignment?.status === 'completed') continue;
     const children = task && !assignment ? (await new WorkRepository(manager).snapshot(task.projectId)).tasks.filter((entry) => entry.parentId === task.id) : [];
     for (const current of children.length ? children.filter((child) => child.status !== 'completed') : [task]) {
-      result.push(source({ ...row, taskId: current?.id ?? row.taskId, title: current?.title ?? row.title, groupId: assignment?.groupId ?? row.groupId, key: `plan:${row.sourceIds.join(':')}${children.length ? `:${current?.id}` : ''}`, sourceId: row.sourceIds[0] ?? baseline?.id ?? '', sourceKind: 'plan', ownerId: assignment?.accountId ?? row.accountId, occurredOn: null, text: `发布计划尚未完成：${row.text}`, status: `${current?.status ?? row.status}/${assignment?.status ?? ''}` }));
+      result.push(source({ ...row, taskId: current?.id ?? row.taskId, title: current?.title ?? row.title, groupId: assignment ? assignment.groupId : row.groupId, key: `plan:${row.sourceIds.join(':')}${children.length ? `:${current?.id}` : ''}`, sourceId: row.sourceIds[0] ?? baseline?.id ?? '', sourceKind: 'plan', ownerId: assignment?.accountId ?? row.accountId, occurredOn: null, text: `发布计划尚未完成：${row.text}`, status: `${current?.status ?? row.status}/${assignment?.status ?? ''}` }));
     }
   }
   return result;

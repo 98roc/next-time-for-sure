@@ -40,10 +40,11 @@ export async function verifySplits(fixture: WorkFixture): Promise<void> {
   assert.deepEqual(moved, { ...before, taskId: childA.id, originTaskId: parentId, version: before.version + 1 });
   assert.equal(afterAssignments.assignments.length, beforeAssignments.assignments.length);
   assert.deepEqual(afterAssignments.progress, beforeAssignments.progress); assert.deepEqual(await personal(), beforePersonal);
-  await write('milestones/commands', { action: 'add_node', taskId: parentId, version: (await task(parentId)).version, expectedOn: '2026-11-01' }, leader);
-  await write('milestones/commands', { action: 'add_node', taskId: childA.id, version: (await task(childA.id)).version, expectedOn: '2026-11-05' }, leader);
-  assert.equal((await task(parentId)).expectedOn, '2026-11-01');
-  assert.equal((await task(childA.id)).expectedOn, '2026-11-05');
+  const milestoneId = await write('milestones/commands', { action: 'create_node', projectId, ownerId, title: '拆分验收目标', expectedOn: '2026-11-01', operationId: randomUUID() }, leader);
+  for (const taskId of [parentId, childA.id]) await write('milestones/commands', { action: 'link_task', taskId, milestoneId, version: (await task(taskId)).version }, leader);
+  assert.equal((await task(parentId)).milestoneId, milestoneId);
+  assert.equal((await task(childA.id)).milestoneId, milestoneId);
+  assert.equal((await task(childA.id)).expectedOn, null);
   await write('tasks/split', { ...command, taskId: childA.id, version: childA.version, moves: [], operationId: randomUUID() }, leader, 409);
   await write('assignments/commands', { action: 'claim', taskId: parentId, groupId: group.id, content: '', operationId: randomUUID() }, developer, 409);
 

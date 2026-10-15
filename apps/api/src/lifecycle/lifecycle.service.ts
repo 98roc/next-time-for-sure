@@ -33,13 +33,14 @@ export class LifecycleService {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token); const team = access.actor.teamId;
       if (!team || !access.organization.teams.some((entry) => entry.id === team && entry.leaderId === access.actor.id)) throw new ForbiddenException('仅团队负责人可查看交接清单。');
-      const tasks: WorkSnapshot['tasks'] = []; const assignments: Array<Assignment & { projectId: string }> = [];
+      const tasks: WorkSnapshot['tasks'] = []; const milestones: WorkSnapshot['milestones'] = []; const assignments: Array<Assignment & { projectId: string }> = [];
       for (const project of access.organization.projects.filter((entry) => entry.teamId === team)) {
-        const current = (await new WorkRepository(manager).snapshot(project.id)).tasks;
+        const snapshot = await new WorkRepository(manager).snapshot(project.id); const current = snapshot.tasks;
+        milestones.push(...snapshot.milestones.filter((entry) => entry.status === 'open'));
         tasks.push(...current.filter((entry) => !['completed', 'cancelled'].includes(entry.status)));
         assignments.push(...(await new AssignmentRepository(manager).snapshot(project.id)).assignments.filter((entry) => ['not_started', 'in_progress'].includes(entry.status) && current.some((task) => task.id === entry.taskId && !['completed', 'cancelled'].includes(task.status))).map((entry) => ({ ...entry, projectId: project.id })));
       }
-      return access.organization.accounts.filter((account) => account.teamId !== team || account.disabled).map((account) => ({ accountId: account.id, displayName: account.displayName, tasks: tasks.filter((task) => task.ownerId === account.id).map(({ id, title, projectId, version }) => ({ id, title, projectId, version })), assignments: assignments.filter((entry) => entry.accountId === account.id).map(({ id, taskId, projectId, version }) => ({ id, taskId, projectId, version })), duties: [...access.organization.groups.filter((group) => group.teamId === team && group.leaderId === account.id).map((group) => `${group.name}组长`), ...access.organization.projects.filter((project) => project.teamId === team && project.members.some((entry) => entry.accountId === account.id && entry.roles.some((role) => role !== 'developer'))).map((project) => `${project.name}管理角色`)] })).filter((entry) => entry.tasks.length || entry.assignments.length || entry.duties.length);
+      return access.organization.accounts.filter((account) => account.teamId !== team || account.disabled).map((account) => ({ accountId: account.id, displayName: account.displayName, tasks: tasks.filter((task) => task.ownerId === account.id).map(({ id, title, projectId, version }) => ({ id, title, projectId, version })), assignments: assignments.filter((entry) => entry.accountId === account.id).map(({ id, taskId, projectId, version }) => ({ id, taskId, projectId, version })), duties: [...milestones.filter((entry) => entry.ownerId === account.id).map((entry) => `里程碑负责人：${entry.title}`), ...access.organization.groups.filter((group) => group.teamId === team && group.leaderId === account.id).map((group) => `${group.name}组长`), ...access.organization.projects.filter((project) => project.teamId === team && project.members.some((entry) => entry.accountId === account.id && entry.roles.some((role) => role !== 'developer'))).map((project) => `${project.name}管理角色`)] })).filter((entry) => entry.tasks.length || entry.assignments.length || entry.duties.length);
     });
   }
   /** 删除、转移、归档和移出与历史同事务提交。 */

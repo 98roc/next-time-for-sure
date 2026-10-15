@@ -15,10 +15,17 @@ export class LifecycleRepository {
     await this.manager.query('DELETE FROM project_members WHERE project_id=? AND account_id=?', [project, account]);
     await this.manager.query('UPDATE projects SET version=version+1 WHERE id=?', [project]);
   }
-  /** 当前时间被修正为空也不能抹去曾经执行的事实。 */
+  /** 成对的开始与撤销不算执行；时间修正、进展和成员执行历史仍阻止删除。 */
   async executed(task: string) {
-    const rows: unknown = await this.manager.query("SELECT id FROM work_events WHERE (object_id=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.before.taskId'))=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.after.taskId'))=?) AND action IN ('task.start_task','task.complete_task','task.cancel_task','task.reopen_task','task.task_progress','task.task_times','assignment.start','assignment.complete','assignment.record_progress','assignment.correct_times','assignment.transfer','assignment.exit') LIMIT 1", [task, task, task]);
-    if (z.array(z.object({ id: z.string() })).parse(rows).length) return true;
+    const rows: unknown = await this.manager.query("SELECT action FROM work_events WHERE (object_id=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.before.taskId'))=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.after.taskId'))=?) AND action IN ('task.start_task','task.undo_start_task','task.complete_task','task.cancel_task','task.reopen_task','task.task_progress','task.task_times','assignment.start','assignment.complete','assignment.record_progress','assignment.correct_times','assignment.transfer','assignment.exit') ORDER BY CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.after.version')) AS UNSIGNED)", [task, task, task]);
+    let started = false;
+    // 使用任务版本顺序配对，避免同毫秒事件或多次误开始被错误判定。
+    for (const event of z.array(z.object({ action: z.string() })).parse(rows)) {
+      if (event.action === 'task.start_task' && !started) started = true;
+      else if (event.action === 'task.undo_start_task' && started) started = false;
+      else return true;
+    }
+    if (started) return true;
     // 本人删除关联事项后，执行历史仍限制团队任务删除，不能借删除来源抹去执行事实。
     const personalRows: unknown = await this.manager.query("SELECT e.id FROM personal_events e JOIN task_assignments a ON a.id=JSON_UNQUOTE(JSON_EXTRACT(e.payload_json,'$.before.assignmentId')) OR a.id=JSON_UNQUOTE(JSON_EXTRACT(e.payload_json,'$.after.assignmentId')) WHERE a.task_id=? AND e.action IN ('personal_progress','start_personal','complete_personal','personal_times') LIMIT 1", [task]);
     return z.array(z.object({ id: z.string() })).parse(personalRows).length > 0;
@@ -34,7 +41,7 @@ export class LifecycleRepository {
   async removeMember(account: string) { await this.manager.query('UPDATE accounts SET team_id=NULL,version=version+1,updated_at=UTC_TIMESTAMP(3) WHERE id=?', [account]); }
   /** 转移不改本人内容及执行时间，递增版本使旧页面不能覆盖归属。 */
   async moveTask(task: string, project: string) {
-    await this.manager.query('UPDATE team_tasks SET project_id=?,version=version+1,updated_at=UTC_TIMESTAMP(3) WHERE id=?', [project, task]);
+    await this.manager.query('UPDATE team_tasks SET project_id=?,milestone_id=NULL,in_milestone=0,version=version+1,updated_at=UTC_TIMESTAMP(3) WHERE id=?', [project, task]);
     await this.manager.query('UPDATE personal_items i JOIN task_assignments a ON a.id=i.assignment_id SET i.project_id=?,i.version=i.version+1,i.updated_at=UTC_TIMESTAMP(3) WHERE a.task_id=?', [project, task]);
   }
   /** 独立个人工作迁移用于归档前整理，不能迁移私人事项或拆散关联。 */

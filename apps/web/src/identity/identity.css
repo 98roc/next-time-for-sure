@@ -1,20 +1,74 @@
-.identity-layout { min-height: 100vh; padding: 32px 20px 60px; }
-.identity-brand { max-width: 1000px; margin: 0 auto 40px; display: flex; gap: 16px; align-items: center; }
-.identity-brand a { color: var(--text); font-weight: 600; font-size: 20px; text-decoration: none; }
-.identity-brand span { color: var(--muted); font-size: 12px; }
+/* 登录保持单列；已登录设置采用独立的信息、导航和内容区域。 */
+.identity-layout { min-height: 100dvh; padding: 28px 24px 60px; }
+.identity-brand { max-width: 1040px; margin: 0 auto 56px; }
 main.identity-card { width: min(440px, 100%); margin: 0 auto; padding: 32px; }
-.identity-card h1 { font-size: 26px; }
-.identity-card form { margin-top: 26px; display: grid; gap: 18px; }
-.identity-card label { display: grid; gap: 8px; font-size: 14px; }
-.identity-card input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); color: var(--text); font: inherit; }
-.identity-card small { margin: 0; }
+.identity-card h1 { margin: 0 0 10px; font-size: 26px; }
+.identity-card form { margin-top: 28px; }
+.identity-card .footnote { color: var(--muted); font-size: 13px; margin-top: 24px; }
 .primary-button { background: var(--accent); color: var(--surface); border: 0; padding: 12px; border-radius: 6px; min-height: 44px; }
-.primary-button:disabled { opacity: .6; cursor: wait; }
+.primary-button:disabled { opacity: .6; cursor: not-allowed; }
 .text-button { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 10px 18px; border-radius: 6px; margin-top: 18px; }
 .status-link { display: block; color: var(--accent); font-size: 13px; margin-top: 26px; }
-.identity-card .form-error { color: #bc5353; margin: 0; }
-.identity-card .notice { color: var(--accent); }
-.identity-card input[type=checkbox] { min-height: 18px; padding: 0; }
-.identity-card section { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
-.identity-card section article { padding: 12px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-@media (max-width: 540px) { main.identity-card { padding: 24px; } }
+.identity-layout .account-topbar { max-width: 1040px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.account-topbar a { text-decoration: none; font-size: 14px; }
+.account-container { max-width: 1040px; margin: 28px auto 0; }
+.account-section-heading p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.account-profile { display: flex; align-items: center; gap: 16px; padding-bottom: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+.account-avatar { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: var(--selected); color: var(--accent); font-size: 20px; }
+.account-profile h2 { font-size: 17px; margin: 0 0 6px; }
+.account-profile p { font-size: 13px; color: var(--muted); margin: 0; }
+.account-badge { display: inline-block; padding: 4px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 11px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.account-profile > .account-badge { margin-left: auto; }
+.account-grid { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 40px; align-items: start; }
+.account-navigation nav { display: grid; gap: 6px; }
+.identity-layout .account-navigation nav button { text-align: left; border: 1px solid transparent; background: transparent; padding: 13px 16px; }
+.identity-layout .account-navigation nav button[aria-current=page] { color: var(--accent); background: var(--selected); }
+.account-navigation nav button span { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
+.account-session { margin-top: 32px; padding: 22px 16px 0; border-top: 1px solid var(--line); }
+.account-session > span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+.identity-layout .account-session button { padding: 6px 0; border: 0; background: transparent; color: var(--muted); min-height: 36px; }
+.identity-layout .account-session button:hover:not(:disabled) { color: var(--danger); background: transparent; }
+.account-content { padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.account-section-heading { display: block; margin-bottom: 22px; }
+.account-section-heading h2 { margin: 0 0 8px; font-size: 19px; }
+.identity-layout .account-password-form { max-width: 460px; }
+.identity-layout .account-password-form fieldset { gap: 16px; margin: 0; }
+.password-field { display: grid; gap: 8px; min-width: 0; }
+.password-field small { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.password-input { position: relative; }
+.identity-layout .password-input input { padding-right: 64px; }
+.identity-layout .password-input button { position: absolute; right: 4px; top: 4px; bottom: 4px; padding: 2px 10px; min-height: 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; }
+.account-security-note { color: var(--muted); padding: 12px 14px; border-radius: 8px; background: var(--canvas); margin: 0; font-size: 12px; line-height: 1.7; }
+.account-form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.account-notice { margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: var(--accent); }
+.account-tokens .token-heading { display: flex; align-items: start; gap: 20px; justify-content: space-between; }
+.token-heading button { flex-shrink: 0; }
+.token-empty { text-align: center; padding: 40px 16px; border: 1px dashed var(--line); border-radius: 8px; }
+.token-empty h3 { font-size: 15px; font-weight: 500; margin: 0 0 8px; }
+.token-empty p, .token-row p { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.7; }
+.token-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; border-top: 1px solid var(--line); }
+.token-row > div { min-width: 0; }
+.token-row > button { flex-shrink: 0; }
+.token-row h3 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px; font-size: 15px; font-weight: 500; }
+.issued-token { padding: 20px; background: var(--selected); border-radius: 8px; margin-bottom: 24px; }
+.issued-token h3 { margin: 0; font-size: 16px; }
+.issued-token p { color: var(--muted); font-size: 13px; line-height: 1.7; }
+.issued-token button { margin-top: 14px; }
+@media (max-width: 700px) {
+  .identity-layout { padding: 20px 16px 40px; }
+  .identity-brand { margin-bottom: 32px; }
+  main.identity-card { padding: 24px; }
+  .account-container { margin-top: 28px; }
+  .account-profile { flex-wrap: wrap; margin-bottom: 20px; padding-bottom: 20px; }
+  .account-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .account-navigation { display: contents; }
+  .account-navigation nav { display: flex; gap: 8px; }
+  .account-navigation nav button { flex: 1; }
+  .account-navigation nav button span { display: none; }
+  .account-session { grid-row: 3; margin: 0; padding: 16px 4px 0; display: flex; align-items: center; justify-content: space-between; }
+  .account-session > span { margin: 0; }
+  .account-content { padding: 24px 20px; }
+  .account-tokens .token-heading { flex-wrap: wrap; }
+  .account-topbar .app-brand small { display: none; }
+  .account-topbar a { font-size: 12px; }
+}

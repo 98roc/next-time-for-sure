@@ -37,7 +37,7 @@ export class TaskService {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token, csrf);
       const task = await requireTask(manager, command.taskId);
-      if (['start_task', 'reopen_task', 'task_progress'].includes(command.action)) activeProject(access, task.projectId);
+      if (['start_task', 'undo_start_task', 'reopen_task', 'task_progress'].includes(command.action)) activeProject(access, task.projectId);
       if (command.action === 'task_blocker') {
         projectAccess(access, task.projectId);
         const participating = (await new AssignmentRepository(manager).snapshot(task.projectId)).assignments.some((entry) => entry.taskId === task.id && entry.accountId === access.actor.id && !['exited', 'transferred'].includes(entry.status));
@@ -65,6 +65,13 @@ export class TaskService {
         const owner = access.organization.accounts.find((entry) => entry.id === command.ownerId && entry.teamId === project.teamId && !entry.disabled);
         if (!owner || !project.members.some((member) => member.accountId === owner.id && member.roles.some((role) => role === 'developer' || role === 'project_lead'))) throw new BadRequestException('主负责人必须是当前项目可用研发成员。');
         await repository.owner(task.id, command.ownerId);
+      } else if (command.action === 'undo_start_task') {
+        if (task.status !== 'in_progress') throw new ConflictException('只有进行中的任务可以撤销开始。');
+        await ensureParentActive(manager, task);
+        if (task.progress > 0 || task.endedAt || !(await repository.hasUndoableStart(task.id)) || await repository.hasExecutionFacts(task.id)) {
+          throw new ConflictException('已有执行进展、开始时间修正或关联工作已执行，不能撤销开始。现有记录保持不变。');
+        }
+        await repository.undoStart(task.id);
       } else if (command.action === 'reopen_task') {
         if (!stopped(task)) throw new ConflictException('只有已完成或取消的任务可重开。');
         await ensureParentActive(manager, task);

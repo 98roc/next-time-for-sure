@@ -9,67 +9,83 @@ import { activeProject, loadWorkAccess, projectAccess } from './work-access.js';
 import { AssignmentRepository } from './assignment.repository.js';
 import { WorkRepository } from './work.repository.js';
 import { ReportingRepository } from '../weekly-plans/reporting.repository.js';
+import { MilestoneRepository } from './milestone.repository.js';
 
-/** 规划操作只维护原团队任务的规划字段，不复制或删除个人执行数据。 */
+/** 独立目标和任务关联共用项目授权、组织锁及历史事务。 */
 @Injectable()
 export class MilestoneService {
   constructor(private readonly database: DatabaseService, private readonly identity: IdentityService) {}
 
-  /** 当前授权、版本、变更和历史在同一事务提交，重试创建不会生成重复节点。 */
+  /** 新建不生成任务；完成由目标负责人确认，任务状态不会反向完成目标。 */
   async execute(token: string, csrf: string, command: MilestoneCommand): Promise<{ objectId: string }> {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token, csrf);
       const tasks = new AssignmentRepository(manager);
-      const repository = new WorkRepository(manager);
-      const before = 'taskId' in command ? await tasks.task(command.taskId) : undefined;
-      if ('taskId' in command && !before) throw new NotFoundException('任务不存在。');
-      const projectId = command.action === 'create_node' ? command.projectId : before?.projectId;
+      const work = new WorkRepository(manager);
+      const repository = new MilestoneRepository(manager);
+      const task = 'taskId' in command ? await tasks.task(command.taskId) : undefined;
+      const node = 'milestoneId' in command && command.milestoneId ? await repository.get(command.milestoneId) : undefined;
+      if ('taskId' in command && !task || 'milestoneId' in command && command.milestoneId && !node) throw new NotFoundException('任务或里程碑不存在。');
+      const projectId = command.action === 'create_node' ? command.projectId : task?.projectId ?? node?.projectId;
       if (!projectId) throw new NotFoundException('项目不存在。');
       const project = projectAccess(access, projectId);
-      if (command.action !== 'edit_task') activeProject(access, projectId);
+      activeProject(access, projectId);
+      const manage = hasPermission(access.actor, access.organization, 'milestones.manage', { teamId: project.teamId, projectId });
 
-      // 内容由主负责人维护；规划权限不隐式允许代改任务范围。
+      // 编辑执行内容与规划权限分离；目标完成仅允许当前负责人。
       if (command.action === 'edit_task') {
-        if (before?.ownerId !== access.actor.id) throw new ForbiddenException('仅任务主负责人可修改任务内容。');
-      } else if (!hasPermission(access.actor, access.organization, 'milestones.manage', { teamId: project.teamId, projectId })) throw new ForbiddenException('没有本项目的里程碑维护权限。');
+        if (task?.ownerId !== access.actor.id) throw new ForbiddenException('仅任务主负责人可修改任务内容。');
+      } else if (command.action === 'link_task') {
+        if (task?.ownerId !== access.actor.id && !manage) throw new ForbiddenException('仅任务主负责人或规划管理者可调整关联。');
+        if (node && (node.projectId !== projectId || node.status === 'removed')) throw new ConflictException('只能关联同项目有效里程碑。');
+      } else if (command.action === 'complete_node' || command.action === 'reopen_node') {
+        if (node?.ownerId !== access.actor.id) throw new ForbiddenException('仅里程碑负责人可确认完成或重新打开。');
+      } else if (!manage) throw new ForbiddenException('没有本项目的里程碑维护权限。');
+
       const hash = digest(JSON.stringify(command));
       if (command.action === 'create_node') {
-        const previous = await repository.operation(access.actor.id, command.operationId);
+        const previous = await work.operation(access.actor.id, command.operationId);
         if (previous) {
           if (previous.hash !== hash) throw new ConflictException('操作标识已用于其他内容。');
           return { objectId: previous.objectId };
         }
       }
-      if ('version' in command && before?.version !== command.version) throw new ConflictException('任务或规划已变化，请刷新后核对再保存。');
-      const changesDate = before?.expectedOn && ((('expectedOn' in command) && command.expectedOn !== before.expectedOn) || command.action === 'remove_node');
-      if (before && changesDate && await new ReportingRepository(manager).publishedTask(project.teamId, before.id) && !access.organization.teams.some((team) => team.id === project.teamId && team.leaderId === access.actor.id)) throw new ForbiddenException('已发布工作明确交付日期变化须由团队负责人确认。');
-      let objectId = before?.id ?? '';
+      const before = task ?? node;
+      if ('version' in command && before?.version !== command.version) throw new ConflictException('记录已变化，请刷新后核对。');
+      if (node?.status === 'removed' && command.action !== 'link_task') throw new ConflictException('里程碑已移出。');
+      if ('ownerId' in command) {
+        const owner = access.organization.accounts.find((entry) => entry.id === command.ownerId && entry.teamId === project.teamId && !entry.disabled);
+        if (!owner || !project.members.some((entry) => entry.accountId === owner.id && entry.roles.some((role) => role === 'developer' || role === 'project_lead'))) throw new BadRequestException('负责人须为当前项目可用研发成员。');
+      }
 
-      // 创建规划事项就是创建团队任务，主负责人必须是当前项目可用研发成员。
-      if (command.action === 'create_node') {
-        const account = access.organization.accounts.find((entry) => entry.id === command.ownerId && entry.teamId === project.teamId && !entry.disabled);
-        const member = project.members.find((entry) => entry.accountId === command.ownerId);
-        if (!account || !member?.roles.some((role) => role === 'developer' || role === 'project_lead')) throw new BadRequestException('主负责人必须是当前项目可用研发成员。');
-        objectId = await repository.createTask(projectId, null, command.ownerId, command.title, command.description, command.acceptance);
-        await repository.planTask(objectId, true, command.expectedOn);
-      } else {
-        if (!before) throw new NotFoundException('任务不存在。');
-        switch (command.action) {
-          case 'add_node':
-            if (before.inMilestone) throw new ConflictException('任务已在里程碑中，请编辑现有节点。');
-            await repository.planTask(objectId, true, command.expectedOn); break;
-          case 'reschedule_node':
-            if (!before.inMilestone) throw new ConflictException('任务已移出里程碑，请刷新。');
-            await repository.planTask(objectId, true, command.expectedOn); break;
-          case 'remove_node':
-            if (!before.inMilestone) throw new ConflictException('任务已移出里程碑。');
-            await repository.planTask(objectId, false, null); break;
-          case 'edit_task': await repository.editTask(objectId, command.title, command.description, command.acceptance); break;
+      // 已发布任务关联的明确交付日期变化仍需团队负责人确认。
+      if (node?.expectedOn && (command.action === 'remove_node' || command.action === 'reschedule_node' && command.expectedOn !== node.expectedOn)) {
+        const linked = (await work.snapshot(projectId)).tasks.filter((entry) => entry.milestoneId === node.id);
+        const teamLeader = access.organization.teams.some((entry) => entry.id === project.teamId && entry.leaderId === access.actor.id);
+        if (!teamLeader) for (const entry of linked) {
+          if (await new ReportingRepository(manager).publishedTask(project.teamId, entry.id)) throw new ForbiddenException('已发布工作关联目标的交付日期变化须由团队负责人确认。');
         }
       }
-      await repository.event(projectId, objectId, access.actor.id, `milestone.${command.action}`, { ...command, before: before ?? null, after: await tasks.task(objectId) });
+
+      // 目标变更和任务关联分别写入，禁止隐式复制执行对象。
+      let objectId = before?.id ?? '';
+      switch (command.action) {
+        case 'create_node': objectId = await repository.create(projectId, command.ownerId, command.title, command.expectedOn); break;
+        case 'link_task': await repository.link(command.taskId, command.milestoneId); break;
+        case 'edit_task': await work.editTask(command.taskId, command.title, command.description, command.acceptance); break;
+        case 'edit_node': await repository.edit(command.milestoneId, command.title, command.ownerId); break;
+        case 'reschedule_node': await repository.reschedule(command.milestoneId, command.expectedOn); break;
+        case 'remove_node': await repository.unlinkAll(command.milestoneId); await repository.status(command.milestoneId, 'removed'); break;
+        case 'complete_node':
+          if (node?.status !== 'open') throw new ConflictException('目标已完成。');
+          await repository.status(command.milestoneId, 'completed'); break;
+        case 'reopen_node':
+          if (node?.status !== 'completed') throw new ConflictException('仅已完成目标可重新打开。');
+          await repository.status(command.milestoneId, 'open'); break;
+      }
+      await work.event(projectId, objectId, access.actor.id, `milestone.${command.action}`, { ...command, before: before ?? null, after: task ? await tasks.task(objectId) : await repository.get(objectId) });
       await new IdentityRepository(manager).audit(access.actor.id, `milestone.${command.action}`, objectId);
-      if (command.action === 'create_node') await repository.recordOperation(access.actor.id, command.operationId, hash, objectId);
+      if (command.action === 'create_node') await work.recordOperation(access.actor.id, command.operationId, hash, objectId);
       return { objectId };
     });
   }

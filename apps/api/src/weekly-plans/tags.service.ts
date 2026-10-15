@@ -56,7 +56,7 @@ async function tagScope(manager: EntityManager, access: WorkAccess, id: string, 
   const candidate = access.organization.projects.find((entry) => entry.id === task.projectId && entry.teamId === access.actor.teamId);
   if (!candidate) throw new ForbiddenException('任务不在当前团队。');
   const responsible = (await assignments.snapshot(candidate.id)).assignments.filter((entry) => entry.taskId === id && !['exited', 'transferred'].includes(entry.status));
-  const managesGroup = responsible.some((entry) => canEditSource(access, candidate.teamId, { groupId: entry.groupId, ownerId: entry.accountId }));
+  const managesGroup = responsible.some((entry) => canEditSource(access, candidate.teamId, { groupId: entry.groupId, ownerId: entry.accountId, taskId: entry.taskId }));
   const project = managesGroup ? candidate : projectAccess(access, task.projectId);
   const teamLead = access.organization.teams.some((team) => team.id === project.teamId && team.leaderId === access.actor.id);
   const projectLead = project.members.some((entry) => entry.accountId === access.actor.id && entry.roles.includes('project_lead'));

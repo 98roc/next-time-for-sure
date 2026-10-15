@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
-import { organizationSnapshotSchema, projectRoleSchema, rolePolicySchema } from '@ntfs/contracts';
-import type { OrganizationSnapshot, Permission, Role } from '@ntfs/contracts';
+import { fixedPermissions, organizationSnapshotSchema, projectRoleSchema } from '@ntfs/contracts';
+import type { OrganizationSnapshot } from '@ntfs/contracts';
 import { z } from 'zod';
 
 /** 组织模块数据访问集中管理；仅在服务校验身份和范围后写入。 */
@@ -13,16 +13,15 @@ export class OrganizationRepository {
 
   /** 一次事务读取完整组织关系，服务层在返回前按当前身份裁剪。 */
   async snapshot(): Promise<OrganizationSnapshot> {
-    const accounts: unknown = await this.manager.query('SELECT id, login_name AS loginName, display_name AS displayName, team_id AS teamId, disabled, version FROM accounts WHERE is_super_admin = 0 FOR UPDATE');
+    // 账号与成员目录统一按创建时间倒序；同一毫秒创建时用ID稳定排序。
+    const accounts: unknown = await this.manager.query('SELECT id, login_name AS loginName, display_name AS displayName, team_id AS teamId, disabled, version FROM accounts WHERE is_super_admin = 0 ORDER BY created_at DESC, id ASC FOR UPDATE');
     const teams: unknown = await this.manager.query('SELECT id, name, leader_id AS leaderId, version FROM teams');
     const groups: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, leader_id AS leaderId, version FROM work_groups');
     const memberships: unknown = await this.manager.query('SELECT group_id AS groupId, account_id AS accountId FROM group_members');
     const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version, archived FROM projects');
     const projectMemberships: unknown = await this.manager.query('SELECT project_id AS projectId, account_id AS accountId, roles_json FROM project_members');
-    const policies: unknown = await this.manager.query('SELECT role_name AS role, permissions_json, version FROM role_policies');
     const gm = z.array(z.object({ groupId: z.string(), accountId: z.string() })).parse(memberships);
     const pm = z.array(z.object({ projectId: z.string(), accountId: z.string(), roles_json: z.unknown() })).parse(projectMemberships);
-    const policyRows = z.array(z.object({ role: z.string(), permissions_json: z.unknown(), version: z.number() })).parse(policies);
     const groupRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), leaderId: z.string(), version: z.number() })).parse(groups);
     const projectRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), version: z.number(), archived: z.number() })).parse(projects);
     const accountRows = z.array(z.object({ id: z.string(), loginName: z.string(), displayName: z.string(), teamId: z.string().nullable(), disabled: z.number(), version: z.number() })).parse(accounts);
@@ -30,18 +29,18 @@ export class OrganizationRepository {
       accounts: accountRows.map((row) => ({ ...row, disabled: Boolean(row.disabled) })), teams,
       groups: groupRows.map((row) => ({ ...row, memberIds: gm.filter((member) => member.groupId === row.id).map((member) => member.accountId) })),
       projects: projectRows.map((row) => ({ ...row, archived: Boolean(row.archived), members: pm.filter((member) => member.projectId === row.id).map((member) => ({ accountId: member.accountId, roles: z.array(projectRoleSchema).parse(decodeJson(member.roles_json)) })) })),
-      policies: policyRows.map((row) => rolePolicySchema.parse({ role: row.role, version: row.version, permissions: decodeJson(row.permissions_json) })),
+      policies: Object.entries(fixedPermissions).map(([role, permissions]) => ({ role, permissions, version: 0 })),
     });
   }
 
-  /** 创建账号；团队可空，仅用于建立团队负责人时的同一事务。 */
+  /** 超管创建独立账号，团队归属由后续关联操作维护。 */
   async createAccount(login: string, display: string, hash: string, teamId: string | null): Promise<string> {
     const id = randomUUID();
     await this.manager.query('INSERT INTO accounts (id, login_name, display_name, password_hash, team_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [id, login, display, hash, teamId]);
     return id;
   }
 
-  /** 建立团队并关联同事务创建的负责人。 */
+  /** 建立团队并关联已有的未入团队账号。 */
   async createTeam(name: string, leaderId: string): Promise<string> {
     const id = randomUUID();
     await this.manager.query('INSERT INTO teams (id, name, leader_id, created_at) VALUES (?, ?, ?, UTC_TIMESTAMP(3))', [id, name, leaderId]);
@@ -90,8 +89,60 @@ export class OrganizationRepository {
     await this.manager.query('DELETE FROM login_sessions WHERE account_id = ?', [account]);
   }
 
-  /** 只更新已有预设角色，不能插入新角色或配置固定数据边界。 */
-  async setPolicy(role: Role, permissions: Permission[]): Promise<void> { await this.manager.query('UPDATE role_policies SET permissions_json = ?, version = version + 1 WHERE role_name = ?', [JSON.stringify([...new Set(permissions)]), role]); }
+  /** 包括超管在内检查登录名，避免唯一索引冲突泄漏为内部错误。 */
+  async loginExists(login: string, except = ''): Promise<boolean> {
+    const rows: unknown = await this.manager.query('SELECT id FROM accounts WHERE login_name = ? AND id <> ? LIMIT 1', [login, except]);
+    return z.array(z.object({ id: z.string() })).parse(rows).length > 0;
+  }
+
+  /** 修改身份资料并递增版本，不隐式调整团队归属。 */
+  async updateAccount(id: string, login: string, display: string): Promise<void> {
+    await this.manager.query('UPDATE accounts SET login_name = ?, display_name = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [login, display, id]);
+  }
+
+  /** 一次保存团队名称与管理员，已有关联由服务校验。 */
+  async updateTeam(id: string, name: string, leaderId: string): Promise<void> {
+    await this.manager.query('UPDATE teams SET name = ?, leader_id = ?, version = version + 1 WHERE id = ?', [name, leaderId, id]);
+  }
+
+  /** 检查业务关联及无外键历史；只返回存在性，不暴露私人内容。 */
+  async accountInUse(id: string): Promise<boolean> {
+    const references = [
+      ['teams', 'leader_id'], ['work_groups', 'leader_id'], ['group_members', 'account_id'], ['project_members', 'account_id'],
+      ['work_requests', 'submitter_id'], ['team_tasks', 'owner_id'], ['project_milestones', 'owner_id'], ['task_assignments', 'account_id'],
+      ['personal_categories', 'owner_id'], ['personal_items', 'owner_id'], ['personal_events', 'owner_id'],
+      ['work_events', 'actor_id'], ['work_operations', 'actor_id'], ['weekly_events', 'actor_id'],
+      ['lifecycle_events', 'actor_id'], ['lifecycle_events', 'object_id'], ['notifications', 'account_id'],
+    ];
+    return this.hasReferences(references, id);
+  }
+
+  /** 团队的项目、小组及历史存在时拒绝删除，避免级联清理业务数据。 */
+  async teamInUse(id: string): Promise<boolean> {
+    return this.hasReferences(['work_groups', 'projects', 'weekly_drafts', 'weekly_publications', 'report_drafts', 'weekly_events', 'lifecycle_events', 'notification_outbox'].map((table) => [table, 'team_id']), id);
+  }
+
+  /** 仅用于本文件固定表列清单，不接受外部输入作为SQL标识符。 */
+  private async hasReferences(references: string[][], id: string): Promise<boolean> {
+    for (const [table, column] of references) {
+      const rows: unknown = await this.manager.query(`SELECT 1 AS found FROM ${table} WHERE ${column} = ? LIMIT 1`, [id]);
+      if (z.array(z.object({ found: z.coerce.number() })).parse(rows).length) return true;
+    }
+    return false;
+  }
+
+  /** 只删除服务已确认无业务关联的账号；审计不随账号删除。 */
+  async deleteAccount(id: string): Promise<void> {
+    await this.manager.query('DELETE FROM login_sessions WHERE account_id = ?', [id]);
+    await this.manager.query('DELETE FROM personal_tokens WHERE account_id = ?', [id]);
+    await this.manager.query('DELETE FROM accounts WHERE id = ?', [id]);
+  }
+
+  /** 空团队删除前解除唯一管理员的团队归属，账号本身保留。 */
+  async deleteTeam(id: string): Promise<void> {
+    await this.manager.query('UPDATE accounts SET team_id = NULL, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE team_id = ?', [id]);
+    await this.manager.query('DELETE FROM teams WHERE id = ?', [id]);
+  }
 }
 
 /** mysql2对JSON列的返回可能是文本或已解析值，统一后再校验。 */

@@ -43,14 +43,15 @@ export async function lifecycleScope(manager: EntityManager, access: WorkAccess,
   } else if (intent.action === 'archive_project' || intent.action === 'restore_project') {
     const project = projectAccess(access, intent.objectId); team = project.teamId; projectId = project.id;
     if (!teamLeader(team) && !project.members.some((entry) => entry.accountId === access.actor.id && entry.roles.includes('project_lead'))) throw new ForbiddenException('仅团队负责人或项目研发负责人可归档恢复。');
-    const tasks = (await work.snapshot(project.id)).tasks; const items = (await personal.candidates(access.actor.id, team)).filter((entry) => entry.kind === 'work' && entry.projectId === project.id);
+    const snapshot = await work.snapshot(project.id); const tasks = snapshot.tasks; const milestones = snapshot.milestones; const items = (await personal.candidates(access.actor.id, team)).filter((entry) => entry.kind === 'work' && entry.projectId === project.id);
     title = `${intent.action === 'archive_project' ? '归档' : '恢复'}项目：${project.name}`;
     if (intent.action === 'archive_project') {
       if (project.archived) blockers.push('项目已经归档。');
+      blockers.push(...milestones.filter((entry) => entry.status === 'open').map((entry) => `未结束里程碑：${entry.title}`));
       blockers.push(...tasks.filter((entry) => !stopped(entry.status)).map((entry) => `未结束团队任务：${entry.title}`));
       blockers.push(...items.filter((entry) => !entry.assignmentId && entry.status !== 'completed').map((entry) => `未完成独立工作：${canViewPersonal(access, entry) ? entry.title : '受权限保护的个人工作'}`));
     } else if (!project.archived) blockers.push('项目尚未归档。');
-    impacts.push('保留历史及已发布周报；归档期间禁止新增工作及进入新周计划。'); fingerprint = { project, tasks, items: items.map(({ id, version }) => ({ id, version })) };
+    impacts.push('保留历史及已发布周报；归档期间禁止新增工作及进入新周计划。'); fingerprint = { project, tasks, milestones, items: items.map(({ id, version }) => ({ id, version })) };
   } else if (task) {
     const project = projectAccess(access, task.projectId); team = project.teamId; projectId = project.id;
     const manage = teamLeader(team) || project.members.some((entry) => entry.accountId === access.actor.id && entry.roles.includes('project_lead'));
@@ -69,7 +70,7 @@ export async function lifecycleScope(manager: EntityManager, access: WorkAccess,
     } else {
       if (task.parentId) blockers.push('子任务请随父任务整体转移，避免跨项目父子关系。');
       joinIds = [...new Set([task.ownerId, ...children.map((entry) => entry.ownerId), ...involved.filter((entry) => !['exited', 'transferred'].includes(entry.status)).map((entry) => entry.accountId)])];
-      impacts.push(`连同 ${children.length} 个子任务及 ${items.length} 条关联个人工作转移；按目标项目权限开放查看。`, '不改变个人内容、状态和时间；旧发布快照保留，历史参与人不自动加入目标项目。');
+      impacts.push(`连同 ${children.length} 个子任务及 ${items.length} 条关联个人工作转移；按目标项目权限开放查看。`, '解除原项目里程碑关联；不改变个人内容、状态和时间；旧发布快照保留，历史参与人不自动加入目标项目。');
     }
     fingerprint = { task, children, involved, progress: state.progress.filter((entry) => involved.some((assignment) => assignment.id === entry.assignmentId)), items: items.map(({ id, version }) => ({ id, version })) };
   } else if (item) {

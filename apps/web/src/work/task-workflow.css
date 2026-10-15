@@ -1,0 +1,55 @@
+.app-dialog.org-layout.task-workflow { width: min(1040px, calc(100vw - 32px)); }
+.task-workflow .dialog-body { padding: 24px; }
+.task-overview { display: grid; gap: 10px; }
+.task-overview p, .task-overview .detail-meta { margin: 0; }
+.task-overview .detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.task-content-editor > button { margin: 4px 0; }
+.task-owner-editor { color: var(--muted); font-size: 14px; }
+.task-owner-heading, .task-owner-actions { display: flex; align-items: center; gap: 10px; }
+.task-workflow .task-owner-change { min-height: 28px; padding: 3px 10px; font-size: 13px; color: var(--accent); }
+.task-workflow .task-owner-form { display: grid; gap: 10px; margin: 10px 0 4px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
+.task-owner-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.task-workflow .task-owner-fields > label { flex: 1 1 220px; max-width: 380px; margin: 0; }
+.task-owner-form small { line-height: 1.6; }
+.workflow-tabs { margin: 22px 0 18px; gap: 24px; }
+.workflow-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.workflow-footer > span { margin-right: auto; }
+.workflow-footer > .workflow-primary { order: 2; }
+.task-workflow .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.task-workflow .section-heading h3, .task-workflow .section-heading h4 { margin: 0; }
+.assignment-picker { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 18px; }
+.assignment-picker fieldset { display: grid; gap: 14px; }
+.assignment-picker-hint { margin: 0; color: var(--muted); font-size: 13px; }
+.assignment-owner-label { margin-left: 8px; color: var(--accent); font-size: 12px; }
+.assignment-unavailable { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 13px; }
+.assignment-picker-list { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.assignment-picker-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(130px, .9fr) minmax(160px, 1.4fr); align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--line); }
+.assignment-picker-row:last-child { border-bottom: 0; }
+.assignment-picker-row.is-selected { background: color-mix(in srgb, var(--accent, #a9b9ed) 10%, transparent); }
+.task-workflow .assignment-person, .task-workflow .week-person-choice { display: flex; align-items: center; gap: 10px; margin: 0; }
+.assignment-person input[type="checkbox"], .week-person-choice input[type="checkbox"] { flex: 0 0 auto; width: 18px; height: 18px; }
+.assignment-person small, .week-person-choice small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.task-workflow .assignment-entry { margin: 10px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; }
+.assignment-entry > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.assignment-entry > summary::before { content: '›'; }
+.assignment-entry[open] > summary::before { content: '⌄'; }
+.assignment-entry > summary span, .assignment-entry > summary small { color: var(--muted); }
+.assignment-entry > summary small { flex-basis: 100%; padding-left: 20px; }
+.assignment-entry p { font-size: 14px; overflow-wrap: anywhere; }
+.task-week-plan > fieldset { margin: 18px 0; }
+.task-week-plan .week-picker { flex-wrap: wrap; }
+.task-week-plan .detail-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.weekly-task-row { border: 1px solid var(--line); padding: 14px; border-radius: 10px; margin: 12px 0; }
+.weekly-task-row p { color: var(--muted); font-size: 14px; }
+.task-week-plan .week-person-choice { padding: 12px; border-bottom: 1px solid var(--line); }
+.task-workflow .assignment-actions { flex-wrap: wrap; }
+.arrangement-fields .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 640px) {
+  .app-dialog.org-layout.task-workflow { width: 100%; max-width: 100%; }
+  .task-workflow .dialog-body { padding: 16px; }
+  .workflow-tabs { gap: 14px; overflow-x: auto; white-space: nowrap; }
+  .assignment-picker-row { grid-template-columns: 1fr 1fr; }
+  .assignment-picker-row > label:last-child { grid-column: 1 / -1; }
+  .assignment-unavailable { grid-column: 1 / -1; }
+  .arrangement-fields .form-grid { grid-template-columns: 1fr; }
+}

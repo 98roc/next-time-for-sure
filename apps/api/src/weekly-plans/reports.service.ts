@@ -1,3 +1,4 @@
+import { automaticCarryWeek, carryForward } from './carry-forward.js';
 import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { ReportCommand, ReportEntry, ReportSource, PublicationRow } from '@ntfs/contracts';
@@ -33,6 +34,7 @@ export class ReportsService {
     return this.database.transaction(async (manager) => {
       const access = await loadWorkAccess(manager, this.identity, token); assertTeam(access, team);
       if (!canPublish(access, team)) throw new ForbiddenException('仅团队负责人可以发布周报。');
+      if (automaticCarryWeek(nextWeek(week))) await carryForward(manager, access, team, nextWeek(week));
       const draft = await new ReportingRepository(manager).report(team, week); const sources = await reportSources(manager, access, team, week); const next = await planRows(manager, access, team, nextWeek(week));
       return { confirmation: digest(JSON.stringify({ draft, sources, next })), rows: reportRows(draft?.entries ?? []), next };
     });

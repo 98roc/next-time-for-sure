@@ -24,12 +24,55 @@
 .fish-drop-target { background: var(--selected); border-radius: var(--radius); }
 /* 落点提示脱离文档流，避免拖动时撑高分支、使原目标移开鼠标。 */
 .fish-placeholder { position: absolute; top: 0; left: 18px; right: 18px; z-index: 2; pointer-events: none; background: var(--selected); border: 1px dashed var(--accent); padding: 8px; font-size: 12px; }
-.fish-empty { grid-row: 1 / 4; grid-column: 1 / -1; min-width: 300px; position: relative; background: var(--surface); padding: 40px 24px; width: 100%; text-align: center; }
-.fish-add-date { grid-row: 2; align-self: center; position: relative; padding: 20px; }
+.fish-empty { grid-row: 1 / 4; grid-column: 1; position: relative; background: var(--surface); padding: 40px 24px; width: 100%; text-align: center; }
+/* 唯一通用新增入口随时间轴末端排列；长轴时固定在可视区右侧，不必滚到底。 */
+.fish-add-date { grid-row: 2; align-self: center; justify-self: start; position: sticky; right: 0; z-index: 2; padding: 8px 20px; background: var(--surface); border-radius: 8px; }
+.fish-add-date button { white-space: nowrap; }
 .fish-unplanned { border-top: 1px dashed var(--line); padding-top: 16px; }
 .fish-unplanned h3 { display: flex; gap: 10px; align-items: center; margin: 0; font-size: 14px; }
 .fish-unplanned-nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 14px; }
+
+/* 详情与编辑分别组织操作，页脚在长任务列表中仍保持可达。 */
+.milestone-detail .dialog-header { gap: 10px; }
+.milestone-detail .dialog-header h2 { flex: 1; min-width: 0; margin: 0; }
+.milestone-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.milestone-detail-content:focus { outline: none; }
+.milestone-more { position: relative; }
+.org-layout .milestone-more > summary { list-style: none; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; }
+.milestone-more > summary::-webkit-details-marker { display: none; }
+.milestone-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.milestone-more > div { position: absolute; right: 0; top: calc(100% + 6px); min-width: 152px; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px #0003; }
+.milestone-more button { width: 100%; text-align: left; white-space: nowrap; }
+.milestone-facts { margin: 0 0 24px; display: grid; gap: 16px; }
+.milestone-facts > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 12px; }
+.milestone-facts dt { color: var(--muted); font-size: 13px; }
+.milestone-facts dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; overflow-wrap: anywhere; }
+.milestone-status { border-radius: 6px; background: var(--selected); padding: 3px 8px; font-size: 13px; }
+.milestone-status.completed { color: var(--accent); }
+.milestone-linked { border-top: 1px solid var(--line); padding-top: 18px; }
+.milestone-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.milestone-section-heading h3 { margin: 0; font-size: 15px; }
+.milestone-empty { padding: 20px 0; margin: 0; }
+.milestone-task-list { list-style: none; padding: 0; margin: 12px 0; }
+.milestone-task-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.milestone-task-list li .text-button { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.milestone-task-list li > span { flex-shrink: 0; }
+.milestone-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.milestone-detail-content > .milestone-footer { position: sticky; bottom: -24px; background: var(--surface); padding-bottom: 16px; margin-bottom: -16px; }
+.milestone-detail .dialog-body form { margin: 0; }
+.milestone-detail .milestone-context { margin-top: 0; }
+.milestone-notice { color: var(--accent); }
+.milestone-unfinished { margin: 0; padding-left: 22px; max-height: 180px; overflow: auto; overflow-wrap: anywhere; }
+.milestone-discard { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--selected); }
+.milestone-discard p { margin: 0; }
+.milestone-discard .milestone-footer { margin-top: 12px; padding-top: 0; border: 0; }
 @media (max-width: 640px) {
+ .milestone-detail .dialog-header { flex-wrap: wrap; padding: 16px 18px; }
+ .milestone-detail .dialog-header h2 { flex-basis: calc(100% - 60px); }
+ .milestone-header-actions { order: 3; width: 100%; justify-content: flex-end; }
+ .milestone-facts > div { grid-template-columns: 96px minmax(0, 1fr); gap: 8px; }
+ .milestone-task-list li { flex-direction: column; gap: 4px; }
+ .milestone-detail-content > .milestone-footer { bottom: -18px; }
  .fish-scroll { padding: 10px 0; }
  .fish-axis { display: flex; flex-direction: column; width: 100%; }
  .fish-axis::before { content: ''; position: absolute; top: 0; left: 14px; height: 100%; width: 0; border-top: 0; border-left: 2px solid var(--line); }
@@ -37,5 +80,5 @@
  .fish-day { width: 100%; display: flex; flex-direction: column; padding-left: 30px; margin-bottom: 18px; }
  .fish-date { align-self: flex-start; }
  .fish-branch { border: 0; margin: 0; padding: 12px 0; width: 100%; }
- .fish-add-date { align-self: flex-start; }
+ .fish-add-date { position: relative; right: auto; order: -1; align-self: flex-start; margin-bottom: 12px; padding: 8px 0 8px 30px; }
 }

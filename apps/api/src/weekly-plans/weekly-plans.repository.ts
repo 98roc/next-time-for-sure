@@ -7,6 +7,27 @@ import type { WeeklyArrangement } from '@ntfs/contracts';
 /** 周计划持久化集中入口，调用方须已取得组织事务锁并校验权限。 */
 export class WeeklyPlansRepository {
   constructor(private readonly manager: EntityManager) {}
+  /** 主动移出形成阻断点，避免刷新或跨周自动重新加入。 */
+  async exclude(draft: string, object: string, kind: 'assignment' | 'task') {
+    await this.manager.query('INSERT IGNORE INTO weekly_carry_exclusions (draft_id,object_id,object_kind) VALUES (?,?,?)', [draft, object, kind]);
+  }
+  /** 人工重新安排解除当前周阻断，后续周从新的安排继续延续。 */
+  async include(draft: string, object: string, kind: 'assignment' | 'task') {
+    await this.manager.query('DELETE FROM weekly_carry_exclusions WHERE draft_id=? AND object_id=? AND object_kind=?', [draft, object, kind]);
+  }
+  /** 读取目标周之前的有效来源；中间缺周无需创建历史草稿，主动移出优先。 */
+  async carrySources(team: string, week: string, kind: 'assignment' | 'task') {
+    const table = kind === 'assignment' ? 'weekly_arrangements' : 'weekly_pending';
+    const column = kind === 'assignment' ? 'assignment_id' : 'task_id';
+    const rows: unknown = await this.manager.query(`
+      SELECT a.${column} AS objectId,DATE_FORMAT(MAX(d.week),'%Y-%m-%d') AS sourceWeek
+      FROM ${table} a JOIN weekly_drafts d ON d.id=a.draft_id
+      WHERE d.team_id=? AND d.week<? AND NOT EXISTS (
+        SELECT 1 FROM weekly_carry_exclusions e JOIN weekly_drafts x ON x.id=e.draft_id
+        WHERE x.team_id=d.team_id AND x.week>=d.week AND x.week<=? AND e.object_id=a.${column} AND e.object_kind=?
+      ) GROUP BY a.${column}`, [team, week, week, kind]);
+    return z.array(z.object({ objectId: z.string(), sourceWeek: z.string() })).parse(rows);
+  }
   /** 父任务拆分后草稿待分配项展开到子任务，正式发布副本保持不变。 */
   async splitPending(parent: string, children: string[]) {
     const rows: unknown = await this.manager.query('SELECT id,draft_id AS draftId FROM weekly_pending WHERE task_id=?', [parent]);
@@ -16,11 +37,11 @@ export class WeeklyPlansRepository {
     }
   }
   /** 待分配项与人员安排分开，不能伪造执行人。 */
-  async pending(draft: string) { return z.array(z.object({ id: z.string(), taskId: z.string(), version: z.number() })).parse(await this.manager.query('SELECT id,task_id AS taskId,version FROM weekly_pending WHERE draft_id=?', [draft])); }
+  async pending(draft: string) { return z.array(z.object({ id: z.string(), taskId: z.string(), version: z.number(), sourceWeek: z.string().nullable() })).parse(await this.manager.query("SELECT id,task_id AS taskId,version,DATE_FORMAT(source_week,'%Y-%m-%d') AS sourceWeek FROM weekly_pending WHERE draft_id=?", [draft])); }
   /** 添加待分配事项，重复加入返回原条目。 */
-  async addPending(draft: string, task: string) {
+  async addPending(draft: string, task: string, sourceWeek: string | null = null) {
     const previous = (await this.pending(draft)).find((entry) => entry.taskId === task); if (previous) return previous.id;
-    const id = randomUUID(); await this.manager.query('INSERT INTO weekly_pending (id,draft_id,task_id) VALUES (?,?,?)', [id, draft, task]); await this.touch(draft); return id;
+    const id = randomUUID(); await this.manager.query('INSERT INTO weekly_pending (id,draft_id,task_id,source_week) VALUES (?,?,?,?)', [id, draft, task, sourceWeek]); await this.touch(draft); return id;
   }
   /** 移出仅影响草稿，发布副本保持不变，操作历史由服务记录。 */
   async remove(draft: string, id: string, pending: boolean) { await this.manager.query(`DELETE FROM ${pending ? 'weekly_pending' : 'weekly_arrangements'} WHERE id=? AND draft_id=?`, [id, draft]); await this.touch(draft); }

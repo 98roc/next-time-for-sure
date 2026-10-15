@@ -1,59 +1,83 @@
-import { Brand } from '../layout/app-shell';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Brand } from '../layout/app-shell';
 import { changePassword, currentIdentity, login, logout } from './api';
-import './identity.css';
+import { PasswordField } from './password-field';
 import { TokenPanel } from './token-panel';
+import './identity.css';
 
-/** 身份入口：未登录时展示登录表单，已登录时提供本人改密与退出。 */
+type AccountAction = { type: 'login'; loginName: string; password: string } | { type: 'password'; current: string; replacement: string } | { type: 'logout' };
+
+/** 登录与设置分开呈现；强制改密完成前不提供业务返回或Token入口。 */
 export function AccountPage() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [section, setSection] = useState('password');
   const identity = useQuery({ queryKey: ['identity'], queryFn: currentIdentity, retry: false });
-  const [loginName, setLoginName] = useState('');
-  const [password, setPassword] = useState('');
-  const [replacement, setReplacement] = useState('');
+  const [section, setSection] = useState<'password' | 'tokens'>('password');
   const [notice, setNotice] = useState('');
   const action = useMutation({
-    mutationFn: async (type: 'login' | 'password' | 'logout') => {
-      if (type === 'login') return login(loginName, password);
+    mutationFn: async (input: AccountAction) => {
+      if (input.type === 'login') return login(input.loginName, input.password);
       if (!identity.data) throw new Error('请先登录。');
-      if (type === 'password') await changePassword(password, replacement, identity.data.csrfToken);
+      if (input.type === 'password') await changePassword(input.current, input.replacement, identity.data.csrfToken);
       else await logout(identity.data.csrfToken);
       return null;
     },
-    onSuccess: (result, type) => {
-      client.clear();
-      client.setQueryData(['identity'], result);
-      setPassword(''); setReplacement('');
-      if (type === 'login' && result && !result.mustChangePassword) { const next = params.get('returnTo'); navigate(next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') && !next.startsWith('/account') ? next : result.isSuperAdmin ? '/organization' : '/personal', { replace: true }); }
-      setNotice(type === 'password' ? '密码已修改，所有旧会话已撤销，请重新登录。' : type === 'logout' ? '已退出登录。' : '');
+    onSuccess: (result, input) => {
+      // 身份变化时清除旧账号的业务查询；改密撤销会话后回到登录表单。
+      client.clear(); client.setQueryData(['identity'], result);
+      setSection('password');
+      setNotice(input.type === 'password' ? '密码已修改，请使用新密码重新登录。' : input.type === 'logout' ? '已退出登录。' : '');
+      if (input.type === 'login' && result && !result.mustChangePassword) {
+        const next = params.get('returnTo');
+        const allowed = next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') && next.split('?')[0] !== '/account';
+        navigate(allowed ? next : result.isSuperAdmin ? '/accounts' : '/personal', { replace: true });
+      }
     },
   });
+  const user = identity.data;
+  const back = user?.isSuperAdmin ? '/accounts' : '/personal';
+  const feedback = <>{notice && <p role="status" className="account-notice">{notice}</p>}{action.error && <p role="alert" className="form-error account-notice">{action.error.message}</p>}</>;
 
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); action.mutate(identity.data ? 'password' : 'login'); }
+  if (identity.isPending || identity.isError) return <div className="identity-layout"><header className="identity-brand"><Brand /></header><main className="identity-card panel">{identity.isPending ? <p role="status">正在检查登录状态…</p> : <div role="alert"><p>暂时无法连接服务。</p><button onClick={() => { void identity.refetch(); }}>重新连接</button></div>}</main></div>;
+  if (!user) return <div className="identity-layout"><header className="identity-brand"><Brand /></header><main className="identity-card panel"><h1>登录工作空间</h1><p className="subtitle">下次一定，从这次开始。</p>{feedback}<LoginForm pending={action.isPending} submit={(loginName, password) => action.mutate({ type: 'login', loginName, password })} /><p className="footnote">账号由管理员创建。忘记密码请联系管理员。</p></main></div>;
 
-  return <div className="identity-layout"><div className="identity-brand"><Link to="/personal"><Brand /></Link></div><main className="identity-card panel">
-    <p className="eyebrow">账号与安全</p><h1>{identity.data ? `你好，${identity.data.displayName}` : '登录工作空间'}</h1>
-    {identity.isPending ? <p role="status">正在检查登录状态…</p> : identity.isError ? <div role="alert"><p>服务暂时不可用，请检查后重试。</p><button onClick={() => { void identity.refetch(); }}>重新连接</button></div> : <>
-      {identity.data && <p className="subtitle">{identity.data.mustChangePassword ? '首次登录请先修改临时密码。' : '修改密码后，所有设备需要重新登录。'}</p>}
-      {notice && <p role="status" className="notice">{notice}</p>}
-      {identity.data && !identity.data.mustChangePassword && <div className="view-tabs"><button aria-pressed={section === 'password'} onClick={() => setSection('password')}>密码</button><button aria-pressed={section === 'tokens'} onClick={() => setSection('tokens')}>Agent 访问令牌</button></div>}
-      {(!identity.data || identity.data.mustChangePassword || section === 'password') && <form onSubmit={submit}>
-        {!identity.data && <label>账号<input name="username" autoComplete="username" required maxLength={64} value={loginName} onChange={(event) => setLoginName(event.target.value)} /></label>}
-        <label>{identity.data ? '当前密码' : '密码'}<input name="password" type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-        {identity.data && <label>新密码<input name="new-password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={replacement} onChange={(event) => setReplacement(event.target.value)} /><small>12～128个字符</small></label>}
-        {action.isError && <p className="form-error" role="alert">{action.error.message}</p>}
-        <button className="primary-button" disabled={action.isPending}>{action.isPending ? '正在处理…' : identity.data ? '修改密码并重新登录' : '登录'}</button>
-      </form>}
-      {identity.data && <button className="text-button" disabled={action.isPending} onClick={() => action.mutate('logout')}>退出登录</button>}
-      {!identity.data && <p className="footnote">账号由管理员创建，不开放自行注册。忘记密码请联系团队管理员。</p>}
-    </>}
-    <Link className="status-link" to="/personal">← 返回工作空间</Link>
-    {identity.data && !identity.data.mustChangePassword && section === 'tokens' && <TokenPanel key={identity.data.id} identity={identity.data} />}
-  </main></div>;
+  return <div className="identity-layout account-settings"><header className="account-topbar"><Brand />{!user.mustChangePassword && <Link to={back}>← 返回{user.isSuperAdmin ? '系统管理' : '工作空间'}</Link>}</header>
+    <main className="account-container" aria-label="账号设置">
+      <section className="account-profile"><span className="account-avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span><div><h2>{user.displayName}</h2><p>登录账号：{user.loginName}</p></div><span className="account-badge">{user.isSuperAdmin ? '系统管理员' : '个人账号'}</span></section>
+      <div className="account-grid"><aside className="account-navigation"><nav aria-label="账号设置分类"><button aria-current={section === 'password' ? 'page' : undefined} disabled={action.isPending} onClick={() => { setSection('password'); action.reset(); }}>登录密码<span>修改密码，保护账号</span></button>{!user.mustChangePassword && <button aria-current={section === 'tokens' ? 'page' : undefined} disabled={action.isPending} onClick={() => { setSection('tokens'); action.reset(); }}>Agent 访问令牌<span>连接外部 Agent</span></button>}</nav><div className="account-session"><span>当前登录会话</span><button disabled={action.isPending} onClick={() => action.mutate({ type: 'logout' })}>退出登录</button></div></aside>
+        <section className="account-content" aria-label={section === 'password' ? '登录密码' : 'Agent 访问令牌'}>{feedback}{user.mustChangePassword || section === 'password' ? <><header className="account-section-heading"><h2>{user.mustChangePassword ? '设置你的登录密码' : '修改登录密码'}</h2><p>{user.mustChangePassword ? '首次登录，请先将临时密码修改为你自己的密码。' : '使用与其他平台不同的密码，降低账号泄露风险。'}</p></header><PasswordForm pending={action.isPending} submit={(current, replacement) => action.mutate({ type: 'password', current, replacement })} /></> : <TokenPanel key={user.id} identity={user} />}</section>
+      </div>
+    </main>
+  </div>;
+}
+
+/** 登录表单只保存当前输入；提交期间禁用编辑，防止重复登录。 */
+function LoginForm({ pending, submit }: { pending: boolean; submit: (loginName: string, password: string) => void }) {
+  const [loginName, setLoginName] = useState(''); const [password, setPassword] = useState('');
+  return <form onSubmit={(event) => { event.preventDefault(); submit(loginName, password); }}><fieldset disabled={pending}><label>账号<input name="username" autoComplete="username" required maxLength={64} value={loginName} onChange={(event) => setLoginName(event.target.value)} /></label><PasswordField label="密码" value={password} onChange={setPassword} autoComplete="current-password" /><button className="primary-button">{pending ? '正在登录…' : '登录'}</button></fieldset></form>;
+}
+
+/** 提交前核对两次新密码及新旧差异；字段错误保留输入供修正，取消清空全部密码。 */
+function PasswordForm({ pending, submit }: { pending: boolean; submit: (current: string, replacement: string) => void }) {
+  const [current, setCurrent] = useState(''); const [replacement, setReplacement] = useState(''); const [confirmation, setConfirmation] = useState('');
+  const [checked, setChecked] = useState(false);
+  const mismatch = confirmation !== replacement;
+  const unchanged = current === replacement;
+  const error = checked ? unchanged ? '新密码不能与当前密码相同。' : mismatch ? '两次输入的新密码不一致，请重新确认。' : '' : '';
+  function send(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setChecked(true);
+    if (!unchanged && !mismatch) submit(current, replacement);
+  }
+  return <form className="account-password-form" onSubmit={send}><fieldset disabled={pending}>
+    <PasswordField label="当前密码" value={current} onChange={setCurrent} autoComplete="current-password" />
+    <PasswordField label="新密码" value={replacement} onChange={setReplacement} autoComplete="new-password" hint="12～128个字符，不能与当前密码相同。" invalid={checked && unchanged} />
+    <PasswordField label="确认新密码" value={confirmation} onChange={setConfirmation} autoComplete="new-password" invalid={checked && mismatch} />
+    {error && <p role="alert" className="form-error">{error}</p>}
+    <p className="account-security-note">修改成功后，所有设备的登录会话将失效，需要重新登录。</p>
+    <div className="account-form-actions"><button className="primary-button">{pending ? '正在更新…' : '更新密码'}</button><button type="button" disabled={!current && !replacement && !confirmation} onClick={() => { setCurrent(''); setReplacement(''); setConfirmation(''); setChecked(false); }}>取消修改</button></div>
+  </fieldset></form>;
 }

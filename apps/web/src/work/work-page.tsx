@@ -1,14 +1,17 @@
 import { Dialog } from '../layout/dialog';
 import { TaskDetail } from './task-detail';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { TaskBoard } from './task-board';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { workCommandSchema } from '@ntfs/contracts';
-import type { OrganizationSnapshot, Permission, WorkCommand, WorkSnapshot } from '@ntfs/contracts';
+import type { OrganizationCommand, OrganizationSnapshot, Permission, WorkCommand, WorkSnapshot } from '@ntfs/contracts';
 import { currentIdentity } from '../identity/api';
-import { organizationSnapshot } from '../organization/api';
+import { organizationCommand, organizationSnapshot } from '../organization/api';
+import { CommandForm } from '../organization/command-form';
+import { ProjectOnboarding } from '../organization/project-onboarding';
+import { EmptyState } from '../layout/empty-state';
 import { workCommand, workSnapshot } from './api';
 import '../organization/organization.css';
 import './work.css';
@@ -30,6 +33,7 @@ export function WorkPage() {
   const view = params.get('view') ?? 'tasks';
   const taskId = location.hash.startsWith('#task-') ? location.hash.slice(6) : '';
   const [creating, setCreating] = useState(false);
+  const [projectEditor, setProjectEditor] = useState<OrganizationSnapshot | null>(null);
   const [query, setQuery] = useState('');
   const [requestId, setRequestId] = useState('');
   const openTask = (id: string) => navigate({ pathname: '/work', search: location.search, hash: id ? `#task-${id}` : '' });
@@ -38,10 +42,30 @@ export function WorkPage() {
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
+  const continueCreation = useRef(false);
   const operation = useRef<{ content: string; id: string } | null>(null);
+  const leader = organization.data?.teams.some((team) => team.leaderId === identity.data?.id) ?? false;
+  const createProject = useMutation({
+    mutationFn: (command: OrganizationCommand) => organizationCommand(command, identity.data?.csrfToken ?? ''),
+    onSuccess: async (_, command) => {
+      const previous = new Set(organization.data?.projects.map((entry) => entry.id));
+      setProjectEditor(null);
+      setParams({ view: 'tasks' });
+      await client.invalidateQueries({ queryKey: ['organization'] });
+
+      // 组织命令返回204，仅在回读能唯一确定新增项目时自动进入，避免并发创建时选错。
+      const refreshed = client.getQueryData<OrganizationSnapshot>(['organization', identity.data?.id]);
+      const added = refreshed?.projects.filter((entry) => !previous.has(entry.id) && command.action === 'create_project' && entry.name === command.name) ?? [];
+      if (added.length === 1 && added[0]) setParams({ projectId: added[0].id, view: 'tasks' });
+      setNotice('项目已创建，接下来添加任务并安排分工。');
+    },
+  });
+  function openProjectEditor() { if (organization.data) { createProject.reset(); setProjectEditor(organization.data); } }
+  function closeProjectEditor() { setProjectEditor(null); if (params.has('create')) setParams((current) => { current.delete('create'); return current; }, { replace: true }); }
+  const projectFormData = projectEditor ?? (params.get('create') === 'project' && leader ? organization.data : undefined);
   const save = useMutation({
     mutationFn: (command: WorkCommand) => { if (!identity.data) throw new Error('请先登录。'); return workCommand(command, identity.data.csrfToken); },
-    onSuccess: async () => { operation.current = null; setCreating(false); setNotice('已保存。'); setRevision((value) => value + 1); await client.invalidateQueries({ queryKey: ['work'] }); },
+    onSuccess: async (result, command) => { operation.current = null; setCreating(false); setNotice(command.action === 'create_task' ? '任务已创建，接下来分配人员并安排到本周或下周。' : '已保存。'); setRevision((value) => value + 1); await client.invalidateQueries({ queryKey: ['work'] }); if (command.action === 'create_task' && continueCreation.current) openTask(result.objectId); },
   });
 
   function send(input: unknown) {
@@ -63,30 +87,53 @@ export function WorkPage() {
   }
   function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget);
-    send({ action: String(form.get('action')), projectId: project?.id, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), operationId: crypto.randomUUID() });
+    const submitter = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null;
+    continueCreation.current = !(submitter instanceof HTMLButtonElement && submitter.value === 'only');
+    send({ action: String(form.get('action')), projectId: project?.id, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), ...(form.get('action') === 'create_task' ? { milestoneId: String(form.get('milestoneId')) || null } : {}), operationId: crypto.randomUUID() });
   }
   const data = state.isError ? undefined : state.data;
   const activeTask = data?.tasks.find((entry) => entry.id === taskId);
   const activeRequest = data?.requests.find((entry) => entry.id === requestId);
-  const tasks = data?.tasks.filter((task) => task.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? [];
   function switchView(next: string) { setParams({ projectId: project?.id ?? '', view: next }); setQuery(''); }
-  return <main className="org-layout project-workspace"><header className="org-header"><div><p className="eyebrow">{organization.data?.teams.find((team) => team.id === project?.teamId)?.name ?? '项目空间'}</p><h1>{project?.name ?? '项目'}</h1><p className="subtitle">{project ? `${project.members.length} 位项目成员` : '选择项目，查看团队工作'}</p></div>
-    {view !== 'milestones' && can(view === 'requests' ? 'requests.submit' : 'tasks.create') && <button className="primary-button" onClick={() => setCreating(true)}>＋ {view === 'requests' ? '提交需求' : '新建任务'}</button>}
+  return <main className="org-layout project-workspace"><header className="org-header"><div><p className="eyebrow">{organization.data?.teams.find((team) => team.id === project?.teamId)?.name ?? '项目空间'}</p><div className="project-title-row"><h1>{project?.name ?? '项目'}</h1>{project && organization.data && organization.data.projects.length > 1 && <label className="project-switcher"><span className="sr-only">当前项目</span><select value={project.id} onChange={(event) => { setParams({ projectId: event.target.value, view }); setQuery(''); setRequestId(''); setNotice(''); save.reset(); }}>{organization.data?.projects.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>}</div><p className="subtitle">{project ? `${project.members.length} 位项目成员` : '集中管理任务、分工与里程碑'}</p></div>
+    <div className="org-actions">{project && leader && <button onClick={openProjectEditor}>＋ 创建项目</button>}{view !== 'milestones' && can(view === 'requests' ? 'requests.submit' : 'tasks.create') && <button className="primary-button" onClick={() => setCreating(true)}>＋ {view === 'requests' ? '提交需求' : '新建任务'}</button>}</div>
   </header>
     {(organization.error || state.error) && <p role="alert" className="form-error">{organization.error?.message || state.error?.message}<button onClick={() => { void organization.refetch(); void state.refetch(); }}>重试</button></p>}
-    {organization.data && !project && <div className="empty-state">暂无项目，请联系团队负责人。</div>}
-    {project && <><div className="page-toolbar"><label><span className="sr-only">当前项目</span><select value={project.id} onChange={(event) => { setParams({ projectId: event.target.value, view }); setQuery(''); setRequestId(''); setNotice(''); save.reset(); }}>{organization.data?.projects.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label><label className="search-field"><span className="sr-only">搜索{view === 'requests' ? '需求' : '任务'}</span><input type="search" placeholder="输入名称" value={query} onChange={(event) => setQuery(event.target.value)} /></label><button disabled={state.isFetching} onClick={() => { void state.refetch(); }}>刷新</button></div>
+    {organization.isPending && <p role="status">正在加载项目…</p>}
+    {!organization.isError && organization.data && identity.data && !project && <ProjectOnboarding identity={identity.data} organization={organization.data} onCreate={openProjectEditor} />}
+    {leader && projectFormData && <Dialog title="创建项目" busy={createProject.isPending} onClose={closeProjectEditor}><p className="subtitle">先确定项目名称和负责人，创建后即可添加任务。</p><CommandForm action="create_project" targetId={undefined} data={projectFormData} pending={createProject.isPending} submit={(command) => createProject.mutate(command)} cancel={closeProjectEditor} />{createProject.error && <p role="alert" className="form-error">{createProject.error.message}</p>}</Dialog>}
+    {project && <><div className="collection-toolbar">
       <div className="view-tabs" aria-label="项目视图">{[{ value: 'tasks', label: '任务看板' }, { value: 'milestones', label: '里程碑' }, { value: 'requests', label: '需求' }].map((entry) => <button key={entry.value} aria-pressed={view === entry.value} onClick={() => switchView(entry.value)}>{entry.label}</button>)}</div>
+      <div className="collection-tools"><label><span className="sr-only">搜索{view === 'requests' ? '需求' : view === 'milestones' ? '里程碑' : '任务'}</span><input type="search" placeholder={view === 'requests' ? '搜索需求' : view === 'milestones' ? '搜索里程碑' : '搜索任务'} value={query} onChange={(event) => setQuery(event.target.value)} /></label><button className="text-button" disabled={state.isFetching} onClick={() => { void state.refetch(); }}>刷新</button></div>
+    </div>
       {notice && <p role="status">{notice}</p>}{state.isPending && <p role="status">正在加载项目…</p>}
       {data && organization.data && identity.data && <>
-        {view === 'milestones' ? <MilestonePanel key={project.id} projectId={project.id} tasks={data.tasks} query={query} identity={identity.data} organization={organization.data} canManage={can('milestones.manage')} onOpenTask={openTask} /> : view === 'requests' ? <section className="panel"><h2>需求池</h2>{data.requests.filter((entry) => entry.title.includes(query)).map((request) => <article className="request-row" key={request.id}><button className="text-button" onClick={() => setRequestId(request.id)}>{request.title}</button><span className="status-badge">{statusLabels[request.status]}</span></article>)}{!data.requests.some((entry) => entry.title.includes(query)) && <p className="empty-state">{query ? '没有找到匹配的需求' : '暂无需求，点击右上角提交第一条'}</p>}<details><summary>处理记录</summary>{data.events.filter((entry) => entry.action in eventLabels).map((entry) => <p key={entry.id}>{new Date(entry.createdAt).toLocaleString('zh-CN')} · {eventLabels[entry.action]}</p>)}</details></section> : <><TaskBoard key={project.id} tasks={data.tasks} query={query} onOpenTask={openTask} identity={identity.data} organization={organization.data} projectId={project.id} /><p className="detail-meta">{query ? `找到 ${tasks.length} 项` : `共 ${tasks.length} 项任务`}</p></>}
-        {activeTask && <TaskDetail task={activeTask} data={data} organization={organization.data} identity={identity.data} onClose={() => openTask('')} onSelect={openTask} />}
+        {view === 'tasks' && data.tasks.length === 0 && <EmptyState title={can('tasks.create') ? '项目已就绪，添加第一项任务' : '项目还没有任务'} description={can('tasks.create') ? '创建任务后，继续选择执行人，一键安排到本周或下周。' : '项目管理者添加任务后，你可以查看任务并认领自己的工作。'}>{can('tasks.create') && <button className="primary-button" onClick={() => setCreating(true)}>＋ 新建任务</button>}{leader && <Link to="/organization?view=groups">管理成员与小组</Link>}</EmptyState>}
+        {view === 'milestones' ? <MilestonePanel key={project.id} projectId={project.id} tasks={data.tasks} milestones={data.milestones} query={query} identity={identity.data} organization={organization.data} canManage={can('milestones.manage')} onOpenTask={openTask} /> : view === 'requests' ? <section className="panel"><h2>需求池</h2>{data.requests.filter((entry) => entry.title.includes(query)).map((request) => <article className="request-row" key={request.id}><button className="text-button" onClick={() => setRequestId(request.id)}>{request.title}</button><span className="status-badge">{statusLabels[request.status]}</span></article>)}{!data.requests.some((entry) => entry.title.includes(query)) && <p className="empty-state">{query ? '没有找到匹配的需求' : can('requests.submit') ? '暂无需求，点击右上角提交第一条' : '暂无需求，项目成员提交后会显示在这里'}</p>}<details><summary>处理记录</summary>{data.events.filter((entry) => entry.action in eventLabels).map((entry) => <p key={entry.id}>{new Date(entry.createdAt).toLocaleString('zh-CN')} · {eventLabels[entry.action]}</p>)}</details></section> : data.tasks.length > 0 ? <><TaskBoard key={project.id} tasks={data.tasks} query={query} onOpenTask={openTask} identity={identity.data} organization={organization.data} projectId={project.id} /></> : null}
+        {activeTask && <TaskDetail key={activeTask.id} task={activeTask} data={data} organization={organization.data} identity={identity.data} onClose={() => openTask('')} onSelect={openTask} />}
         {taskId && !activeTask && !state.isFetching && <p role="alert">该任务已移除或无权查看。<button onClick={() => openTask('')}>返回项目</button></p>}
         {activeRequest && <Dialog title="需求详情" drawer onClose={() => setRequestId('')} busy={save.isPending}><RequestCard key={`${activeRequest.id}:${activeRequest.version}`} request={activeRequest} own={activeRequest.submitterId === identity.data.id} review={can('requests.accept')} organization={organization.data} projectId={project.id} pending={save.isPending} send={send} />{(save.error || formError) && <p role="alert" className="form-error">{formError || save.error?.message}</p>}</Dialog>}
       </>}
-      {creating && <Dialog title={view === 'requests' ? '提交需求' : '新建任务'} onClose={() => setCreating(false)} busy={save.isPending}><form key={`${project.id}:${revision}`} onSubmit={create}><fieldset disabled={save.isPending}><input type="hidden" name="action" value={view === 'requests' ? 'submit_request' : 'create_task'} /><label>名称<input autoFocus name="title" required maxLength={200} /></label><details><summary>补充说明与完成标准（选填）</summary><label>说明<textarea name="description" maxLength={20000} /></label><label>完成标准<textarea name="acceptance" maxLength={20000} /></label></details>{(save.error || formError) && <p role="alert" className="form-error">{formError || save.error?.message}</p>}<button className="primary-button">{save.isPending ? '正在保存…' : '创建'}</button></fieldset></form></Dialog>}
+      {creating && <Dialog title={view === 'requests' ? '提交需求' : '新建任务'} onClose={() => setCreating(false)} busy={save.isPending}><form key={`${project.id}:${revision}`} onSubmit={create}><fieldset disabled={save.isPending}><input type="hidden" name="action" value={view === 'requests' ? 'submit_request' : 'create_task'} />{view === 'requests' ? <label>名称<input autoFocus name="title" required maxLength={200} /></label> : <TaskCreationFields milestones={data?.milestones.filter((entry) => entry.status !== 'removed') ?? []} />}<details><summary>补充说明与完成标准（选填）</summary><label>说明<textarea name="description" maxLength={20000} /></label><label>完成标准<textarea name="acceptance" maxLength={20000} /></label></details>{(save.error || formError) && <p role="alert" className="form-error">{formError || save.error?.message}</p>}<div className="workflow-footer"><button className="primary-button workflow-primary" name="next" value="assign">{save.isPending ? '正在保存…' : view === 'requests' ? '创建' : '创建并分配人员 →'}</button>{view !== 'requests' && <button name="next" value="only">仅创建</button>}</div></fieldset></form></Dialog>}
     </>}
   </main>;
+}
+
+/** 新建任务先选目标；仅在名称为空或尚未改写自动名称时跟随选择，避免覆盖手工输入。 */
+function TaskCreationFields({ milestones }: { milestones: Array<{ id: string; title: string }> }) {
+  const [milestoneId, setMilestoneId] = useState('');
+  const [title, setTitle] = useState('');
+  const [suggestedTitle, setSuggestedTitle] = useState('');
+  function selectMilestone(id: string) {
+    const nextTitle = milestones.find((entry) => entry.id === id)?.title ?? '';
+    if (!title.trim() || title === suggestedTitle) setTitle(nextTitle);
+    setSuggestedTitle(nextTitle);
+    setMilestoneId(id);
+  }
+  return <>
+    <label>关联里程碑（选填）<select name="milestoneId" value={milestoneId} onChange={(event) => selectMilestone(event.target.value)}><option value="">不关联</option>{milestones.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}</select></label>
+    <label>名称<input name="title" required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+  </>;
 }
 
 /** 需求详情中的作者动作及处理动作；接收后仅提供追加说明，不编辑原文。 */

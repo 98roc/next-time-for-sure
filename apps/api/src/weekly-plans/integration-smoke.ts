@@ -1,3 +1,6 @@
+import { verifyAutomaticCarry } from './carry-forward.integration.js';
+import { verifyTaskWorkflow } from './task-workflow.integration.js';
+import { verifyTeamDirect } from './team-direct.integration.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -71,3 +74,6 @@ await smoke(async ({ call, developer, leader, manager, admin, projectId, otherPr
   console.log('PASS: weekly candidate scope, cross-project group management, role rejection, Monday validation, stopped task exclusion and no multi-group duplication');
 });
 await smoke(reportingSmoke);
+await smoke(verifyAutomaticCarry);
+await smoke(verifyTaskWorkflow);
+await smoke(verifyTeamDirect);

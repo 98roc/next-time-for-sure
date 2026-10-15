@@ -54,7 +54,8 @@ export async function reportingSmoke({ call, developer, leader, manager, admin, 
   const reportPreview = async (reportWeek = week) => publicationPreviewSchema.parse(await (await call(`reports/preview?teamId=${team.id}&week=${reportWeek}`, leader)).json());
   const publishReport = async (reportWeek = week) => { const draft = (await state(leader, reportWeek)).draft; assert.ok(draft); return { action: 'publish', teamId: team.id, week: reportWeek, version: draft.version, confirmation: (await reportPreview(reportWeek)).confirmation, reason: '阶段演练发布' }; };
   const publication = await publishReport(); const reportId = await write('reports/commands', publication); assert.equal(await write('reports/commands', publication), reportId);
-  const publicState = await state(manager); assert.equal(publicState.draft, null); assert.equal(publicState.sources.length, 0); assert.equal(publicState.publications.length, 1); assert.equal(publicState.publications[0]?.next.length, 1);
+  const publicState = await state(manager); assert.equal(publicState.draft, null); assert.equal(publicState.sources.length, 0); assert.equal(publicState.publications.length, 1); assert.equal(publicState.publications[0]?.next.length, 2);
+  assert.ok(publicState.publications[0]?.next.some((entry) => entry.taskId === pending && entry.person === '待分配'));
   assert.equal((await call(`reports?teamId=${team.id}&week=${week}`, admin)).status, 403);
   const frozen = JSON.stringify(publicState.publications[0]);
   const deletion = lifecyclePreviewSchema.parse(await (await call('lifecycle/preview', leader, { action: 'delete_task', objectId: pending })).json());
@@ -84,8 +85,9 @@ export async function reportingSmoke({ call, developer, leader, manager, admin, 
   const personal = personalSnapshotSchema.parse(await (await call('personal', developer)).json()); assert.equal(personal.progress.find((entry) => entry.itemId === personalId)?.content, '完成接口校验');
   // 发布后日期调整需团队负责人；拆分沿用分工和标签，历史内容仍指向发布时任务。
   const taskState = async () => { const tasks = workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, developer)).json()).tasks; const current = tasks.find((entry) => entry.id === task); assert.ok(current); return { tasks, current }; };
-  await write('milestones/commands', { action: 'add_node', taskId: task, version: (await taskState()).current.version, expectedOn: '2026-11-13' }, developer);
-  const reschedule = { action: 'reschedule_node', taskId: task, version: (await taskState()).current.version, expectedOn: '2026-11-16', reason: '调整交付日期' };
+  const milestoneId = await write('milestones/commands', { action: 'create_node', projectId, ownerId, title: '周报交付目标', expectedOn: '2026-11-13', operationId: randomUUID() }, developer);
+  await write('milestones/commands', { action: 'link_task', taskId: task, milestoneId, version: (await taskState()).current.version }, developer);
+  const reschedule = { action: 'reschedule_node', milestoneId, version: 0, expectedOn: '2026-11-16', reason: '调整交付日期' };
   assert.equal((await call('milestones/commands', developer, reschedule)).status, 403);
   await write('milestones/commands', reschedule);
   await write('work-tags/commands', { objectId: task, objectKind: 'task', dimension: 'milestone', week: null, marked: true, version: null }, developer);

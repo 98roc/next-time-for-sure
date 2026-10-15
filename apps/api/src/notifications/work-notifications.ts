@@ -6,7 +6,7 @@ import { NotificationRepository } from './notification.repository.js';
 export async function notifyWork(manager: EntityManager, event: string, project: string, object: string, action: string, payload: unknown) {
   const scopeRows: unknown = await manager.query('SELECT team_id AS teamId FROM projects WHERE id=?', [project]);
   const scope = z.array(z.object({ teamId: z.string() })).parse(scopeRows)[0]; if (!scope) return;
-  const data = z.object({ resultId: z.string().optional(), ownerId: z.string().optional(), after: z.object({ taskId: z.string().optional(), accountId: z.string().optional(), ownerId: z.string().optional(), groupId: z.string().optional() }).passthrough().nullable().optional(), before: z.object({ accountId: z.string().optional(), ownerId: z.string().optional(), groupId: z.string().optional() }).passthrough().nullable().optional() }).passthrough().parse(payload);
+  const data = z.object({ resultId: z.string().optional(), ownerId: z.string().optional(), after: z.object({ taskId: z.string().optional(), accountId: z.string().optional(), ownerId: z.string().optional(), groupId: z.string().nullable().optional() }).passthrough().nullable().optional(), before: z.object({ accountId: z.string().optional(), ownerId: z.string().optional(), groupId: z.string().nullable().optional() }).passthrough().nullable().optional() }).passthrough().parse(payload);
   const taskId = data.after?.taskId ?? object;
   const taskRows: unknown = await manager.query('SELECT owner_id AS ownerId FROM team_tasks WHERE id=?', [taskId]);
   const task = z.array(z.object({ ownerId: z.string() })).parse(taskRows)[0];
@@ -22,16 +22,27 @@ export async function notifyWork(manager: EntityManager, event: string, project:
   else if (action === 'task.change_owner') { recipients = [data.before?.ownerId, data.after?.ownerId].filter((id): id is string => Boolean(id)); title = '团队任务主负责人发生变化'; }
   else if (['assignment.complete', 'assignment.assignment_blocker', 'task.task_blocker'].includes(action) && task) { recipients = [task.ownerId]; title = action.includes('blocker') ? '任务协作阻塞发生变化，请核对' : '参与人已确认完成本人分工'; }
   else if (['assignment.claim', 'assignment.exit'].includes(action)) {
-    const rows: unknown = await manager.query('SELECT leader_id AS id FROM work_groups WHERE id=?', [data.after?.groupId ?? data.before?.groupId]); recipients = z.array(z.object({ id: z.string() })).parse(rows).map((row) => row.id); title = '本组成员认领或退出了执行分工';
+    const groupId = data.after ? data.after.groupId : data.before?.groupId;
+    const rows: unknown = groupId
+      ? await manager.query('SELECT leader_id AS id FROM work_groups WHERE id=?', [groupId])
+      : await manager.query('SELECT leader_id AS id FROM teams WHERE id=?', [scope.teamId]);
+    recipients = z.array(z.object({ id: z.string() })).parse(rows).map((row) => row.id);
+    title = groupId ? '本组成员认领或退出了执行分工' : '成员认领或退出了团队直属分工';
   } else if (action === 'personal.link_managed') { recipients = data.ownerId ? [data.ownerId] : []; title = '管理者调整了你的个人工作关联'; }
   else if (action === 'assignment.restored_by_personal') { recipients = data.after?.accountId ? [data.after.accountId] : []; title = '新增或恢复的个人工作使本人分工恢复未完成'; }
-  else if (['task.complete_task', 'task.cancel_task', 'task.ended_by_parent', 'milestone.reschedule_node', 'milestone.remove_node'].includes(action) || action === 'milestone.add_node' && data.after?.expectedOn) {
-    const rows: unknown = await manager.query("SELECT account_id AS id FROM task_assignments WHERE task_id=? AND status NOT IN ('exited','transferred')", [object]); recipients = z.array(z.object({ id: z.string() })).parse(rows).map((row) => row.id); title = action.startsWith('milestone.') ? '任务排期发生重要变化' : '关联团队工作已整体结束或取消';
+  else if (['task.complete_task', 'task.cancel_task', 'task.ended_by_parent'].includes(action)) {
+    const rows: unknown = await manager.query("SELECT account_id AS id FROM task_assignments WHERE task_id=? AND status NOT IN ('exited','transferred')", [object]); recipients = z.array(z.object({ id: z.string() })).parse(rows).map((row) => row.id); title = '关联团队工作已整体结束或取消';
     if (task) recipients.push(task.ownerId);
     if (action === 'task.complete_task' || action === 'task.ended_by_parent' && data.after?.status === 'completed') {
       const dependents: unknown = await manager.query('SELECT owner_id AS id FROM team_tasks WHERE waiting_task_id=? UNION SELECT account_id AS id FROM task_assignments WHERE waiting_task_id=?', [object, object]);
       await notifications.enqueue(scope.teamId, project, z.array(z.object({ id: z.string() })).parse(dependents).map((row) => row.id), '等待的关联工作已结束，请人工确认是否解除阻塞', object, `/work?projectId=${project}`);
     }
+  }
+  // 仅改目标名称属于普通编辑，不增加通知；责任交接仍通知新旧负责人。
+  const ordinaryMilestoneEdit = action === 'milestone.edit_node' && data.before?.ownerId === data.after?.ownerId;
+  if (action.startsWith('milestone.') && action !== 'milestone.edit_task' && action !== 'milestone.link_task' && !ordinaryMilestoneEdit) {
+    recipients = [data.before?.ownerId, data.after?.ownerId].filter((id): id is string => Boolean(id));
+    title = '里程碑目标发生变化，请核对';
   }
   if (title) await notifications.enqueue(scope.teamId, project, recipients, title, object, `/work?projectId=${project}`, event);
 }
