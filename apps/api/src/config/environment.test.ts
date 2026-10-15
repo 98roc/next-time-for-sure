@@ -13,9 +13,14 @@ test('rejects other project databases and never discloses supplied credentials',
   });
 });
 
-test('rejects invalid ports and external binding in the local-only foundation', () => {
+test('rejects invalid ports and arbitrary bind addresses', () => {
   assert.throws(() => parseEnvironment({ ...valid, DB_PORT: '3306extra' }));
   assert.throws(() => parseEnvironment({ ...valid, API_PORT: '0' }));
-  assert.throws(() => parseEnvironment({ ...valid, API_HOST: '0.0.0.0' }));
+  assert.throws(() => parseEnvironment({ ...valid, API_HOST: '192.168.1.1' }));
   assert.equal(parseEnvironment(valid).DB_PORT, 3306);
+});
+
+test('keeps loopback by default and supports explicit container binding', () => {
+  assert.equal(parseEnvironment(valid).API_HOST, '127.0.0.1');
+  assert.equal(parseEnvironment({ ...valid, API_HOST: '0.0.0.0' }).API_HOST, '0.0.0.0');
 });

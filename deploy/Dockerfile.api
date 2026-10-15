@@ -1,0 +1,9 @@
+FROM node:24.21.0-alpine
+ENV NODE_ENV=production
+WORKDIR /app
+COPY pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY api/ ./apps/api/
+USER node
+EXPOSE 3100
+HEALTHCHECK --interval=10s --timeout=6s --start-period=30s --retries=6 CMD node -e "fetch('http://127.0.0.1:3100/api/v1/health/ready',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "apps/api/dist/main.js"]

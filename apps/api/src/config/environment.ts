@@ -11,7 +11,8 @@ const environmentSchema = z.object({
   DB_PASSWORD: z.string().min(1),
   // 本阶段只允许项目独立库，避免迁移触及其他项目。
   DB_DATABASE: z.literal('next_time_for_sure'),
-  API_HOST: z.literal('127.0.0.1').default('127.0.0.1'),
+  // 本地默认仅回环；容器通过独立网络与反向代理通信时显式监听所有接口。
+  API_HOST: z.enum(['127.0.0.1', '0.0.0.0']).default('127.0.0.1'),
   API_PORT: z.coerce.number().int().min(1024).max(65535).default(3100),
 });
 export type Environment = z.infer<typeof environmentSchema>;
