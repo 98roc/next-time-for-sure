@@ -1,0 +1,17 @@
+{
+  "testedAt": "2026-10-15T11:58:51.245Z",
+  "checks": [
+    "real Electron config load",
+    "business page has no settings bridge",
+    "cross-origin navigation blocked",
+    "local settings IPC reads config",
+    "invalid path rejected without saving",
+    "valid config saved through IPC",
+    "normal quit completes after save"
+  ],
+  "limits": [
+    "isolated temporary profile and HTTP fixture",
+    "relaunch suppressed to avoid stray process",
+    "no production deployment or install replacement performed"
+  ]
+}

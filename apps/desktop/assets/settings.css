@@ -1,0 +1,25 @@
+:root { font-family: 'Segoe UI', "Microsoft YaHei", sans-serif; color: #242730; background: #f5f6f9; font-size: 14px; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { padding: 28px 32px; }
+header { display: flex; align-items: center; justify-content: space-between; }
+h1 { font-size: 22px; margin: 24px 0 0; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { width: 40px; height: 40px; }
+.brand strong { font-size: 17px; font-weight: 600; }
+.brand small { font-size: 8px; letter-spacing: .8px; margin-top: 4px; }
+p { line-height: 1.7; color: #686e7c; }
+label { display: block; margin-top: 22px; margin-bottom: 9px; font-weight: 600; }
+input[type="url"] { width: 100%; padding: 11px 12px; border: 1px solid #e3e6ed; border-radius: 6px; background: #fff; color: #242730; font: inherit; }
+input:focus-visible, button:focus-visible { outline: 2px solid #5066a6; outline-offset: 3px; }
+small { display: block; color: #686e7c; line-height: 1.6; margin-top: 7px; }
+.optional { color: #686e7c; font-size: 12px; font-weight: 400; }
+.checkbox { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+.checkbox input { width: 16px; height: 16px; accent-color: #5066a6; }
+.hint { font-size: 12px; }
+#version { color: #686e7c; }
+#message { color: #a0372b; min-height: 24px; margin: 10px 0; }
+footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+footer small { max-width: 300px; margin: 0; }
+button { flex-shrink: 0; border: 0; border-radius: 6px; padding: 11px 16px; background: #5066a6; color: #fff; font: inherit; cursor: pointer; }
+button:disabled { opacity: .55; cursor: default; }

@@ -3,7 +3,7 @@ import { readFile, rename, writeFile } from 'node:fs/promises';
 import { NotificationLedger, parseNotices } from './notification-state.js';
 
 /** 主进程轮询同一Electron会话；隐藏窗口后仍继续，显式退出时停止。 */
-export async function startNotifications(origin: string, ledgerPath: string, open: (path: string) => void): Promise<() => void> {
+export async function startNotifications(origin: string, ledgerPath: string, open: (path: string) => void, businessSession: Electron.Session = session.defaultSession): Promise<() => void> {
   let saved: unknown = [];
   try { saved = JSON.parse(await readFile(ledgerPath, 'utf8')); } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw new Error('无法读取通知展示记录', { cause: error });
@@ -14,11 +14,11 @@ export async function startNotifications(origin: string, ledgerPath: string, ope
   let writes = Promise.resolve();
   const invalidate = () => { generation++; account = ''; for (const toast of active.values()) toast.close(); active.clear(); };
   const changed = (_event: Electron.Event, cookie: Electron.Cookie) => { if (cookie.name === 'ntfs_session') invalidate(); };
-  session.defaultSession.cookies.on('changed', changed);
+  businessSession.cookies.on('changed', changed);
 
   /** fetch自动使用当前分区Cookie，禁止重定向到其他服务。 */
   const get = async (path: string): Promise<unknown> => {
-    const response = await session.defaultSession.fetch(`${origin}/api/v1/${path}`, { redirect: 'error', signal: AbortSignal.timeout(5000) });
+    const response = await businessSession.fetch(`${origin}/api/v1/${path}`, { redirect: 'error', signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error('会话或服务不可用');
     return response.json();
   };
@@ -67,5 +67,5 @@ export async function startNotifications(origin: string, ledgerPath: string, ope
   };
   const interval = setInterval(() => { void poll(); }, 10000);
   void poll();
-  return () => { stopped = true; clearInterval(interval); session.defaultSession.cookies.removeListener('changed', changed); invalidate(); };
+  return () => { stopped = true; clearInterval(interval); businessSession.cookies.removeListener('changed', changed); invalidate(); };
 }

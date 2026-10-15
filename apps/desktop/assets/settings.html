@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <title>下次一定 · 客户端设置</title>
+  <link rel="stylesheet" href="settings.css">
+  <script src="settings.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><div class="brand"><img src="logo.svg" alt=""><div><strong>下次一定</strong><small>NEXT TIME, FOR SURE</small></div></div><span id="version"></span></header>
+    <h1>客户端设置</h1>
+    <p>连接你的下次一定服务，可使用本机、局域网或公网地址。</p>
+    <form id="settings">
+      <label for="webUrl">网页地址</label>
+      <input id="webUrl" name="webUrl" type="url" placeholder="http://127.0.0.1:5174" required autocomplete="off" spellcheck="false">
+      <small>例如 http://192.168.1.10:5174 或 https://work.example.com，仅填写站点地址。</small>
+      <label for="updateUrl">安装包更新地址 <span class="optional">选填</span></label>
+      <input id="updateUrl" name="updateUrl" type="url" placeholder="https://downloads.example.com/desktop/" autocomplete="off" spellcheck="false">
+      <small>填写管理员提供的更新目录。留空时不检查客户端版本更新。</small>
+      <label class="checkbox"><input id="checkOnStartup" name="checkOnStartup" type="checkbox">启动时检查客户端更新</label>
+      <p class="hint">公网服务建议使用 HTTPS。网页功能发布后，刷新页面即可加载。客户端安装更新需要你确认重启。</p>
+      <p id="message" role="status" aria-live="polite"></p>
+      <footer><small>保存后将重启客户端，请先保存正在编辑的内容。</small><button id="save" type="submit">保存并重启</button></footer>
+    </form>
+  </main>
+</body>
+</html>

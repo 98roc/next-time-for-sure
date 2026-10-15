@@ -1,14 +1,14 @@
 {
   "name": "@ntfs/desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build-icons.mjs && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsc -p tsconfig.json && electron .",
+    "dev": "node scripts/build-icons.mjs && tsc -p tsconfig.json && electron .",
     "test": "tsc -p tsconfig.json && node --test dist/*.test.js",
-    "package": "tsc -p tsconfig.json && electron-builder --win nsis --x64"
+    "package": "node scripts/build-icons.mjs && tsc -p tsconfig.json && electron-builder --win nsis --x64 --publish never"
   },
   "devDependencies": {
     "electron": "44.7.0",
@@ -24,13 +24,21 @@
     },
     "files": [
       "dist/**/*.js",
-      "!dist/**/*.test.js"
+      "!dist/**/*.test.js",
+      "assets/**/*"
     ],
+    "publish": {
+      "provider": "generic",
+      "url": "https://github.com/98roc/next-time-for-sure/releases/latest/download/"
+    },
     "win": {
-      "signAndEditExecutable": false,
+      "signExecutable": false,
+      "icon": "assets/icon.ico",
       "target": "nsis"
     },
     "nsis": {
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "allowToChangeInstallationDirectory": true,
       "createStartMenuShortcut": true,
@@ -39,5 +47,9 @@
     },
     "artifactName": "NextTimeForSure-${version}-Setup.${ext}",
     "electronDist": "node_modules/electron/dist"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10",
+    "sharp": "0.34.5"
   }
 }
