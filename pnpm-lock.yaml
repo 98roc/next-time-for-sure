@@ -71,9 +71,6 @@ importers:
       electron-updater:
         specifier: 6.8.10
         version: 6.8.10
-      sharp:
-        specifier: 0.34.5
-        version: 0.34.5
     devDependencies:
       electron:
         specifier: 44.7.0
@@ -81,6 +78,9 @@ importers:
       electron-builder:
         specifier: 26.15.3
         version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
+      sharp:
+        specifier: 0.34.5
+        version: 0.34.5
 
   apps/mcp:
     dependencies:

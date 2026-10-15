@@ -1,22 +1,20 @@
 {
-  "testedAt": "2026-10-15T11:58:37.461Z",
-  "version": "0.2.0",
-  "checksum": "82GuB4eCnWUdMI3WhZpwbmImVNhrDHOmAPzSbVoKsWqNS2E5NfD3iGgJwBy0yDmNADl0Qe5jNFhqq0k1L/uwEg==",
+  "testedAt": "2026-10-15T12:10:10.428Z",
+  "version": "1.0.0",
+  "checksum": "m7YUzKjSVJOzUC6Rhrfzp4wZSUWLNOalQvFIQsr8txjHIOVeQ/hODDASOfeRowlBR6EyLKEI97KiaI7df026nA==",
   "sameVersionIgnored": true,
   "downgradeIgnored": true,
   "corruptChecksumRejected": true,
-  "installerBytes": 118260779,
-  "requests": [
-    "/good/latest.yml",
-    "/good/NextTimeForSure-0.2.0-Setup.exe",
-    "/good/latest.yml",
-    "/good/latest.yml",
-    "/bad/latest.yml",
-    "/bad/NextTimeForSure-0.2.0-Setup.exe"
+  "displayedVersion": "1.0.0",
+  "installerBytes": 118260721,
+  "packageChecks": [
+    "version and brand source match",
+    "no private runtime configuration",
+    "default GitHub Releases feed"
   ],
   "limits": [
-    "real NSIS updater and Electron HTTP executor with isolated app version adapter",
-    "local static feed and real generated installer",
+    "local feed with real installer and Electron network",
+    "isolated updater version adapter",
     "installer execution and in-place replacement not performed"
   ]
 }
