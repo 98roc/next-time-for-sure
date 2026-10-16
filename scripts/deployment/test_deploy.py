@@ -29,10 +29,14 @@ class DeploymentSafetyTest(unittest.TestCase):
             context.mkdir()
             file = context / 'index.js'
             file.write_text('export const value = 1;', encoding='utf-8')
+            metadata = context / '.modules.yaml'
+            metadata.write_text('temporary-directory-one', encoding='utf-8')
             DEPLOY.pack_context(context, base / 'first.tar')
             os.utime(file, (1900000000, 1900000000))
+            metadata.write_text('temporary-directory-two', encoding='utf-8')
             DEPLOY.pack_context(context, base / 'second.tar')
             self.assertEqual((base / 'first.tar').read_bytes(), (base / 'second.tar').read_bytes())
+            self.assertNotIn(b'temporary-directory', (base / 'first.tar').read_bytes())
 
     def test_private_files_are_excluded_and_internal_links_are_relative(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -105,6 +105,9 @@ def pack_context(context, archive):
                 # 本地环境和私钥永不进入构建上下文，包括包目录下未来新增的配置。
                 if path.name.startswith('.env') or path.name.endswith(('.local', '.pem', '.key', '.p12', '.pfx')) or path.name in ['.npmrc', '.git']:
                     return
+                # 安装器元数据和 Windows CLI 包装器含临时绝对路径、时间戳；运行 API 不需要它们。
+                if path.name in ['.modules.yaml', '.pnpm-workspace-state-v1.json'] or (path.name == '.bin' and path.parent.name == 'node_modules'):
+                    return
                 output.add(path, arcname=name, recursive=False, filter=normalize)
                 if path.is_dir():
                     for child in sorted(path.iterdir()):
