@@ -31,3 +31,4 @@ export * from './notifications.js';
 export * from './overview.js';
 export * from './tokens.js';
 export * from './agent.js';
+export * from './v2.js';
