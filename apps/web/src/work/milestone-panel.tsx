@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { milestoneCommandSchema } from '@ntfs/contracts';
@@ -40,7 +41,7 @@ export function MilestonePanel({ projectId, tasks, milestones, identity, organiz
     const command = parsed.data;
     if (command.action === 'create_node') {
       const content = JSON.stringify({ ...command, operationId: '' });
-      if (operation.current?.content !== content) operation.current = { content, id: crypto.randomUUID() };
+      if (operation.current?.content !== content) operation.current = { content, id: createOperationId() };
       command.operationId = operation.current.id;
     }
     setError(''); save.mutate(command);
@@ -73,7 +74,7 @@ export function MilestonePanel({ projectId, tasks, milestones, identity, organiz
     <section className={`fish-unplanned ${dropTarget === 'unplanned' ? 'fish-drop-target' : ''}`} onDragOver={(event) => { if (canManage && dragging) { event.preventDefault(); setDropTarget('unplanned'); } }} onDrop={(event) => { event.preventDefault(); drop(null); }}><div className="panel-title"><h3>未规划日期</h3></div><div className="fish-unplanned-nodes">{nodes.filter((entry) => !entry.expectedOn && matches(entry)).map(node)}</div></section>
     {creating && <Dialog title="新增里程碑" onClose={() => setCreating(null)} busy={save.isPending}><form onSubmit={(event) => {
       event.preventDefault(); const form = new FormData(event.currentTarget);
-      send({ action: 'create_node', projectId, ownerId: String(form.get('owner')), title: String(form.get('title')), expectedOn: String(form.get('date')) || null, operationId: crypto.randomUUID() });
+      send({ action: 'create_node', projectId, ownerId: String(form.get('owner')), title: String(form.get('title')), expectedOn: String(form.get('date')) || null, operationId: createOperationId() });
     }}><fieldset disabled={save.isPending}><label>目标名称<input autoFocus name="title" required maxLength={200} placeholder="例如：完成项目联调验收" /></label><label>负责人<select name="owner" defaultValue={defaultOwner?.id ?? ''} required><option value="">请选择</option>{owners.map((entry) => <option key={entry.id} value={entry.id}>{entry.displayName}</option>)}</select></label><label>预计完成日期<input type="date" name="date" defaultValue={creating.date ?? ''} /><small>留空放入未规划日期</small></label><p className="detail-meta">创建后可在团队任务中关联此目标。</p>{feedback}<button className="primary-button">创建里程碑</button></fieldset></form></Dialog>}
     {selected && <MilestoneDetail key={selected.id} milestone={selected} linked={tasks.filter((entry) => entry.milestoneId === selected.id)}
       identity={identity} accounts={organization.accounts} owners={owners} canManage={canManage} initialDate={draft}

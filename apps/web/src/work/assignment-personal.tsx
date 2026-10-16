@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Assignment, Identity, WorkSnapshot } from '@ntfs/contracts';
@@ -13,7 +14,7 @@ export function AssignmentPersonal({ entry, identity }: { task: WorkSnapshot['ta
   const categories = personal.data?.categories.filter((category) => category.status === status) ?? [];
   const linked = personal.data?.items.filter((item) => item.assignmentId === entry.id) ?? [];
   const save = useMutation({ mutationFn: (category: string) => {
-    if (operation.current?.category !== category) operation.current = { category, id: crypto.randomUUID() };
+    if (operation.current?.category !== category) operation.current = { category, id: createOperationId() };
     return personalCommand({ action: 'import_assignment', assignmentId: entry.id, categoryId: category, split: false, operationId: operation.current.id }, identity.csrfToken);
   }, onSuccess: async () => { operation.current = null; await Promise.all(['personal', 'assignments', 'work'].map((key) => client.invalidateQueries({ queryKey: [key] }))); } });
   return <details onToggle={(event) => setOpen(event.currentTarget.open)}><summary>加入我的工作</summary>

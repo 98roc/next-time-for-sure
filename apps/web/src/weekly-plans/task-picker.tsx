@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { TaskTagFields, taskCreationTags } from '../work/task-tag-fields';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,10 +27,10 @@ export function WeeklyTaskPicker({ organization, identity, week, mode, initialPr
   const canCreate = organization.policies.some((policy) => policy.permissions.includes('tasks.create') && (policy.role === 'team_leader' ? leader : roles.some((role) => role === policy.role)));
   const save = useMutation({
     mutationFn: async (form: FormData) => {
-      const command = workCommandSchema.parse({ action: 'create_task', projectId, tags: taskCreationTags(form), title: String(form.get('title')), description: String(form.get('description') ?? ''), acceptance: String(form.get('acceptance') ?? ''), milestoneId: String(form.get('milestoneId') ?? '') || null, operationId: crypto.randomUUID() });
+      const command = workCommandSchema.parse({ action: 'create_task', projectId, tags: taskCreationTags(form), title: String(form.get('title')), description: String(form.get('description') ?? ''), acceptance: String(form.get('acceptance') ?? ''), milestoneId: String(form.get('milestoneId') ?? '') || null, operationId: createOperationId() });
       if (command.action !== 'create_task') throw new Error('创建参数无效。');
       const content = JSON.stringify({ ...command, operationId: '' });
-      if (operation.current.content !== content) operation.current = { content, id: crypto.randomUUID() };
+      if (operation.current.content !== content) operation.current = { content, id: createOperationId() };
       return workCommand({ ...command, operationId: operation.current.id }, identity.csrfToken);
     },
     onSuccess: async (result) => { await client.invalidateQueries({ queryKey: ['work'] }); onSelect(projectId, result.objectId); },

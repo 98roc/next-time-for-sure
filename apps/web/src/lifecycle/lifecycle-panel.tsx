@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { lifecyclePreviewSchema } from '@ntfs/contracts';
@@ -9,9 +10,9 @@ import './lifecycle.css';
 /** 高影响操作统一先展示范围和阻止原因，再提交绑定摘要的确认。 */
 export function LifecyclePanel({ identity, options, initialIntent, onClose }: { identity: Identity; options: Array<{ label: string; intent: LifecycleIntent }>; initialIntent?: LifecycleIntent; onClose?: () => void }) {
   const [selected, setSelected] = useState<number | null>(null); const client = useQueryClient();
-  const [key, setKey] = useState(() => crypto.randomUUID());
+  const [key, setKey] = useState(() => createOperationId());
   const preview = useMutation({ mutationFn: async (intent: LifecycleIntent) => lifecyclePreviewSchema.parse(await reportingRequest('lifecycle/preview', intent, identity.csrfToken)) });
-  const execute = useMutation({ mutationFn: (body: object) => reportingRequest('lifecycle/commands', body, identity.csrfToken), onSuccess: async () => { setSelected(null); preview.reset(); setKey(crypto.randomUUID()); await Promise.all(['work', 'personal', 'organization', 'assignments', 'weekly', 'reports', 'handoff', 'lifecycle-history', 'overview', 'notifications'].map((queryKey) => client.invalidateQueries({ queryKey: [queryKey] }))); onClose?.(); } });
+  const execute = useMutation({ mutationFn: (body: object) => reportingRequest('lifecycle/commands', body, identity.csrfToken), onSuccess: async () => { setSelected(null); preview.reset(); setKey(createOperationId()); await Promise.all(['work', 'personal', 'organization', 'assignments', 'weekly', 'reports', 'handoff', 'lifecycle-history', 'overview', 'notifications'].map((queryKey) => client.invalidateQueries({ queryKey: [queryKey] }))); onClose?.(); } });
   const loadPreview = preview.mutate;
   // 卡片快捷入口直接读取影响范围，与详情入口共用确认和并发校验。
   useEffect(() => { if (initialIntent) loadPreview(initialIntent); }, [initialIntent, loadPreview]);
@@ -22,7 +23,7 @@ export function LifecyclePanel({ identity, options, initialIntent, onClose }: { 
   function cancel() { setSelected(null); preview.reset(); onClose?.(); }
   const content = <>
     {preview.isPending && <p role="status">正在检查影响范围…</p>}
-    {!initialIntent && <div className="weekly-toolbar">{options.map((entry, index) => <button key={JSON.stringify(entry.intent)} disabled={busy} onClick={() => { setSelected(index); setKey(crypto.randomUUID()); execute.reset(); preview.mutate(entry.intent); }}>{entry.label}…</button>)}</div>}
+    {!initialIntent && <div className="weekly-toolbar">{options.map((entry, index) => <button key={JSON.stringify(entry.intent)} disabled={busy} onClick={() => { setSelected(index); setKey(createOperationId()); execute.reset(); preview.mutate(entry.intent); }}>{entry.label}…</button>)}</div>}
     {(preview.error || execute.error) && <p role="alert" className="form-error">{preview.error?.message || execute.error?.message}</p>}{execute.isSuccess && <p role="status">操作已完成。</p>}
     {option && review && !preview.isPending && <form className="lifecycle-confirmation" onSubmit={(event) => {
       event.preventDefault();

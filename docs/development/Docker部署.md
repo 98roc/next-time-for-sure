@@ -109,6 +109,8 @@ Docker Hub 拉取失败时，脚本可通过本机 Python HTTPS/系统代理下�
 
 ## 边界与验证口径
 
+- 浏览器在内网 HTTP 页面上可能不提供 `crypto.randomUUID()`。前端统一通过 `createOperationId` 生成 UUID v4：优先使用原生方法，否则使用 HTTP 上可用的 `crypto.getRandomValues`，保持后端幂等键格式与随机性。2026-10-16 已覆盖周计划新建任务、分工、里程碑、个人事项与生命周期等 28 处调用；15 项前端测试、类型检查、构建与 ESLint 通过，并在生产 HTTP 来源的 Chromium 中验证原生方法缺失时兼容生成成功。该浏览器验证未写入生产业务数据。[浏览器接口说明](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)
+
 - 当前认证实现只接受 HTTP Origin，Cookie 未启用 Secure；此部署方案适用于受限内网 HTTP。接入 HTTPS 前必须同步修改并验证认证行为，不能只在外层加 TLS 后宣称可用。
 - Node 24 在 GNU/Linux x64 的官方支持基线为内核 4.18+；Alpine/musl 属实验支持。旧系统实测通过只能证明本次基础兼容性，不能等同于官方生产支持，生产环境仍应安排系统维护升级。[Node 官方平台说明](https://github.com/nodejs/node/blob/v24.x/BUILDING.md#platform-list)
 - 构建、配置测试、临时挂载验证、数据库迁移、业务验收、正式上线是不同证据。`Prepare` 和 `Validate` 不代表正式发布成功；以正式部署的迁移结果、健康状态和实际账号登录回读为准。完整业务验收需另行覆盖。

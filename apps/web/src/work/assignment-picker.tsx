@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Assignment, AssignmentCommand, Identity, OrganizationSnapshot } from '@ntfs/contracts';
@@ -42,7 +43,7 @@ export function AssignmentPicker({ taskId, ownerId, teamId, identity, organizati
   return <form className="assignment-picker" onSubmit={(event) => {
     event.preventDefault(); if (!selected.length) return;
     const content = JSON.stringify(selected);
-    if (operation.current.content !== content) operation.current = { content, id: crypto.randomUUID() };
+    if (operation.current.content !== content) operation.current = { content, id: createOperationId() };
     save.mutate({ action: 'assign_many', taskId, members: selected, operationId: operation.current.id });
   }}><fieldset disabled={save.isPending}>
     <div className="section-heading"><h4>添加人员</h4>{people.some((person) => person.id === identity.id && (canAssignDirect || groups.some((group) => group.memberIds.includes(person.id)))) && <button type="button" onClick={() => toggle(identity.id, true)}>我来做</button>}</div>

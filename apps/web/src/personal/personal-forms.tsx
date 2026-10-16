@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { useState } from 'react';
 import type { PersonalItem } from '@ntfs/contracts';
 import { localDate, weekStart } from '../layout/week-picker';
@@ -26,7 +27,7 @@ export function PersonalContentForm({ item, pending, send, onCancel }: Props & {
         <button type="button" className="text-button" onClick={() => setRemoving(entry.id)}>移除</button>
       </div>)}
       {removing && <div className="inline-notice" role="alert"><p>移除“{checklist.find((entry) => entry.id === removing)?.title}”？保存后不提供恢复。</p><div className="personal-form-actions"><button type="button" onClick={() => setRemoving(null)}>保留</button><button type="button" className="danger-button" onClick={() => { setChecklist(checklist.filter((entry) => entry.id !== removing)); setRemoving(null); }}>确认移除</button></div></div>}
-      <button type="button" disabled={Boolean(item.stopReason) || checklist.length >= 100} onClick={() => setChecklist([...checklist, { id: crypto.randomUUID(), title: '', checked: false }])}>＋ 添加检查项</button>
+      <button type="button" disabled={Boolean(item.stopReason) || checklist.length >= 100} onClick={() => setChecklist([...checklist, { id: createOperationId(), title: '', checked: false }])}>＋ 添加检查项</button>
     </div>
     <div className="personal-form-actions"><button type="button" onClick={onCancel}>取消</button><button className="primary-button">{pending ? '正在保存…' : '保存内容'}</button></div>
   </fieldset></form>;
@@ -38,7 +39,7 @@ export function PersonalProgressForm({ item, pending, send }: Props) {
     event.preventDefault();
     const element = event.currentTarget;
     const form = new FormData(element);
-    send({ itemId: item.id, version: item.version, action: 'personal_progress', occurredOn: String(form.get('occurredOn')), reportWeek: weekStart(String(form.get('reportWeek'))), content: String(form.get('content')), operationId: crypto.randomUUID() }, () => element.reset());
+    send({ itemId: item.id, version: item.version, action: 'personal_progress', occurredOn: String(form.get('occurredOn')), reportWeek: weekStart(String(form.get('reportWeek'))), content: String(form.get('content')), operationId: createOperationId() }, () => element.reset());
   }}><fieldset disabled={pending}>
     <label>进展内容<textarea name="content" required maxLength={20000} placeholder="记录完成了什么、遇到的问题或下一步" /></label>
     <div className="personal-form-grid"><label>发生日期<input type="date" name="occurredOn" defaultValue={localDate()} required /></label><label>归属周<input type="date" name="reportWeek" defaultValue={weekStart(localDate())} required /></label></div>

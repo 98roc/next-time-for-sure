@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { TaskTagFields, taskCreationTags } from './task-tag-fields';
 import { Dialog } from '../layout/dialog';
 import { TaskDetail } from './task-detail';
@@ -75,7 +76,7 @@ export function WorkPage() {
     const command = parsed.data;
     if ('operationId' in command) {
       const content = JSON.stringify({ ...command, operationId: '' });
-      if (operation.current?.content !== content) operation.current = { content, id: crypto.randomUUID() };
+      if (operation.current?.content !== content) operation.current = { content, id: createOperationId() };
       command.operationId = operation.current.id;
     }
     setFormError(''); setNotice(''); save.mutate(command);
@@ -90,7 +91,7 @@ export function WorkPage() {
     event.preventDefault(); const form = new FormData(event.currentTarget);
     const submitter = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null;
     continueCreation.current = !(submitter instanceof HTMLButtonElement && submitter.value === 'only');
-    send({ action: String(form.get('action')), projectId: project?.id, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), ...(form.get('action') === 'create_task' ? { milestoneId: String(form.get('milestoneId')) || null, tags: taskCreationTags(form) } : {}), operationId: crypto.randomUUID() });
+    send({ action: String(form.get('action')), projectId: project?.id, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')), ...(form.get('action') === 'create_task' ? { milestoneId: String(form.get('milestoneId')) || null, tags: taskCreationTags(form) } : {}), operationId: createOperationId() });
   }
   const data = state.isError ? undefined : state.data;
   const activeTask = data?.tasks.find((entry) => entry.id === taskId);
@@ -143,7 +144,7 @@ function RequestCard({ request, own, review, organization, projectId, pending, s
     event.preventDefault(); const form = new FormData(event.currentTarget); const type = String(form.get('action'));
     const base = { requestId: request.id, version: request.version };
     if (type === 'edit_request') send({ ...base, action: type, title: String(form.get('title')), description: String(form.get('description')), acceptance: String(form.get('acceptance')) });
-    else if (type === 'accept_request') send({ ...base, action: type, ownerId: String(form.get('ownerId')), operationId: crypto.randomUUID() });
+    else if (type === 'accept_request') send({ ...base, action: type, ownerId: String(form.get('ownerId')), operationId: createOperationId() });
     else if (type === 'supplement_request') send({ ...base, action: type, content: String(form.get('content')) });
     else send({ ...base, action: 'review_request', decision: type, reason: String(form.get('reason')) });
   }

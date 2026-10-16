@@ -1,3 +1,4 @@
+import { createOperationId } from '../identity/operation-id';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { personalCommandSchema, personalStatusLabels } from '@ntfs/contracts';
@@ -64,7 +65,7 @@ export function PersonalPage() {
     const parsed = personalCommandSchema.safeParse(input);
     if (!parsed.success) { setError('请检查标题、分类和日期是否填写完整。'); return; }
     const command = parsed.data;
-    if ('operationId' in command) { const content = JSON.stringify({ ...command, operationId: '' }); if (operation.current?.content !== content) operation.current = { content, id: crypto.randomUUID() }; command.operationId = operation.current.id; }
+    if ('operationId' in command) { const content = JSON.stringify({ ...command, operationId: '' }); if (operation.current?.content !== content) operation.current = { content, id: createOperationId() }; command.operationId = operation.current.id; }
     setError(''); setNotice(''); save.mutate(command, { onSuccess: () => onSuccess?.() });
   }
   function locate(id: string) {
@@ -80,7 +81,7 @@ export function PersonalPage() {
     const targets = data.categories.filter((entry) => entry.status === status);
     const selected = categoryId ?? (targets.length === 1 ? targets[0]?.id : '');
     if (split || !selected) { setImporting({ assignment, split, categoryId: selected ?? '', title: '' }); return; }
-    send({ action: 'import_assignment', assignmentId: assignment.id, split, categoryId: selected, operationId: crypto.randomUUID() });
+    send({ action: 'import_assignment', assignmentId: assignment.id, split, categoryId: selected, operationId: createOperationId() });
   }
   /** 排序携带完整目标列版本，筛选视图不丢失隐藏事项的顺序。 */
   function insert(categoryId: string, beforeId: string | null) {
@@ -111,7 +112,7 @@ export function PersonalPage() {
       </div>}
       {data && creating && teamData && <Dialog title="新建事项" busy={save.isPending} onClose={() => setCreating(null)}><PersonalCreate data={data} projects={teamData.projects} categoryId={creating.categoryId} pending={save.isPending} send={send} />{feedback && <p role="alert" className="form-error">{feedback}</p>}</Dialog>}
       {data && managing && <Dialog title="管理分类" busy={save.isPending} onClose={() => setManaging(false)}><CategoryManager categories={data.categories} pending={save.isPending} revision={revision} send={send} />{feedback && <p role="alert" className="form-error">{feedback}</p>}</Dialog>}
-      {data && importing && <Dialog title={importing.split ? '拆出一项个人工作' : '选择放入的分类'} busy={save.isPending} onClose={() => setImporting(null)}><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); send({ action: 'import_assignment', assignmentId: importing.assignment.id, split: importing.split, categoryId: String(form.get('categoryId')), ...(importing.split ? { title: String(form.get('title')) } : {}), operationId: crypto.randomUUID() }); }}><p className="detail-meta">{teamData?.tasks.find((entry) => entry.id === importing.assignment.taskId)?.title} · 关联本人分工</p>{importing.split && <label>这一步要做什么？<input name="title" required maxLength={200} placeholder="例如：完成接口联调" /></label>}<label>放入分类<select name="categoryId" required defaultValue={importing.categoryId}><option value="" disabled>请选择分类</option>{data.categories.filter((entry) => entry.status === (importing.split ? 'not_started' : importing.assignment.status)).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>{importing.assignment.status === 'completed' && importing.split && <p className="inline-notice">新增工作后，我的分工将恢复进行中。</p>}<button className="primary-button" disabled={save.isPending}>加入我的工作</button></form>{feedback && <p role="alert" className="form-error">{feedback}</p>}</Dialog>}
+      {data && importing && <Dialog title={importing.split ? '拆出一项个人工作' : '选择放入的分类'} busy={save.isPending} onClose={() => setImporting(null)}><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); send({ action: 'import_assignment', assignmentId: importing.assignment.id, split: importing.split, categoryId: String(form.get('categoryId')), ...(importing.split ? { title: String(form.get('title')) } : {}), operationId: createOperationId() }); }}><p className="detail-meta">{teamData?.tasks.find((entry) => entry.id === importing.assignment.taskId)?.title} · 关联本人分工</p>{importing.split && <label>这一步要做什么？<input name="title" required maxLength={200} placeholder="例如：完成接口联调" /></label>}<label>放入分类<select name="categoryId" required defaultValue={importing.categoryId}><option value="" disabled>请选择分类</option>{data.categories.filter((entry) => entry.status === (importing.split ? 'not_started' : importing.assignment.status)).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>{importing.assignment.status === 'completed' && importing.split && <p className="inline-notice">新增工作后，我的分工将恢复进行中。</p>}<button className="primary-button" disabled={save.isPending}>加入我的工作</button></form>{feedback && <p role="alert" className="form-error">{feedback}</p>}</Dialog>}
       {task && identity.data && organization.data && <PersonalTeamDetail task={task} identity={identity.data} organization={organization.data} onClose={() => { setTask(null); void team.refetch(); void state.refetch(); }} onSelect={setTask} />}
     </>}
   </main>;
