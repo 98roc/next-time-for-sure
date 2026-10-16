@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { passwordHint, passwordSchema } from '@ntfs/contracts';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -67,14 +68,15 @@ function PasswordForm({ pending, submit }: { pending: boolean; submit: (current:
   const [checked, setChecked] = useState(false);
   const mismatch = confirmation !== replacement;
   const unchanged = current === replacement;
-  const error = checked ? unchanged ? '新密码不能与当前密码相同。' : mismatch ? '两次输入的新密码不一致，请重新确认。' : '' : '';
+  const invalidPassword = !passwordSchema.safeParse(replacement).success;
+  const error = checked ? invalidPassword ? passwordHint : unchanged ? '新密码不能与当前密码相同。' : mismatch ? '两次输入的新密码不一致，请重新确认。' : '' : '';
   function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setChecked(true);
-    if (!unchanged && !mismatch) submit(current, replacement);
+    if (!invalidPassword && !unchanged && !mismatch) submit(current, replacement);
   }
   return <form className="account-password-form" onSubmit={send}><fieldset disabled={pending}>
     <PasswordField label="当前密码" value={current} onChange={setCurrent} autoComplete="current-password" />
-    <PasswordField label="新密码" value={replacement} onChange={setReplacement} autoComplete="new-password" hint="12～128个字符，不能与当前密码相同。" invalid={checked && unchanged} />
+    <PasswordField label="新密码" value={replacement} onChange={setReplacement} autoComplete="new-password" hint={passwordHint + '不能与当前密码相同。'} invalid={checked && (invalidPassword || unchanged)} />
     <PasswordField label="确认新密码" value={confirmation} onChange={setConfirmation} autoComplete="new-password" invalid={checked && mismatch} />
     {error && <p role="alert" className="form-error">{error}</p>}
     <p className="account-security-note">修改成功后，所有设备的登录会话将失效，需要重新登录。</p>

@@ -13,7 +13,7 @@ import { loadEnvironment } from '../config/environment.js';
 import { createDataSource } from '../database/data-source.js';
 import { IdentityRepository } from '../identity/identity.repository.js';
 import { IdentityService } from '../identity/identity.service.js';
-import { digest, hashPassword } from '../identity/password.js';
+import { digest, generateTemporaryPassword, hashPassword } from '../identity/password.js';
 import { SafeExceptionFilter } from '../safe-exception.filter.js';
 
 export type Session = { cookie: string; csrf: string; bearer?: string };
@@ -27,8 +27,8 @@ export async function smoke(verifyWork?: (fixture: WorkFixture) => Promise<void>
   app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new SafeExceptionFilter());
   const prefix = `verify.${randomBytes(8).toString('hex')}`;
   const superId = randomUUID();
-  const password = randomBytes(24).toString('hex');
-  const replacement = randomBytes(24).toString('hex');
+  const password = generateTemporaryPassword();
+  const replacement = generateTemporaryPassword();
   let base = '';
   const retainedAccounts = new Set<string>();
   let retainTeam = false;

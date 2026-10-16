@@ -22,6 +22,7 @@ Copy-Item deploy/production.env.example .deploy.production.local
 | --- | --- |
 | `DEPLOY_HOST`、`DEPLOY_SSH_PORT`、`DEPLOY_USER` | SSH 连接目标 |
 | `DEPLOY_PASSWORD` | 可选 SSH 密码；留空时使用密钥或交互输入 |
+| `INITIAL_ADMIN_PASSWORD` | 可选初始管理员密码，仅填写在本地私有配置；留空则随机生成 |
 | `DEPLOY_PATH` | 服务器绝对目录，末级必须为 `next-time-for-sure`，不能包含 `..` |
 | `HTTP_BIND`、`HTTP_PORT` | 网页入口绑定的服务器 IPv4 地址与空闲端口 |
 | `DB_HOST`、`DB_PORT`、`DB_USERNAME`、`DB_PASSWORD` | 独立 MySQL 服务的连接参数 |
@@ -82,7 +83,9 @@ API 不映射宿主机端口。两个容器使用独立网络，设置内存上�
 .\scripts\deploy.ps1 -Action InitAdmin
 ```
 
-程序仅在无账号时创建初始管理员，已有账号时拒绝。随机临时密码保存到服务器部署目录下 `shared/.bootstrap-credentials.local`，权限为 600，不打印到终端。通过受控 SSH/SFTP 读取，首次登录改密后删除凭据文件。普通部署不会重复初始化管理员。
+程序仅在无账号时创建 `admin` 超级管理员，已有账号时拒绝；不会创建演示账号或业务数据。可在本地 `.deploy.production.local` 中设置 `INITIAL_ADMIN_PASSWORD`，须符合密码规则；留空时随机生成。指定密码通过 SSH 标准输入传递，不进入命令参数、运行环境或镜像。
+
+凭据保存到服务器部署目录下 `shared/.bootstrap-credentials.local`（权限 600），并下载至本地 `.deploy.production.account.local`，不打印到终端，不覆盖开发账号凭据。首次登录仍要求修改初始密码；修改后删除这些临时凭据。普通部署不会重复初始化管理员，也不会重置密码。不得将真实密码或其哈希写入 SQL、文档或 Git。
 
 ## 服务器目录与恢复
 

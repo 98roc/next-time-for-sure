@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { z } from 'zod';
+import { sessionLifetimeSeconds } from './session-policy.js';
 
 /** 从HttpOnly Cookie中提取会话，绝不把Bearer Token当登录会话。 */
 export function sessionToken(request: IncomingMessage): string {
@@ -42,7 +43,7 @@ export function csrfHeader(request: IncomingMessage): string {
 
 /** Cookie限制于API，HttpOnly且SameSite严格；本机HTTP不设置Secure。 */
 export function setSessionCookie(response: ServerResponse, token: string): void {
-  response.setHeader('Set-Cookie', `ntfs_session=${token}; Path=/api; HttpOnly; SameSite=Strict; Max-Age=${token ? 43200 : 0}`);
+  response.setHeader('Set-Cookie', `ntfs_session=${token}; Path=/api; HttpOnly; SameSite=Strict; Max-Age=${token ? sessionLifetimeSeconds : 0}`);
   response.setHeader('Cache-Control', 'no-store');
 }
 

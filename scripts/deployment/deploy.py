@@ -150,10 +150,13 @@ def build_images(directory, release):
     return result
 
 
-def remote(client, command):
+def remote(client, command, private_input=None):
     """逐段读取两条流，长操作持续输出且避免 SSH 缓冲区死锁。"""
     channel = client.get_transport().open_session()
     channel.exec_command(command)
+    if private_input is not None:
+        channel.sendall(private_input.encode('utf-8'))
+        channel.shutdown_write()
     deadline = time.monotonic() + 1800
     while True:
         for ready, receive, stream in [(channel.recv_ready, channel.recv, sys.stdout),
@@ -227,7 +230,18 @@ def main():
         command = 'bash ' + shlex.quote(base + '/deploy.sh')
         command += ' ' + ' '.join(shlex.quote(value) for value in [args.action.lower(), base, release, values['HTTP_BIND'], values['HTTP_PORT']])
         if args.action in ['Check', 'InitAdmin']:
-            remote(client, command)
+            initial_password = values.get('INITIAL_ADMIN_PASSWORD') if args.action == 'InitAdmin' else None
+            if initial_password:
+                command += ' stdin'
+            remote(client, command, initial_password)
+            if args.action == 'InitAdmin':
+                with client.open_sftp() as sftp:
+                    target = ROOT / '.deploy.production.account.local'
+                    # 使用独立私有文件，不覆盖本地开发管理员的凭据。
+                    with target.open('xb') as output, sftp.open(base + '/shared/.bootstrap-credentials.local', 'rb') as source:
+                        shutil.copyfileobj(source, output)
+                    target.chmod(0o600)
+                print('Initial credentials saved to .deploy.production.account.local (not printed).')
             return
         run(['docker', 'info'], stdout=subprocess.DEVNULL)
         ensure_image(NODE_IMAGE)

@@ -1,6 +1,14 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { passwordSchema } from '@ntfs/contracts';
 
 const cost = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
+/** 随机临时密码须满足与手动设密一致的规则，不依赖随机字符恰好齐全。 */
+export function generateTemporaryPassword(): string {
+  let password: string;
+  do { password = randomBytes(24).toString('base64url'); } while (!passwordSchema.safeParse(password).success);
+  return password;
+}
 
 /** 异步scrypt避免阻塞事件循环，参数固定且派生值按账号随机加盐。 */
 function derive(password: string, salt: string): Promise<Buffer> {

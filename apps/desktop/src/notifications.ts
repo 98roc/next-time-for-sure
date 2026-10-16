@@ -18,7 +18,8 @@ export async function startNotifications(origin: string, ledgerPath: string, ope
 
   /** fetch自动使用当前分区Cookie，禁止重定向到其他服务。 */
   const get = async (path: string): Promise<unknown> => {
-    const response = await businessSession.fetch(`${origin}/api/v1/${path}`, { redirect: 'error', signal: AbortSignal.timeout(5000) });
+    // 后台通知不代表用户正在使用，不能无限延长登录会话。
+    const response = await businessSession.fetch(`${origin}/api/v1/${path}`, { headers: { 'X-NTFS-Session-Activity': 'passive' }, redirect: 'error', signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error('会话或服务不可用');
     return response.json();
   };

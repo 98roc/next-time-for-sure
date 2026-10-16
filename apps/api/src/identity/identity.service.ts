@@ -71,6 +71,19 @@ export class IdentityService {
     });
   }
 
+  /** 响应成功后续期；重新锁定并鉴权，避免将并发撤销或过期的会话恢复。 */
+  async renewSession(token: string): Promise<boolean> {
+    try {
+      return await this.database.transaction(async (manager) => {
+        const auth = await this.authenticate(manager, token);
+        return new IdentityRepository(manager).renewSession(auth.hash);
+      });
+    } catch (error) {
+      if (error instanceof UnauthorizedException) return false;
+      throw error;
+    }
+  }
+
   /** 本人改密须校验原密码；所有旧会话立即撤销。 */
   async changePassword(token: string, csrf: string, current: string, replacement: string): Promise<void> {
     await this.database.transaction(async (manager) => {

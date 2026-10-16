@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { organizationCommandSchema } from '@ntfs/contracts';
+import { organizationCommandSchema, passwordHint, passwordMaxLength, passwordMinLength, passwordPattern } from '@ntfs/contracts';
 import type { OrganizationCommand, OrganizationSnapshot, Role } from '@ntfs/contracts';
 
 export const roleLabels: Record<Role, string> = { team_leader: '团队管理员', group_leader: '组长', project_manager: '项目经理', project_lead: '项目研发负责人', developer: '研发人员' };
@@ -51,7 +51,7 @@ export function CommandForm({ action, targetId, data, pending, submit, cancel }:
       case 'set_disabled': input = { action, accountId: account?.id, disabled: !account?.disabled, version: account?.version }; break;
     }
     const parsed = organizationCommandSchema.safeParse(input);
-    if (!parsed.success) { setError('请补全有效输入。账号为3～64位字母、数字或点横线下划线，密码12～128位；小组须选择成员，项目成员须选择角色。'); return; }
+    if (!parsed.success) { setError('请补全有效输入。账号为3～64位字母、数字或点横线下划线；密码' + passwordHint + '小组须选择成员，项目成员须选择角色。'); return; }
     setError(''); submit(parsed.data);
   }
 
@@ -63,7 +63,7 @@ export function CommandForm({ action, targetId, data, pending, submit, cancel }:
     {action === 'set_disabled' && <p>{account?.disabled ? '启用后可以重新登录，原会话不会恢复。' : '停用后立即禁止登录和 Agent 调用，工作记录保留。'}</p>}
     {(creatingAccount || action === 'update_account' || action === 'link_member') && <label>登录账号<input name="loginName" required minLength={3} maxLength={64} autoComplete="off" defaultValue={action === 'update_account' ? account?.loginName : ''} /></label>}
     {(creatingAccount || action === 'update_account') && <label>姓名<input name="displayName" required maxLength={100} defaultValue={account?.displayName} /></label>}
-    {(creatingAccount || action === 'reset_password') && <label>临时密码<input type="password" name="password" required minLength={12} maxLength={128} autoComplete="new-password" /><small>12～128位；首次登录必须修改临时密码。</small></label>}
+    {(creatingAccount || action === 'reset_password') && <label>临时密码<input type="password" name="password" required minLength={passwordMinLength} maxLength={passwordMaxLength} pattern={passwordPattern.source} title={passwordHint} autoComplete="new-password" /><small>{passwordHint}首次登录必须修改临时密码。</small></label>}
     {action === 'link_member' && <p className="subtitle">输入已有账号的登录名；该账号须已启用且未加入其他团队。</p>}
     {['create_team', 'update_team', 'create_group', 'update_group', 'create_project'].includes(action) && <label>名称<input name="name" required maxLength={100} defaultValue={action === 'update_team' ? team?.name : action === 'update_group' ? group?.name : ''} /></label>}
     {(action === 'create_team' || action === 'update_team') && <label>团队管理员<select name="leaderId" required defaultValue={action === 'update_team' ? team?.leaderId : ''}><option value="" disabled>请选择账号</option>{leaders.map((entry) => <option key={entry.id} value={entry.id}>{entry.displayName}（{entry.loginName}）</option>)}</select><small>{leaders.length ? '新建团队使用未入团队账号；更换管理员也可选择本团队成员。' : '暂无可选账号，请先在账号管理中新增或启用账号。'}</small></label>}

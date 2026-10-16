@@ -85,7 +85,11 @@ case "$ACTION" in
         exists "$API" || fail 'Deploy the API first.'
         owned "$API"
         # 复用应用初始化程序；凭据从容器复制到仅 root 可读目录后删除容器内副本。
-        docker exec --user 0 "$API" node /app/apps/api/dist/identity/bootstrap.js
+        if [[ "${6:-}" == stdin ]]; then
+            docker exec -i --user 0 "$API" node /app/apps/api/dist/identity/bootstrap.js --password-stdin
+        else
+            docker exec --user 0 "$API" node /app/apps/api/dist/identity/bootstrap.js
+        fi
         docker cp "$API:/app/.bootstrap-credentials.local" "$ROOT/shared/.bootstrap-credentials.local"
         chmod 600 "$ROOT/shared/.bootstrap-credentials.local"
         docker exec --user 0 "$API" rm /app/.bootstrap-credentials.local

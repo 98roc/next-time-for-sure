@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 /** 账号名称用于登录，展示名称单独维护。 */
 export const loginNameSchema = z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9._-]+$/);
-export const passwordSchema = z.string().min(12).max(128);
+/** 新设密码必须同时包含数字、英文大写和小写字母；允许额外符号。 */
+export const passwordMinLength = 8;
+export const passwordMaxLength = 128;
+export const passwordPattern = /(?=[\s\S]*[0-9])(?=[\s\S]*[A-Z])(?=[\s\S]*[a-z])[\s\S]*/;
+export const passwordHint = '8～128 个字符，须包含数字、大写和小写字母。';
+export const passwordSchema = z.string().min(passwordMinLength).max(passwordMaxLength).regex(passwordPattern, passwordHint);
 export const loginSchema = z.object({ loginName: loginNameSchema, password: z.string().min(1).max(128) }).strict();
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: passwordSchema }).strict();
 

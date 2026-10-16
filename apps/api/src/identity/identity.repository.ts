@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
+import { sessionLifetimeSeconds } from './session-policy.js';
 
 const accountSchema = z.object({
   id: z.string(), login_name: z.string(), display_name: z.string(), password_hash: z.string(),
@@ -34,7 +35,13 @@ export class IdentityRepository {
 
   /** 会话创建与审计共用业务事务。 */
   async createSession(hash: string, account: string, csrf: string): Promise<void> {
-    await this.manager.query('INSERT INTO login_sessions (token_hash, account_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, UTC_TIMESTAMP(3), DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 12 HOUR))', [hash, account, csrf]);
+    await this.manager.query('INSERT INTO login_sessions (token_hash, account_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, UTC_TIMESTAMP(3), DATE_ADD(UTC_TIMESTAMP(3), INTERVAL ? SECOND))', [hash, account, csrf, sessionLifetimeSeconds]);
+  }
+
+  /** 仅延长未到期会话；调用方须在同一事务内锁定账号并验证当前状态。 */
+  async renewSession(hash: string): Promise<boolean> {
+    const result: unknown = await this.manager.query('UPDATE login_sessions SET expires_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL ? SECOND) WHERE token_hash = ? AND expires_at > UTC_TIMESTAMP(3)', [sessionLifetimeSeconds, hash]);
+    return z.object({ affectedRows: z.number() }).parse(result).affectedRows > 0;
   }
 
   /** 改密撤销全部旧会话，更新版本及审计。 */
