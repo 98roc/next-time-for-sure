@@ -62,6 +62,50 @@ await smoke(async ({ call, developer, leader, manager, projectId, otherProjectId
   assert.equal(await write('lifecycle/commands', deletion, developer), disposable);
   assert.equal((await call('lifecycle/commands', developer, { ...deletion, reason: '不可复用为另一请求' })).status, 409);
   assert.equal(workSnapshotSchema.parse(await (await call(`work?projectId=${projectId}`, developer)).json()).tasks.some((entry) => entry.id === disposable), false);
+
+  // 未执行的责任终止不能冒充执行；已执行后移除、退出或转交仍须保留任务。
+  await database.initialize();
+  try {
+    for (const action of ['remove', 'exit', 'transfer'] as const) {
+      for (const evidence of ['none', 'start', 'times', 'progress'] as const) {
+        const candidate = await create(`责任终止删除回归-${action}-${evidence}`);
+        const claimed = await write('assignments/commands', { action: 'claim', taskId: candidate, groupId: group.id, content: '', operationId: randomUUID() }, developer);
+        let version = 0;
+        if (evidence === 'start') {
+          await write('assignments/commands', { action: 'start', assignmentId: claimed, version: version++ }, developer);
+        } else if (evidence === 'times') {
+          // 清空当前时间后仍由历史事件阻止删除，不能仅依赖当前快照。
+          for (const startedAt of ['2026-10-01T01:00:00.000Z', null]) {
+            await write('assignments/commands', { action: 'correct_times', assignmentId: claimed, version: version++, startedAt, endedAt: null }, developer);
+          }
+        } else if (evidence === 'progress') {
+          await write('assignments/commands', { action: 'record_progress', assignmentId: claimed, version: version++, occurredOn: week, reportWeek: week, content: '已产生真实进展', operationId: randomUUID() }, developer);
+        }
+        await write('assignments/commands', action === 'transfer'
+          ? { action, assignmentId: claimed, version, accountId: team.leaderId, groupId: null, content: '', reason: '回归验证责任转交', operationId: randomUUID() }
+          : action === 'exit' ? { action, assignmentId: claimed, version, reason: '回归验证退出认领' }
+            : { action, assignmentId: claimed, version }, action === 'exit' ? developer : leader);
+        const intent = { action: 'delete_task' as const, objectId: candidate };
+        const review = await preview(intent, developer);
+        if (evidence === 'none') {
+          assert.deepEqual(review.blockers, [], `${action}: 未执行分工不应阻止删除`);
+          await execute(intent, developer);
+          // 实际删除后回读数据库，确认分工已删除而责任变更历史仍保留。
+          assert.deepEqual(await database.query('SELECT id FROM team_tasks WHERE id=?', [candidate]), []);
+          assert.deepEqual(await database.query('SELECT id FROM task_assignments WHERE task_id=?', [candidate]), []);
+          const events: unknown = await database.query('SELECT action FROM work_events WHERE object_id=? AND action=?', [claimed, `assignment.${action}`]);
+          assert.equal(z.array(z.object({ action: z.string() })).parse(events).length, 1);
+        } else {
+          assert.ok(review.blockers.some((entry) => entry.includes('执行事实')), `${action}/${evidence}: 执行历史必须阻止删除`);
+          assert.equal((await call('lifecycle/commands', developer, { intent, confirmation: review.confirmation, operationId: randomUUID() })).status, 409);
+          const rows: unknown = await database.query('SELECT id FROM team_tasks WHERE id=?', [candidate]);
+          assert.equal(z.array(z.object({ id: z.string() })).parse(rows).length, 1);
+        }
+      }
+    }
+  } finally { await database.destroy(); }
+  console.log('PASS: 12 responsibility-ending deletion cases, HTTP rejection of executed work, database readback and retained audit history');
+
   // 多次误开始都已撤销时可以不填原因删除；旧确认仍必须失效。
   const mistaken = await create('误开始撤销后可删除');
   const mistakenIntent = { action: 'delete_task' as const, objectId: mistaken };

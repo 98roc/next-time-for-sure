@@ -63,7 +63,8 @@ export async function lifecycleScope(manager: EntityManager, access: WorkAccess,
     if (intent.action === 'delete_task') {
       if (children.length) blockers.push('请先处理子任务，不能连带删除。');
       if (items.length) blockers.push('请先处理关联个人工作，不能连带删除他人事项。');
-      if (task.startedAt || task.endedAt || task.progress || task.status !== 'not_started' || involved.some((entry) => entry.startedAt || entry.endedAt || entry.status !== 'not_started') || state.progress.some((entry) => involved.some((assignment) => assignment.id === entry.assignmentId))) blockers.push('已有执行记录，请取消或归档。');
+      // 移除、退出和转交只结束责任关系；是否执行须看实际时间、执行状态和进展。
+      if (task.startedAt || task.endedAt || task.progress || task.status !== 'not_started' || involved.some((entry) => entry.startedAt || entry.endedAt || entry.status === 'in_progress' || entry.status === 'completed') || state.progress.some((entry) => involved.some((assignment) => assignment.id === entry.assignmentId))) blockers.push('已有执行记录，请取消或归档。');
       if (await repository.published(task.id)) blockers.push('任务已进入正式计划或周报，禁止删除。');
       if (await repository.executed(task.id)) blockers.push('历史中已有执行事实，禁止删除。');
       impacts.push('永久删除任务及未执行分工、草稿安排；保留操作历史，不提供恢复。');

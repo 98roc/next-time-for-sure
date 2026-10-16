@@ -17,7 +17,8 @@ export class LifecycleRepository {
   }
   /** 成对的开始与撤销不算执行；时间修正、进展和成员执行历史仍阻止删除。 */
   async executed(task: string) {
-    const rows: unknown = await this.manager.query("SELECT action FROM work_events WHERE (object_id=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.before.taskId'))=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.after.taskId'))=?) AND action IN ('task.start_task','task.undo_start_task','task.complete_task','task.cancel_task','task.reopen_task','task.task_progress','task.task_times','assignment.start','assignment.complete','assignment.record_progress','assignment.correct_times','assignment.transfer','assignment.exit','assignment.remove') ORDER BY CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.after.version')) AS UNSIGNED)", [task, task, task]);
+    // 责任移除、退出、转交本身不算执行；它们之前的开始、完成、进展和时间修正事件仍参与判定。
+    const rows: unknown = await this.manager.query("SELECT action FROM work_events WHERE (object_id=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.before.taskId'))=? OR JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.after.taskId'))=?) AND action IN ('task.start_task','task.undo_start_task','task.complete_task','task.cancel_task','task.reopen_task','task.task_progress','task.task_times','assignment.start','assignment.complete','assignment.record_progress','assignment.correct_times') ORDER BY CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.after.version')) AS UNSIGNED)", [task, task, task]);
     let started = false;
     // 使用任务版本顺序配对，避免同毫秒事件或多次误开始被错误判定。
     for (const event of z.array(z.object({ action: z.string() })).parse(rows)) {
