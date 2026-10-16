@@ -1,0 +1,397 @@
+<div id="ntfs-my-work" aria-label="我的工作页面示例" data-team-message="今天一定，别让产品名赢了。">
+  <div class="mw-shell">
+    <aside class="mw-nav">
+      <div class="mw-brand"><span class="mw-logo">下</span><span>下次一定<small>团队协作工作台</small></span></div>
+      <nav aria-label="主导航"><span class="mw-nav-item active" aria-current="page"><i data-lucide="layout-dashboard"></i>我的工作</span><span class="mw-nav-item"><i data-lucide="calendar-days"></i>周报与周计划</span><span class="mw-nav-item"><i data-lucide="folder-open"></i>项目</span><span class="mw-nav-item"><i data-lucide="users"></i>团队管理</span></nav>
+      <div class="mw-profile"><span class="mw-avatar">解</span><span>解鹏<small>团队成员</small></span></div>
+    </aside>
+    <main class="mw-main">
+      <div class="mw-context"><span>我的工作</span><span class="mw-demo">交互示例 · 模拟数据</span></div>
+      <header class="mw-heading"><div><h1 id="mw-greeting">你好，解鹏</h1><p id="mw-team-phrase" hidden></p></div><div class="mw-actions"><button class="mw-quiet" data-action="add-category"><i data-lucide="plus"></i>新增分类</button><button class="mw-primary" data-action="create"><i data-lucide="plus"></i>新建任务</button></div></header>
+      <div class="mw-toolbar"><label class="mw-search"><i data-lucide="search"></i><input id="mw-search" aria-label="搜索任务" placeholder="搜索任务名称" autocomplete="off"></label><select id="mw-filter" aria-label="筛选任务来源"><option value="all">全部项目与个人任务</option><option value="personal">仅个人任务</option><option>山东</option><option>济南</option><option>烟台</option></select><button id="mw-reorder" data-action="reorder"><i data-lucide="arrow-down-wide-narrow"></i>按优先级重排</button></div>
+      <div class="mw-board-meta"><span id="mw-total"></span></div>
+      <div id="mw-board" class="mw-board" aria-label="任务分类看板"></div>
+    </main>
+  </div>
+  <div id="mw-notice" class="mw-notice" role="status" aria-live="polite" hidden></div>
+
+</div>
+<style>
+#ntfs-my-work{--mw-accent:light-dark(#5066a6,#a8b9ee);--mw-selected:light-dark(#eef1fa,#292f43);--mw-canvas:light-dark(#f5f6f9,#17191e);--mw-surface:light-dark(#fff,#20232a);--mw-text:light-dark(#242730,#edf0f5);--mw-muted:light-dark(#686e7c,#a3aab7);--mw-line:light-dark(#e3e6ed,#363b47);--mw-success:light-dark(#337965,#91cbbb);--mw-danger:light-dark(#b14343,#f0a1a1);--mw-pad:14px;font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif;color:var(--mw-text);color-scheme:light dark}
+#ntfs-my-work *{box-sizing:border-box}#ntfs-my-work [hidden]{display:none!important}#ntfs-my-work button,#ntfs-my-work input,#ntfs-my-work select{font:inherit;color:var(--mw-text)}#ntfs-my-work button{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 11px;min-height:34px;background:var(--mw-surface);border:1px solid var(--mw-line);border-radius:7px;white-space:nowrap}#ntfs-my-work button:hover{background:var(--mw-selected);border-color:var(--mw-accent)}#ntfs-my-work button:disabled{opacity:.5;cursor:not-allowed}#ntfs-my-work :focus-visible{outline:2px solid var(--mw-accent);outline-offset:3px}#ntfs-my-work input,#ntfs-my-work select{min-width:0;padding:8px 10px;min-height:38px;border:1px solid var(--mw-line);background:var(--mw-surface);border-radius:7px}#ntfs-my-work svg{width:16px;height:16px;flex-shrink:0}#ntfs-my-work .mw-primary{background:var(--mw-accent);color:light-dark(#fff,#17191e);border-color:var(--mw-accent)}#ntfs-my-work .mw-link{border:0;background:transparent;color:var(--mw-accent);padding:3px 5px;min-height:28px}#ntfs-my-work h1{font-size:24px;font-weight:500;margin:0}#ntfs-my-work h2{font-size:17px;font-weight:500;margin:0}#ntfs-my-work small{font-size:12px;color:var(--mw-muted)}#ntfs-my-work .mw-shell{display:grid;grid-template-columns:148px minmax(0,1fr);min-height:740px;background:var(--mw-surface);border:1px solid var(--mw-line);border-radius:12px;overflow:hidden}#ntfs-my-work .mw-nav{padding:24px 12px 18px;border-right:1px solid var(--mw-line);display:flex;flex-direction:column;gap:35px;background:var(--mw-surface)}#ntfs-my-work .mw-brand{display:flex;gap:9px;align-items:center;font-weight:500}#ntfs-my-work .mw-brand small{display:block;font-size:11px;font-weight:400;margin-top:2px}#ntfs-my-work .mw-logo{background:var(--mw-accent);color:light-dark(#fff,#17191e);border-radius:9px;display:grid;place-items:center;width:32px;height:34px}#ntfs-my-work .mw-nav nav{display:grid;gap:7px}#ntfs-my-work .mw-nav-item{display:flex;align-items:center;gap:8px;padding:10px 8px;color:var(--mw-muted);border-radius:7px;font-size:13px}#ntfs-my-work .mw-nav-item.active{color:var(--mw-accent);background:var(--mw-selected)}#ntfs-my-work .mw-profile{display:flex;gap:9px;align-items:center;margin-top:auto;padding-top:18px;border-top:1px solid var(--mw-line);font-size:13px}#ntfs-my-work .mw-profile small{display:block}#ntfs-my-work .mw-avatar{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--mw-selected);color:var(--mw-accent)}#ntfs-my-work .mw-main{min-width:0;padding:22px}#ntfs-my-work .mw-context{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--mw-muted);font-size:12px;margin-bottom:28px}#ntfs-my-work .mw-demo{background:var(--mw-canvas);border-radius:5px;padding:2px 7px}#ntfs-my-work .mw-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:25px}#ntfs-my-work .mw-heading p{color:var(--mw-muted);font-size:13px;margin:6px 0 0}#ntfs-my-work .mw-actions{display:flex;gap:8px;flex-wrap:wrap}#ntfs-my-work .mw-toolbar{display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--mw-line);padding-bottom:18px}#ntfs-my-work .mw-search{display:flex;align-items:center;flex:1 1 150px;min-width:120px;border:1px solid var(--mw-line);border-radius:7px;padding-left:10px;background:var(--mw-surface);color:var(--mw-muted)}#ntfs-my-work .mw-search input{width:100%;border:0;background:transparent}#ntfs-my-work .mw-toolbar select{font-size:12px;max-width:100%}#ntfs-my-work .mw-board-meta{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;font-size:12px;color:var(--mw-muted);margin:18px 0 12px}#ntfs-my-work .mw-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}#ntfs-my-work .mw-column{background:var(--mw-canvas);border:1px solid var(--mw-line);border-radius:10px;padding:10px;min-height:410px;min-width:0}#ntfs-my-work .mw-column.over{outline:2px dashed var(--mw-accent);background:var(--mw-selected)}#ntfs-my-work .mw-col-head{display:flex;align-items:center;gap:7px;margin:2px 2px 13px;flex-wrap:wrap}#ntfs-my-work .mw-col-head h2{font-size:14px;flex:1;overflow-wrap:anywhere}#ntfs-my-work .mw-dot{width:7px;height:7px;border-radius:50%;background:var(--mw-muted)}#ntfs-my-work [data-status="doing"] .mw-dot{background:var(--mw-accent)}#ntfs-my-work [data-status="done"] .mw-dot{background:var(--mw-success)}#ntfs-my-work .mw-count{color:var(--mw-muted);font-size:12px}#ntfs-my-work .mw-col-note{font-size:11px;color:var(--mw-muted);margin:-7px 2px 12px}#ntfs-my-work .mw-period{display:grid;gap:4px;margin:0 0 12px;color:var(--mw-muted);font-size:11px}#ntfs-my-work .mw-period select{width:100%;font-size:11px;padding:6px 4px;min-height:33px}#ntfs-my-work .mw-task{background:var(--mw-surface);border:1px solid var(--mw-line);border-radius:8px;margin-bottom:10px;padding:var(--mw-pad);cursor:grab;min-width:0}#ntfs-my-work .mw-task:hover{border-color:var(--mw-accent)}#ntfs-my-work .mw-task.before{border-top:3px solid var(--mw-accent)}#ntfs-my-work .mw-task.dragging{opacity:.4}#ntfs-my-work .mw-task-top{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-bottom:9px;font-size:11px;color:var(--mw-muted)}#ntfs-my-work .mw-source{overflow-wrap:anywhere}#ntfs-my-work .mw-priority{white-space:nowrap;background:var(--mw-canvas);padding:1px 5px;border-radius:4px}#ntfs-my-work .mw-priority.high{color:var(--mw-accent);background:var(--mw-selected)}#ntfs-my-work .mw-title{border:0;background:transparent;padding:0;min-height:0;font-size:14px;text-align:left;justify-content:start;white-space:normal;line-height:1.65;width:100%;overflow-wrap:anywhere}#ntfs-my-work .mw-title:hover{background:transparent;color:var(--mw-accent)}#ntfs-my-work .mw-task-date{font-size:11px;color:var(--mw-muted);margin-top:8px}#ntfs-my-work .mw-task-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px;margin-top:12px}#ntfs-my-work .mw-task-foot button{font-size:12px;padding:3px 7px;min-height:29px}#ntfs-my-work .mw-task-foot .mw-advance{background:var(--mw-selected);color:var(--mw-accent);border:0}#ntfs-my-work .mw-empty{text-align:center;padding:40px 8px;color:var(--mw-muted);font-size:12px}#ntfs-my-work .mw-empty span{display:block;margin-top:7px}#ntfs-my-work .mw-notice{min-height:30px;margin-top:14px;color:var(--mw-accent);font-size:12px}#ntfs-my-work .mw-form{display:grid;gap:17px}#ntfs-my-work .mw-form label{display:grid;gap:7px;font-size:12px;color:var(--mw-muted)}#ntfs-my-work .mw-form input,#ntfs-my-work .mw-form select{width:100%}#ntfs-my-work .mw-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}#ntfs-my-work .mw-static{padding:8px 0;color:var(--mw-text);font-size:14px;border-bottom:1px solid var(--mw-line)}#ntfs-my-work .mw-info{font-size:12px;padding:12px;background:var(--mw-selected);border-radius:7px;color:var(--mw-accent);margin:0}#ntfs-my-work .mw-form-footer{display:flex;justify-content:flex-end;gap:8px;padding-top:15px;border-top:1px solid var(--mw-line);margin-top:5px}#ntfs-my-work .mw-danger{color:var(--mw-danger);margin-right:auto}#ntfs-my-work .mw-menu{display:grid;gap:8px}#ntfs-my-work .mw-menu button{justify-content:space-between;white-space:normal;text-align:left}#ntfs-my-work .mw-category-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;margin:12px 0;align-items:center}#ntfs-my-work .mw-category-row input{width:100%}#ntfs-my-work .mw-category-row small{grid-column:1/-1}#ntfs-my-work .mw-section-label{font-size:13px;color:var(--mw-muted);margin:20px 0 8px}#ntfs-my-work .mw-error{color:var(--mw-danger);font-size:12px}
+@media(max-width:850px){#ntfs-my-work .mw-shell{grid-template-columns:116px minmax(0,1fr)}#ntfs-my-work .mw-nav{padding:22px 8px}#ntfs-my-work .mw-nav-item{padding:10px 5px;font-size:12px;gap:6px}#ntfs-my-work .mw-brand{font-size:13px}#ntfs-my-work .mw-brand small{display:none}#ntfs-my-work .mw-main{padding:18px}#ntfs-my-work .mw-board{gap:8px}#ntfs-my-work .mw-column{padding:8px}#ntfs-my-work .mw-task{padding:10px}}
+@media(max-width:650px){#ntfs-my-work .mw-shell{display:block}#ntfs-my-work .mw-nav{display:none}#ntfs-my-work .mw-main{padding:16px}#ntfs-my-work .mw-board{grid-template-columns:1fr}#ntfs-my-work .mw-column{min-height:160px}#ntfs-my-work .mw-toolbar select{flex:1}#ntfs-my-work .mw-search{flex-basis:100%}#ntfs-my-work .mw-heading{gap:16px}#ntfs-my-work .mw-context{margin-bottom:18px}#ntfs-my-work .mw-period select{font-size:12px}#ntfs-my-work .mw-grid{grid-template-columns:1fr}#ntfs-my-work input,#ntfs-my-work select{font-size:16px}#ntfs-my-work button{min-height:38px}}
+@media(pointer:coarse){#ntfs-my-work button,#ntfs-my-work .mw-task-foot button,#ntfs-my-work select{min-height:44px}}
+#ntfs-my-work{position:relative}#ntfs-my-work .mw-board{display:flex;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--mw-line) transparent;gap:12px;padding-bottom:14px;align-items:stretch;overscroll-behavior-x:contain}#ntfs-my-work .mw-column{flex:1 0 240px;min-height:410px;position:relative}#ntfs-my-work .mw-board-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}#ntfs-my-work .mw-board-footer small{font-size:11px}#ntfs-my-work #mw-reorder{font-size:12px}#ntfs-my-work .mw-default{display:inline-flex;gap:4px;align-items:center;font-size:11px;color:var(--mw-accent);background:var(--mw-selected);padding:2px 6px;border-radius:4px}#ntfs-my-work .mw-col-sub{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:-4px 2px 12px;font-size:11px;color:var(--mw-muted);min-height:24px}#ntfs-my-work .mw-col-head{flex-wrap:nowrap;margin-bottom:8px}#ntfs-my-work .mw-col-menu{position:relative;flex-shrink:0}#ntfs-my-work .mw-col-menu summary{list-style:none;display:grid;place-items:center;width:30px;height:30px;border-radius:6px;cursor:pointer;color:var(--mw-muted)}#ntfs-my-work .mw-col-menu summary::-webkit-details-marker{display:none}#ntfs-my-work .mw-col-menu[open] summary,#ntfs-my-work .mw-col-menu summary:hover{background:var(--mw-selected);color:var(--mw-accent)}#ntfs-my-work .mw-col-menu[open]{z-index:20}#ntfs-my-work .mw-col-menu-panel{position:absolute;right:0;top:34px;min-width:185px;padding:5px;border:1px solid var(--mw-line);border-radius:8px;background:var(--mw-surface);box-shadow:0 10px 26px #0002;display:grid;gap:2px}#ntfs-my-work .mw-col-menu-panel button{border:0;justify-content:flex-start;font-size:12px}#ntfs-my-work .mw-col-menu-panel small{font-size:11px;padding:5px 9px}#ntfs-my-work .mw-check{display:flex!important;align-items:center;gap:8px!important;color:var(--mw-text)!important}#ntfs-my-work .mw-check input{width:16px!important;min-height:16px}#ntfs-my-work .mw-task{position:relative;user-select:none}#ntfs-my-work .mw-task-top{cursor:grab;touch-action:none}#ntfs-my-work .mw-drag-grip{display:inline-flex;align-items:center;gap:5px;min-width:0}#ntfs-my-work .mw-drag-grip svg{width:12px;height:15px;opacity:.5}#ntfs-my-work .mw-card-list{min-height:200px}#ntfs-my-work .mw-placeholder{border:1px dashed var(--mw-accent);border-radius:8px;background:var(--mw-selected);margin-bottom:10px;pointer-events:none}#ntfs-my-work .mw-drag-ghost{position:absolute;z-index:1000;left:0;top:0;margin:0;pointer-events:none;opacity:.97;box-shadow:0 12px 30px #0003;border-color:var(--mw-accent);will-change:transform;cursor:grabbing}#ntfs-my-work.mw-drag-active,#ntfs-my-work.mw-drag-active *{cursor:grabbing!important}#ntfs-my-work .mw-column.over{outline:none;border-color:var(--mw-accent)}#ntfs-my-work .mw-drag-hint{font-size:11px;color:var(--mw-accent);margin-top:7px}#ntfs-my-work .mw-new{font-size:10px;color:var(--mw-accent);margin-left:4px}
+@media(max-width:650px){#ntfs-my-work .mw-board{display:grid;grid-template-columns:1fr;overflow:visible}#ntfs-my-work .mw-column{min-height:160px}#ntfs-my-work .mw-card-list{min-height:60px}#ntfs-my-work .mw-board-footer{align-items:flex-start;flex-direction:column}#ntfs-my-work .mw-col-menu summary{width:40px;height:40px}#ntfs-my-work .mw-col-sub{margin-top:0}}
+@media(prefers-reduced-motion:reduce){#ntfs-my-work *{scroll-behavior:auto!important}}
+#ntfs-my-work .mw-quiet{border-color:transparent;background:transparent;color:var(--mw-muted)}#ntfs-my-work .mw-quiet:hover{color:var(--mw-accent);background:var(--mw-selected)}#ntfs-my-work .mw-notice{position:absolute;z-index:50;top:12px;left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);width:max-content;min-height:0;margin:0;padding:9px 14px;background:var(--mw-surface);border:1px solid var(--mw-line);border-radius:8px;box-shadow:0 5px 20px #0002;pointer-events:none}#ntfs-my-work button.mw-default{min-height:24px;padding:2px 6px;border:0;font-size:11px;cursor:help}#ntfs-my-work .mw-heading>div:first-child{min-width:0}#ntfs-my-work #mw-team-phrase{overflow-wrap:anywhere}#ntfs-my-work .mw-heading{align-items:center}
+</style>
+<!-- BEGIN V2 SHARED (generated by build-v2.py) -->
+<style>
+/* 所有 V2.0 原型共用的控件基线；作用域不影响旧工作区。 */
+.v2-scope{--v2-accent:light-dark(#5066a6,#a8b9ee);--v2-on-accent:light-dark(#fff,#17191e);--v2-bg:light-dark(#fff,#20232a);--v2-canvas:light-dark(#f5f6f9,#17191e);--v2-text:light-dark(#242730,#edf0f5);--v2-muted:light-dark(#686e7c,#a3aab7);--v2-line:light-dark(#e3e6ed,#363b47);--v2-selected:light-dark(#eef1fa,#292f43);--v2-danger:light-dark(#a63232,#f2a0a0);font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif;color-scheme:light dark}
+.v2-scope{--nt-accent:var(--v2-accent);--nt-surface:var(--v2-bg);--nt-bg:var(--v2-canvas);--nt-text:var(--v2-text);--nt-muted:var(--v2-muted);--nt-line:var(--v2-line);--nt-selected:var(--v2-selected);--nt-good:light-dark(#28643a,#a2d5b0);--w-accent:var(--v2-accent);--w-surface:var(--v2-bg);--w-canvas:var(--v2-canvas);--w-text:var(--v2-text);--w-muted:var(--v2-muted);--w-line:var(--v2-line);--w-selected:var(--v2-selected);--w-on-accent:var(--v2-on-accent);--w-green:light-dark(#28643a,#9bd5aa);--w-green-bg:light-dark(#eaf4ed,#23372c)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button{border-radius:7px;min-height:36px;font-size:13px;cursor:pointer}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button:disabled{cursor:not-allowed;opacity:.52}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(button,input,select,textarea):focus-visible{outline:2px solid var(--v2-accent);outline-offset:3px}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.nt-primary,.mw-primary,.w-button.primary){background:var(--v2-accent);color:var(--v2-on-accent);border-color:var(--v2-accent)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.nt-primary,.mw-primary,.w-button.primary):hover{filter:brightness(.95)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-danger{background:var(--v2-bg);color:var(--v2-danger);border:1px solid var(--v2-line);margin:0}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-danger:hover{background:var(--v2-selected);border-color:var(--v2-danger)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog.v2-dialog{position:fixed;inset:0;margin:auto;padding:0;width:min(680px,calc(100% - 24px));max-width:calc(100% - 24px);max-height:calc(100dvh - 32px);min-height:0;overflow:hidden;box-sizing:border-box;border:1px solid var(--v2-line);border-radius:12px;background:var(--v2-bg);color:var(--v2-text);box-shadow:0 20px 70px light-dark(#17203333,#0008);font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog.v2-wide{width:min(960px,calc(100% - 24px))}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog::backdrop{background:light-dark(#17203366,#05080dbb)}
+.v2-scope .v2-dialog-layout{display:flex;flex-direction:column;max-height:calc(100dvh - 34px);min-height:0}
+.v2-scope .v2-dialog-header{display:flex;align-items:flex-start;gap:10px;flex-wrap:nowrap;flex-shrink:0;padding:16px 20px;border-bottom:1px solid var(--v2-line);background:var(--v2-bg)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header h2{font-size:18px;font-weight:500;line-height:1.5;margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.v2-scope .v2-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) button,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-unsaved button{display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;font:inherit;font-size:13px;background:var(--v2-bg);color:var(--v2-text);border:1px solid var(--v2-line);border-radius:7px}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) :is(.nt-primary,.mw-primary,.primary){background:var(--v2-accent);color:var(--v2-on-accent);border-color:var(--v2-accent)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) .v2-danger,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-unsaved .v2-danger{color:var(--v2-danger);background:var(--v2-bg);border-color:var(--v2-line)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{font-size:22px;width:36px;padding:0;border:0;background:transparent;margin-left:2px;flex-shrink:0}
+.v2-scope .v2-content{flex:1 1 auto;overflow:auto;overscroll-behavior:contain;padding:20px;min-height:0}
+.v2-scope .v2-content [data-records],.v2-scope .v2-content [data-batch-rows]{display:grid;gap:14px}
+.v2-scope .v2-context{font-size:12px;color:var(--v2-muted);margin:0 0 16px}
+.v2-scope .v2-unsaved{padding:12px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--v2-line);background:var(--v2-selected)}
+.v2-scope .v2-unsaved[hidden],.v2-scope [data-v2-back][hidden]{display:none!important}
+.v2-scope .v2-content :is(input,select,textarea){box-sizing:border-box;max-width:100%;font:inherit;border:1px solid var(--v2-line);background:var(--v2-bg);color:var(--v2-text);border-radius:7px;padding:8px 10px}
+.v2-scope .v2-content :is(.nt-task-fields,.w-batch-row){display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px;border:1px solid var(--v2-line);border-radius:10px;background:var(--v2-canvas);margin:0}
+.v2-scope .v2-content :is(.nt-name,.nt-record-head,.nt-period,.w-batch-row .w-full){grid-column:1/-1}
+.v2-scope .v2-content :is(.nt-fields,.w-form-grid,.mw-grid){gap:16px}
+.v2-scope .v2-content :is(.nt-error,.mw-error,.w-error){color:var(--v2-danger)}
+.v2-scope .v2-content .v2-section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}
+.v2-scope .v2-content .v2-section-head h3{font-size:14px;font-weight:500;margin:0}
+@media(max-width:600px){.v2-scope .v2-dialog-header{padding:12px;gap:8px}.v2-scope .v2-dialog-footer{padding:12px;gap:12px}.v2-scope .v2-dialog-footer .v2-actions{flex-wrap:wrap}.v2-scope .v2-content{padding:16px}.v2-scope .v2-content :is(.nt-task-fields,.w-batch-row,.nt-fields,.w-form-grid,.mw-grid){grid-template-columns:minmax(0,1fr)}.v2-scope .v2-content :is(input,select,textarea){font-size:16px}.v2-scope .v2-unsaved{padding:12px}}
+@media(pointer:coarse){:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{min-height:44px}:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{width:44px}}
+
+.v2-scope .v2-dialog-footer{display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0;padding:16px 20px;border-top:1px solid var(--v2-line);background:var(--v2-bg)}
+.v2-scope .v2-footer-actions{justify-content:center;gap:8px;max-width:100%}
+
+@media(max-width:600px){.v2-scope .v2-dialog-footer{padding:12px;gap:12px}}
+
+</style>
+<script>
+/* V2.0 原型共用交互；由 build-v2.py 内联到各维护源及预览，不接入业务接口。 */
+(() => {
+  /** 在一个原生对话框内切换内容，保留上一步表单、滚动位置和焦点。 */
+  function createDialog(root, { restore, exit } = {}) {
+    root.classList.add('v2-scope');
+    const host = document.createElement('dialog');
+    host.className = 'v2-dialog';
+    root.append(host);
+    let current = null, stack = [], origin = null, pending = null;
+    const signature = node => JSON.stringify([...node.querySelectorAll('input,select,textarea')].map(input => [input.name || input.dataset.edit, input.value, input.checked]));
+    const dirty = entry => entry && signature(entry.node) !== entry.original;
+
+    function mount(entry) {
+      host.replaceChildren(entry.node);
+      host.setAttribute('aria-label', entry.title);
+      host.classList.toggle('v2-wide', entry.wide);
+      entry.node.querySelector('[data-v2-back]').hidden = !stack.length;
+      if (!host.open) host.showModal();
+      entry.node.querySelector('.v2-content').scrollTop = entry.scroll || 0;
+      const focus = entry.focus?.isConnected ? entry.focus : entry.node.querySelector('.v2-content input:not(:disabled),.v2-content select:not(:disabled),.v2-content textarea:not(:disabled)') || entry.node.querySelector('[data-v2-back]:not([hidden]),[data-v2-close]');
+      focus?.focus({ preventScroll: true });
+    }
+
+    /** 未保存提示占用当前表面，不再增加遮罩；取消保留所有字段。 */
+    function guard(action, all = false) {
+      if (!dirty(current) && !(all && stack.some(dirty))) { action(); return; }
+      pending = action;
+      const warning = current.node.querySelector('.v2-unsaved');
+      warning.hidden = false;
+      warning.querySelector('button').focus();
+    }
+
+    function close(force = false) {
+      const perform = () => {
+        host.close(); host.replaceChildren(); current = null; stack = []; pending = null;
+        exit?.();
+        if (origin?.isConnected) origin.focus({ preventScroll: true });
+        else root.querySelector('main button,button')?.focus({ preventScroll: true });
+      };
+      if (force) perform(); else guard(perform, true);
+    }
+
+    function back(force = false) {
+      if (!stack.length) { close(force); return; }
+      const perform = () => { current = stack.pop(); mount(current); restore?.(current.context); };
+      if (force) perform(); else guard(perform);
+    }
+
+    /** 底部操作组居中，依次为关闭、其他操作、保存；右上角保留快捷关闭。 */
+    function show({ title, body, actions = '', context = {}, form = false, wide = false, key = '' }) {
+      const scroll = current && key && current.key === key ? current.node.querySelector('.v2-content').scrollTop : 0;
+      if (!current) origin = document.activeElement;
+      else if (!key || key !== current.key) {
+        current.scroll = current.node.querySelector('.v2-content').scrollTop;
+        current.focus = document.activeElement;
+        stack.push(current);
+      }
+      const node = document.createElement('section');
+      node.className = 'v2-dialog-layout';
+      node.innerHTML = `<header class="v2-dialog-header"><button type="button" data-v2-back aria-label="返回上一步">← 返回</button><h2></h2><button type="button" data-v2-close aria-label="关闭弹窗" class="v2-close">×</button></header><div class="v2-unsaved" role="alert" hidden><span>有未保存的修改，是否放弃？</span><button type="button" data-v2-keep>继续编辑</button><button type="button" data-v2-discard class="v2-danger">放弃修改</button></div><div class="v2-content"></div><footer class="v2-dialog-footer"><div class="v2-actions v2-footer-actions"><button type="button" data-v2-close>关闭</button></div></footer>`;
+      node.querySelector('h2').textContent = title;
+      const content = node.querySelector('.v2-content');
+      content.innerHTML = form ? `<form data-dialog-form>${body}</form>` : body;
+      const source = document.createElement('div'); source.innerHTML = actions;
+      // 操作区独立于内容滚动，表单外的保存按钮通过 form 属性继续提交。
+      const localActions = content.querySelector('.mw-form-footer');
+      if (localActions) { source.append(...localActions.childNodes); localActions.remove(); }
+      const formNode = content.querySelector('form');
+      if (formNode) formNode.id = root.id + '-v2-form';
+      const controls = node.querySelector('.v2-footer-actions');
+      const secondary = [], primary = [];
+      for (const button of [...source.querySelectorAll('button')]) {
+        if (/^(取消|关闭|返回详情|返回任务)$/.test(button.textContent.trim()) || ['cancelDelete','returnMilestone','back-task'].includes(button.dataset.action)) { button.remove(); continue; }
+        if (button.type === 'submit' && formNode) button.setAttribute('form', formNode.id);
+        if (/删除/.test(button.textContent)) button.classList.add('v2-danger');
+        const commits = button.type === 'submit' || button.matches('.nt-primary,.mw-primary,.primary') || /^(保存|确认|加入安排)/.test(button.textContent.trim());
+        (commits ? primary : secondary).push(button);
+      }
+      controls.append(...secondary, ...primary);
+      const note = source.textContent.trim();
+      if (note) { const info = document.createElement('p'); info.className = 'v2-context'; info.textContent = note; content.prepend(info); }
+      current = { title, node, context, wide, key, scroll, original: signature(node) };
+      mount(current);
+    }
+
+    host.addEventListener('click', event => {
+      if (event.target.closest('[data-v2-close]')) close();
+      if (event.target.closest('[data-v2-back]')) back();
+      if (event.target.closest('[data-v2-keep]')) { current.node.querySelector('.v2-unsaved').hidden = true; pending = null; current.node.querySelector('.v2-content input,.v2-content select,.v2-content textarea')?.focus(); }
+      if (event.target.closest('[data-v2-discard]')) { const action = pending; pending = null; action?.(); }
+    });
+    host.addEventListener('cancel', event => { event.preventDefault(); stack.length ? back() : close(); });
+    // 原生 dialog 负责焦点围栏与背景 inert；屏蔽旧页面的 Escape 处理器。
+    host.addEventListener('keydown', event => { if (event.key === 'Escape') event.stopPropagation(); });
+    return { show, close, back, host, get context() { return current?.context; } };
+  }
+  window.NtfsV2 = { createDialog };
+})();
+
+</script>
+<!-- END V2 SHARED -->
+<script>
+(()=>{
+const root=document.getElementById('ntfs-my-work');
+const $=s=>root.querySelector(s);
+const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const periods=[{id:'previous',start:'2026-10-05',end:'2026-10-11',label:'2026年10月05日—2026年10月11日'},{id:'current',start:'2026-10-12',end:'2026-10-18',label:'2026年10月12日—2026年10月18日'},{id:'next',start:'2026-10-19',end:'2026-10-25',label:'2026年10月19日—2026年10月25日'}];
+const projectMilestones={'山东':['平台稳定性优化','统一身份对接'],'济南':['云资源交付优化'],'烟台':['验收流程优化']};
+function milestoneOptions(project){return '<option value="">不关联</option>'+projectMilestones[project].map(name=>`<option>${escape(name)}</option>`).join('')}
+const statusNames={todo:'未开始',doing:'进行中',done:'已完成'};
+const priorityNames=['','1 最高','2 高','3 中','4 低','5 最低'];
+const today='2026-10-16';
+const initial={version:2,query:'',filter:'all',period:'current',defaults:{todo:'todo',doing:'doing',done:'done'},categories:[{id:'todo',name:'未开始',status:'todo'},{id:'doing',name:'进行中',status:'doing'},{id:'done',name:'已完成',status:'done'}],tasks:[
+{id:'t1',title:'处理 Kafka 消费异常与消息积压',project:'山东',priority:1,category:'todo',creator:'蔡祥龙',plan:'2026-10-05—2026-10-11',milestone:'平台稳定性优化',completedAt:null},
+{id:'t2',title:'山东通部门与用户对接',project:'山东',priority:2,category:'doing',creator:'蔡祥龙',plan:'2026-10-12—2026-10-18',milestone:'统一身份对接',completedAt:null},
+{id:'t3',title:'整理接口联调笔记',project:'',priority:3,category:'todo',creator:'解鹏',plan:'',milestone:'',completedAt:null},
+{id:'t4',title:'系统库关联事项接口调整',project:'山东',priority:2,category:'todo',creator:'解鹏',plan:'2026-10-12—2026-10-18',milestone:'',completedAt:null},
+{id:'t5',title:'云资源工单签章联调',project:'济南',priority:2,category:'doing',creator:'张璐璐',plan:'2026-10-12—2026-10-18',milestone:'云资源交付优化',completedAt:null},
+{id:'t6',title:'读完数据库索引章节',project:'',priority:4,category:'doing',creator:'解鹏',plan:'',milestone:'',completedAt:null},
+{id:'t7',title:'修复验收表单提交问题',project:'烟台',priority:2,category:'done',creator:'蔡祥龙',plan:'2026-10-12—2026-10-18',milestone:'',completedAt:'2026-10-15'},
+{id:'t8',title:'整理常用部署命令',project:'',priority:3,category:'done',creator:'解鹏',plan:'',milestone:'',completedAt:'2026-10-14'},
+{id:'t9',title:'项目档案接口联调',project:'山东',priority:3,category:'done',creator:'蔡祥龙',plan:'2026-10-05—2026-10-11',milestone:'',completedAt:'2026-10-09'}]};
+initial.tasks.sort((a,b)=>a.priority-b.priority);
+let state=structuredClone(initial),dragged=null;
+function restore(snapshot){
+  const s=snapshot?.privateContent;
+  if(![1,2].includes(s?.version)||!Array.isArray(s.tasks)||!Array.isArray(s.categories)||!Object.keys(statusNames).every(status=>s.categories.some(c=>c.status===status))||!s.tasks.every(t=>s.categories.some(c=>c.id===t.category)))return false;
+  state=structuredClone(s);
+  if(state.version===1&&state.sort==='priority')state.tasks.sort((a,b)=>a.priority-b.priority);
+  state.version=2;delete state.sort;state.defaults??={};
+  for(const status of Object.keys(statusNames)){if(!state.categories.some(c=>c.id===state.defaults[status]&&c.status===status))state.defaults[status]=state.categories.find(c=>c.status===status).id}
+  return true;
+}
+restore(window.openai?.widgetState);
+function persist(){if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{page:'我的工作',ordering:'手动排序；新任务置顶；可按优先级重排',filter:state.filter,completedPeriod:periods.find(p=>p.id===state.period)?.label,categories:state.categories.map(c=>({name:c.name,status:statusNames[c.status],defaultEntry:state.defaults[c.status]===c.id}))},privateContent:state}).catch(()=>{})}
+const category=id=>state.categories.find(c=>c.id===id);
+const task=id=>state.tasks.find(t=>t.id===id);
+function icon(){if(globalThis.lucide)lucide.createIcons({attrs:{width:16,height:16}})}
+let noticeTimer=0;
+function notice(message){const el=$('#mw-notice');clearTimeout(noticeTimer);el.textContent=message;el.hidden=false;noticeTimer=setTimeout(()=>{el.hidden=true;el.textContent=''},2600)}
+function visible(t){const period=periods.find(p=>p.id===state.period)||periods[1];return (!state.query||t.title.toLowerCase().includes(state.query.toLowerCase()))&&(state.filter==='all'||(state.filter==='personal'?!t.project:t.project===state.filter))&&(category(t.category).status!=='done'||(t.completedAt>=period.start&&t.completedAt<=period.end))}
+function periodOptions(){return periods.map(p=>`<option value="${p.id}" ${p.id===state.period?'selected':''}>${p.label}</option>`).join('')}
+function card(t){const status=category(t.category).status;return `<article class="mw-task" data-id="${t.id}" aria-label="${escape(t.title)}"><div class="mw-task-top"><span class="mw-drag-grip"><i data-lucide="grip-vertical" aria-hidden="true"></i><span class="mw-source">${escape(t.project||'个人 · 仅自己可见')}${t.isNew?'<span class="mw-new">新</span>':''}</span></span><span class="mw-priority ${t.priority<3?'high':''}">${priorityNames[t.priority]}</span></div><button class="mw-title" data-action="detail" data-id="${t.id}">${escape(t.title)}</button>${status==='done'?`<div class="mw-task-date">完成于 ${t.completedAt}</div>`:t.plan?`<div class="mw-task-date">安排 ${escape(t.plan)}</div>`:''}<div class="mw-task-foot"><button class="mw-link" data-action="move" data-id="${t.id}">移动</button><button class="mw-advance" data-action="${status==='done'?'reopen':'advance'}" data-id="${t.id}">${status==='todo'?'开始':status==='doing'?'完成':'重新打开'}${status!=='done'?'<i data-lucide="arrow-right"></i>':''}</button></div></article>`}
+function rects(){return new Map([...root.querySelectorAll('#mw-board .mw-task:not([hidden])')].map(el=>[el.dataset.id,el.getBoundingClientRect()]))}
+function animatePositions(before){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;root.querySelectorAll('#mw-board .mw-task:not([hidden])').forEach(el=>{const old=before.get(el.dataset.id),now=el.getBoundingClientRect();if(old&&(Math.abs(old.x-now.x)>1||Math.abs(old.y-now.y)>1))el.animate([{transform:`translate(${old.x-now.x}px,${old.y-now.y}px)`},{transform:'translate(0,0)'}],{duration:180,easing:'cubic-bezier(.2,.8,.2,1)'})})}
+function categoryMenu(c){const only=state.categories.filter(x=>x.status===c.status).length===1,isDefault=state.defaults[c.status]===c.id;return `<details class="mw-col-menu"><summary aria-label="${escape(c.name)}分类操作"><i data-lucide="ellipsis" aria-hidden="true"></i></summary><div class="mw-col-menu-panel"><button data-action="rename-category" data-category="${c.id}"><i data-lucide="pencil"></i>修改名称</button><button data-action="default-category" data-category="${c.id}" ${isDefault?'disabled':''}><i data-lucide="log-in"></i>${isDefault?'已设为默认':'设为默认'}</button><button data-action="remove-category" data-category="${c.id}" ${only?'disabled':''}><i data-lucide="trash-2"></i>删除分类</button>${only?'<small>该状态至少保留一个分类</small>':''}</div></details>`}
+function render(){
+renderGreeting();
+const before=rects();
+$('#mw-search').value=state.query;$('#mw-filter').value=state.filter;
+const items=state.tasks.filter(visible);const unfinished=items.filter(t=>category(t.category).status!=='done').length;
+$('#mw-total').textContent=`${unfinished} 项未完成 · 所选区间完成 ${items.length-unfinished} 项`;
+$('#mw-board').innerHTML=state.categories.map(c=>{const ts=items.filter(t=>t.category===c.id);const defaultHelp=`这是“${statusNames[c.status]}”状态的默认分类。新分配的任务或任务从其他状态变为${statusNames[c.status]}时，自动进入这里；点击相应的开始、完成或重新打开按钮也会进入这里。手动拖动按落点放置；更换默认分类不会搬动已有任务，状态未变的任务会保留原分类。`;return `<section class="mw-column" data-category="${c.id}" data-status="${c.status}" aria-label="${escape(c.name)}分类"><div class="mw-col-head"><span class="mw-dot"></span><h2>${escape(c.name)}</h2><span class="mw-count">${ts.length}</span>${categoryMenu(c)}</div><div class="mw-col-sub"><span>${statusNames[c.status]}</span>${state.defaults[c.status]===c.id?`<button type="button" class="mw-default" aria-label="默认分类说明：${escape(c.name)}" data-tooltip="${escape(defaultHelp)}">默认</button>`:''}</div>${c.status==='done'?`<label class="mw-period">实际完成日期区间<select aria-label="${escape(c.name)}完成日期区间" data-period>${periodOptions()}</select></label>`:'<div class="mw-col-note">全部未完成任务 · 不限日期</div>'}<div class="mw-card-list">${ts.map(card).join('')||`<div class="mw-empty">${c.status==='done'?'该区间暂无完成任务':'暂无符合条件的任务'}<span>${c.status==='done'?'可切换日期区间查看历史':'可以拖入任务，或新建任务'}</span></div>`}</div></section>`}).join('');icon();animatePositions(before);
+}
+const ui=NtfsV2.createDialog(root);
+const dialog=ui.host;
+/** 任务与分类表单共用顶部操作栏；详情与编辑在同一表面内切换。 */
+function open(title,html,drawer=false){ui.show({title,body:html,key:title});icon();}
+function close(force=false){ui.close(force);}
+function update(message){render();persist();notice(message)}
+function move(id,target,before=null,placement='top'){
+const t=task(id),c=category(target);if(!t||!c||id===before)return;
+const old=category(t.category).status,same=t.category===target;
+t.category=target;t.isNew=false;
+if(c.status==='done'&&old!=='done')t.completedAt=today;else if(c.status!=='done')t.completedAt=null;
+state.tasks=state.tasks.filter(x=>x.id!==id);
+const index=before?state.tasks.findIndex(x=>x.id===before):placement==='top'?state.tasks.findIndex(x=>x.category===target):-1;
+if(index>=0)state.tasks.splice(index,0,t);else if(placement==='top')state.tasks.unshift(t);else state.tasks.push(t);
+const hidden=c.status==='done'&&!visible(t);
+update(`${same?'顺序已调整':`已移入“${c.name}”${old!==c.status?'，状态更新为'+statusNames[c.status]:''}`}。${hidden?'该任务的完成日期不在当前所选区间。':''}`);
+}
+function chooseMove(id,status){const t=task(id);if(status){move(id,state.defaults[status]);return}const choices=state.categories.filter(c=>c.id!==t.category);open('移动任务',`<div class="mw-menu">${choices.map(c=>`<button data-action="choose" data-id="${id}" data-category="${c.id}"><span>${escape(c.name)}</span><small>${statusNames[c.status]}${state.defaults[c.status]===c.id?' · 默认':''}</small></button>`).join('')}</div><p class="mw-section-label">跨状态移动会同步更新任务的执行状态。</p>`)}
+function catOptions(selected){return state.categories.map(c=>`<option value="${c.id}" ${c.id===selected?'selected':''}>${escape(c.name)}${c.name!==statusNames[c.status]?' · '+statusNames[c.status]:''}${state.defaults[c.status]===c.id?' · 默认':''}</option>`).join('')}
+function priorityOptions(selected){return priorityNames.slice(1).map((p,i)=>`<option value="${i+1}" ${i+1===selected?'selected':''}>${p}</option>`).join('')}
+function detail(id){const t=task(id),personal=!t.project,canDelete=personal||(t.creator==='解鹏'&&category(t.category).status==='todo');open('任务详情',`<form class="mw-form" data-form="detail" data-id="${id}"><p class="mw-info">${personal?'个人任务，仅自己可见，可自由维护。':'项目任务：你是执行人，可调整执行状态与个人分类。'}</p><label>任务名称${personal?`<input name="title" required maxlength="200" value="${escape(t.title)}">`:`<div class="mw-static">${escape(t.title)}</div>`}</label><div class="mw-grid"><label>所属项目<div class="mw-static">${escape(t.project||'无 · 个人任务')}</div></label><label>优先级${personal?`<select name="priority">${priorityOptions(t.priority)}</select>`:`<div class="mw-static">${priorityNames[t.priority]}</div>`}</label><label>执行人<div class="mw-static">解鹏</div></label><label>创建人<div class="mw-static">${escape(t.creator)}</div></label></div>${t.project?`<label>日期区间<div class="mw-static">${escape((t.plan||'').replace(/(\d{4})-(\d{2})-(\d{2})/g,'$1年$2月$3日')||'未设置')}</div></label><label>关联里程碑<div class="mw-static">${escape(t.milestone||'未关联')}</div></label>`:''}<label>个人分类 / 执行状态<select name="category">${catOptions(t.category)}</select></label>${t.completedAt?`<small>实际完成日期：${t.completedAt}</small>`:''}<div class="mw-form-footer">${canDelete?`<button type="button" class="mw-danger" data-action="delete" data-id="${id}">删除任务</button>`:''}<button type="button" data-action="close">取消</button><button class="mw-primary" type="submit">保存</button></div></form>`,true)}
+function create(){open('新建任务',`<form class="mw-form" data-form="create"><label>任务名称<input name="title" required maxlength="200" placeholder="接下来要做什么？" autofocus></label><div class="mw-grid"><label>任务类型<select name="kind" id="mw-kind"><option value="personal">个人任务</option><option value="project">项目任务</option></select></label><label>优先级<select name="priority">${priorityOptions(3)}</select></label></div><div id="mw-project-fields" hidden><label>所属项目<select name="project" id="mw-create-project"><option>山东</option><option>济南</option><option>烟台</option></select></label><div class="mw-grid"><label>执行人<div class="mw-static">解鹏 · 本人</div></label><label>创建人<div class="mw-static">解鹏</div></label></div><label>日期区间 · 必填<select name="period" disabled required>${periods.map(p=>`<option value="${p.id}" ${p.id==='current'?'selected':''}>${p.label}</option>`).join('')}</select></label><label>关联里程碑 · 可选<select name="milestone" disabled>${milestoneOptions('山东')}</select></label></div><label>放入分类<select name="category">${catOptions(state.defaults.todo)}</select></label><p class="mw-info" id="mw-create-info">仅自己可见，不进入项目汇总和团队周计划。</p><div class="mw-form-footer"><button type="button" data-action="close">取消</button><button class="mw-primary" type="submit">创建任务</button></div></form>`)}
+function addCategory(){open('新增分类',`<form data-form="category" class="mw-form"><label>分类名称<input required name="name" maxlength="30" placeholder="例如：等待联调" autofocus></label><label>对应状态<select name="status"><option value="todo">未开始</option><option value="doing">进行中</option><option value="done">已完成</option></select></label><label class="mw-check"><input type="checkbox" name="default">设为该状态的默认进入分类</label><small>默认分类接收新分配的任务和状态变化；已有任务不会搬动。</small><p class="mw-error" role="alert" id="mw-cat-error"></p><div class="mw-form-footer"><button type="button" data-action="close">取消</button><button class="mw-primary" type="submit">添加分类</button></div></form>`)}
+function renameCategory(id){const c=category(id);open('修改分类名称',`<form data-form="rename" data-id="${id}" class="mw-form"><label>分类名称<input required name="name" maxlength="30" value="${escape(c.name)}" autofocus></label><small>对应状态：${statusNames[c.status]}</small><p class="mw-error" role="alert" id="mw-cat-error"></p><div class="mw-form-footer"><button type="button" data-action="close">取消</button><button class="mw-primary" type="submit">保存</button></div></form>`)}
+function closeMenus(){root.querySelectorAll('.mw-col-menu[open]').forEach(el=>el.open=false)}
+root.addEventListener('click',e=>{
+  if(suppressClick){e.preventDefault();e.stopPropagation();return}
+  if(!e.target.closest('.mw-col-menu'))closeMenus();
+  const b=e.target.closest('[data-action]');if(!b)return;const id=b.dataset.id;
+  switch(b.dataset.action){
+    case'close':close();break;
+    case'create':create();break;
+    case'add-category':addCategory();break;
+    case'rename-category':closeMenus();renameCategory(b.dataset.category);break;
+    case'default-category':{const c=category(b.dataset.category);state.defaults[c.status]=c.id;update(`“${c.name}”已设为${statusNames[c.status]}的默认进入分类，已有任务保持原位。`);break}
+    case'reorder':state.tasks.sort((a,b)=>a.priority-b.priority);update('各分类已按优先级重排，同优先级保留原顺序；之后仍可自由拖动。');break;
+    case'detail':detail(id);break;
+    case'move':chooseMove(id);break;
+    case'advance':chooseMove(id,category(task(id).category).status==='todo'?'doing':'done');break;
+    case'reopen':chooseMove(id,'doing');break;
+    case'choose':close(true);move(id,b.dataset.category);break;
+    case'delete':open('删除任务',`<p>确认删除“${escape(task(id).title)}”？</p><p class="mw-info">${task(id).project?'将删除整条任务及其各区间安排。':'此个人任务将被删除。'}</p><div class="mw-form-footer"><button data-action="back-detail">返回详情</button><button class="mw-danger" data-action="confirm-delete" data-id="${id}">确认删除</button></div>`);break;
+    case'back-detail':ui.back();break;
+    case'confirm-delete':state.tasks=state.tasks.filter(t=>t.id!==id);close(true);update('任务已删除。');break;
+    case'remove-category':{
+      const c=category(b.dataset.category),targets=state.categories.filter(x=>x.status===c.status&&x.id!==c.id),isDefault=state.defaults[c.status]===c.id;
+      if(!targets.length)return;closeMenus();
+      open('删除分类',`<form class="mw-form" data-form="remove-category" data-id="${c.id}"><p>删除“${escape(c.name)}”后，任务会保留。</p><label>将任务移至同状态分类<select name="target">${targets.map(x=>`<option value="${x.id}" ${state.defaults[c.status]===x.id?'selected':''}>${escape(x.name)}</option>`).join('')}</select></label>${isDefault?'<p class="mw-info">所选分类同时接替为该状态的默认进入分类。</p>':''}<div class="mw-form-footer"><button type="button" data-action="close">取消</button><button class="mw-primary" type="submit">移动任务并删除分类</button></div></form>`);break;
+    }
+  }
+});
+root.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();const values=new FormData(f),id=f.dataset.id;
+  switch(f.dataset.form){
+    case'detail':{
+      const t=task(id),target=String(values.get('category'));
+      if(!t.project){const title=String(values.get('title')).trim();if(!title){f.elements.title.setCustomValidity('请输入任务名称');f.elements.title.reportValidity();return}t.title=title;t.priority=Number(values.get('priority'))}
+      close(true);if(t.category!==target)move(id,target);else update('任务已保存，顺序保持不变。');break;
+    }
+    case'create':{
+      const title=String(values.get('title')).trim();if(!title){f.elements.title.setCustomValidity('请输入任务名称');f.elements.title.reportValidity();return}
+      const cat=String(values.get('category'));
+      state.tasks.unshift({id:'task-'+Date.now(),title,project:values.get('kind')==='project'?String(values.get('project')):'',priority:Number(values.get('priority')),category:cat,creator:'解鹏',plan:values.get('kind')==='project'?(()=>{const p=periods.find(p=>p.id===values.get('period'));return p.start+'—'+p.end})():'',milestone:values.get('kind')==='project'?String(values.get('milestone')||''):'',isNew:true,completedAt:category(cat).status==='done'?today:null});
+      state.query='';state.filter='all';if(category(cat).status==='done')state.period='current';close(true);update('新任务已置顶，已有任务顺序保持不变。');root.querySelector(`[data-category="${cat}"].mw-column`).scrollIntoView({block:'nearest',inline:'nearest'});break;
+    }
+    case'category':case'rename':{
+      const name=String(values.get('name')).trim();if(!name||state.categories.some(c=>c.name===name&&c.id!==id)){$('#mw-cat-error').textContent='请输入不重复的分类名称。';return}
+      let savedId=id;
+      if(f.dataset.form==='rename')category(id).name=name;
+      else{const status=String(values.get('status'));savedId='cat-'+Date.now();const c={id:savedId,name,status};const last=state.categories.map(x=>x.status).lastIndexOf(status);state.categories.splice(last+1,0,c);if(values.has('default'))state.defaults[status]=savedId}
+      close(true);update('分类已保存，已有任务保持原位。');root.querySelector(`[data-category="${savedId}"].mw-column`).scrollIntoView({block:'nearest',inline:'nearest'});break;
+    }
+    case'remove-category':{
+      const target=String(values.get('target')),c=category(id);
+      if(state.defaults[c.status]===id)state.defaults[c.status]=target;
+      const moving=state.tasks.filter(t=>t.category===id);state.tasks=state.tasks.filter(t=>t.category!==id);moving.forEach(t=>t.category=target);state.tasks.push(...moving);
+      state.categories=state.categories.filter(c=>c.id!==id);close(true);update('分类已删除，任务已保留并移至所选分类。');break;
+    }
+  }
+});
+// 预览容器禁止原生表单导航，校验后显式触发本地保存逻辑。
+function submitLocal(form){if(form?.reportValidity())form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))}
+root.addEventListener('click',e=>{const submit=e.target.closest('button[type="submit"]');if(submit){e.preventDefault();submitLocal(submit.form)}});
+root.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('input')&&e.target.closest('form')){e.preventDefault();submitLocal(e.target.closest('form'))}});
+root.addEventListener('input',e=>{if(e.target.id==='mw-search'){state.query=e.target.value;render();persist()}else if(e.target.name==='title')e.target.setCustomValidity('')});
+root.addEventListener('change',e=>{if(e.target.id==='mw-create-project'){$('[name=milestone]').innerHTML=milestoneOptions(e.target.value);}if(e.target.id==='mw-filter'){state.filter=e.target.value;render();persist()}if(e.target.hasAttribute('data-period')){state.period=e.target.value;update('已切换完成日期区间，未完成任务不受影响。')}if(e.target.id==='mw-kind'){const project=e.target.value==='project';$('#mw-project-fields').hidden=!project;$('#mw-project-fields [name=period]').disabled=!project;$('#mw-project-fields [name=milestone]').disabled=!project;$('#mw-create-info').textContent=project?'创建后由你执行，进入所选项目；保存后，安排信息由负责人维护。':'仅自己可见，不进入项目汇总和团队周计划。'}});
+// 跟随卡片、真实占位和 FLIP 让位动画共用一个指针循环，移动菜单支持键盘和触屏。
+let pointer=null,ghost=null,placeholder=null,dragFrame=0,suppressClick=false,settling=false;
+function stopDrag(keepHidden=false){
+  cancelAnimationFrame(dragFrame);dragFrame=0;
+  if(pointer?.element&&!keepHidden)pointer.element.hidden=false;
+  if(pointer&&root.hasPointerCapture(pointer.pointerId))root.releasePointerCapture(pointer.pointerId);
+  ghost?.remove();placeholder?.remove();ghost=null;placeholder=null;pointer=null;dragged=null;settling=false;
+  root.classList.remove('mw-drag-active');root.querySelectorAll('.over').forEach(el=>el.classList.remove('over'));
+  root.querySelectorAll('.mw-empty').forEach(el=>el.hidden=false);
+}
+function beginDrag(){
+  const box=pointer.element.getBoundingClientRect();dragged=pointer.id;closeMenus();
+  pointer.offsetX=pointer.startX-box.left;pointer.offsetY=pointer.startY-box.top;
+  ghost=pointer.element.cloneNode(true);ghost.classList.add('mw-drag-ghost');ghost.removeAttribute('data-id');ghost.setAttribute('aria-hidden','true');ghost.style.width=box.width+'px';root.appendChild(ghost);
+  placeholder=document.createElement('div');placeholder.className='mw-placeholder';placeholder.style.height=box.height+'px';placeholder.setAttribute('aria-hidden','true');pointer.element.before(placeholder);pointer.element.hidden=true;
+  pointer.target={category:task(dragged).category,before:null};pointer.lastKey='';root.classList.add('mw-drag-active');
+  dragFrame=requestAnimationFrame(dragTick);
+}
+function dragTick(){
+  if(!pointer||!dragged||settling)return;
+  const box=root.getBoundingClientRect();ghost.style.transform=`translate3d(${pointer.x-box.left-pointer.offsetX}px,${pointer.y-box.top-pointer.offsetY}px,0) rotate(1deg)`;
+  const board=$('#mw-board'),boardBox=board.getBoundingClientRect();
+  if(pointer.y>=boardBox.top&&pointer.y<=boardBox.bottom){
+    const edge=44;let speed=0;if(pointer.x<boardBox.left+edge)speed=-Math.min(14,(boardBox.left+edge-pointer.x)/3);else if(pointer.x>boardBox.right-edge)speed=Math.min(14,(pointer.x-boardBox.right+edge)/3);
+    if(speed)board.scrollLeft+=speed;
+  }
+  if(pointer.y>window.innerHeight-52)window.scrollBy(0,Math.min(12,(pointer.y-window.innerHeight+52)/3));else if(pointer.y<52)window.scrollBy(0,-Math.min(12,(52-pointer.y)/3));
+  const hit=document.elementFromPoint(pointer.x,pointer.y),col=hit?.closest('.mw-column');
+  root.querySelectorAll('.over').forEach(el=>el.classList.remove('over'));
+  if(col&&root.contains(col)){
+    col.classList.add('over');
+    const list=col.querySelector('.mw-card-list'),cards=[...list.querySelectorAll('.mw-task:not([hidden])')];
+    // offsetTop 取布局位置，避免让位动画中的临时位移造成落点来回跳动。
+    const top=col.getBoundingClientRect().top;
+    const target=cards.find(el=>pointer.y<top+el.offsetTop+el.offsetHeight/2);
+    const key=col.dataset.category+':'+(target?.dataset.id||'end');
+    pointer.target={category:col.dataset.category,before:target?.dataset.id||null};
+    if(pointer.lastKey!==key){
+      const before=rects();root.querySelectorAll('#mw-board .mw-task').forEach(el=>el.getAnimations().forEach(a=>a.cancel()));
+      root.querySelectorAll('.mw-empty').forEach(el=>el.hidden=false);list.querySelectorAll('.mw-empty').forEach(el=>el.hidden=true);
+      list.insertBefore(placeholder,target||null);pointer.lastKey=key;animatePositions(before);
+    }
+  }else pointer.target=null;
+  dragFrame=requestAnimationFrame(dragTick);
+}
+root.addEventListener('dragstart',e=>e.preventDefault());
+root.addEventListener('pointerdown',e=>{
+  const el=e.target.closest('#mw-board .mw-task');if(!el||e.target.closest('button')||e.button!==0||settling)return;
+  pointer={id:el.dataset.id,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,element:el,pointerId:e.pointerId};root.setPointerCapture(e.pointerId);
+});
+root.addEventListener('pointermove',e=>{if(!pointer||settling)return;pointer.x=e.clientX;pointer.y=e.clientY;if(!dragged&&Math.hypot(pointer.x-pointer.startX,pointer.y-pointer.startY)>6)beginDrag();if(dragged)e.preventDefault()});
+root.addEventListener('pointerup',async e=>{
+  if(!pointer||settling)return;
+  if(!dragged){stopDrag();return}
+  pointer.x=e.clientX;pointer.y=e.clientY;cancelAnimationFrame(dragFrame);dragTick();cancelAnimationFrame(dragFrame);
+  const id=dragged,target=pointer.target,session=pointer;settling=true;suppressClick=true;
+  if(target&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    const dest=placeholder.getBoundingClientRect(),base=root.getBoundingClientRect();
+    try{await ghost.animate([{transform:ghost.style.transform},{transform:`translate3d(${dest.left-base.left}px,${dest.top-base.top}px,0) rotate(0deg)`}],{duration:140,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'}).finished}catch{}
+  }
+  if(pointer!==session){suppressClick=false;return}
+  stopDrag(Boolean(target));if(target)move(id,target.category,target.before,'end');else notice('已取消移动，任务保持原位。');
+  setTimeout(()=>{suppressClick=false},0);
+});
+root.addEventListener('pointercancel',()=>stopDrag());
+root.addEventListener('keydown',e=>{if(e.key==='Escape'&&pointer){stopDrag();notice('已取消移动，任务保持原位。')}});
+window.addEventListener('blur',()=>{if(pointer)stopDrag()});
+window.addEventListener('openai:set_globals',e=>{if(dialog.open)return;if(restore(e.detail?.globals?.widgetState)){stopDrag();if(dialog.open)close(true);render()}});
+/** 展示时间问候及可选团队文案；空配置不生成替代句或占位区域。 */
+function renderGreeting(){
+  const greetingHour=Number(new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'numeric',hourCycle:'h23'}).format(new Date()));
+  $('#mw-greeting').textContent=(greetingHour<5?'夜深了':greetingHour<12?'早上好':greetingHour<18?'下午好':'晚上好')+'，解鹏';
+
+  // data-team-message 仅模拟团队配置，正式维护入口属于团队管理。
+  const message=root.dataset.teamMessage?.trim()??'';
+  const phrase=$('#mw-team-phrase');
+  phrase.textContent=message;
+  phrase.hidden=!message;
+}
+render();
+if(globalThis.Tweak){const design={cardPadding:14};const tweak=new Tweak({container:root,onChange:()=>root.style.setProperty('--mw-pad',design.cardPadding+'px')});tweak.addSlider(design,'cardPadding',{label:'卡片留白',min:10,max:22,unit:'px'})}
+})();
+</script>

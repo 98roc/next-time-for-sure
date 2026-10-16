@@ -1,0 +1,365 @@
+<style>
+#nt-project .nt-app{--nt-bg:light-dark(#f5f6f9,#17191e);--nt-surface:light-dark(#fff,#20232a);--nt-text:light-dark(#242730,#edf0f5);--nt-muted:light-dark(#686e7c,#a3aab7);--nt-line:light-dark(#e3e6ed,#363b47);--nt-accent:light-dark(#5066a6,#a8b9ee);--nt-selected:light-dark(#eef1fa,#292f43);--nt-good:light-dark(#28643a,#a2d5b0);color:var(--nt-text);background:var(--nt-bg);font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif;min-height:770px;border:1px solid var(--nt-line);border-radius:10px;overflow:clip}
+#nt-project .nt-app *{box-sizing:border-box}#nt-project .nt-top{height:60px;display:flex;align-items:center;gap:12px;padding:0 24px;background:var(--nt-surface);border-bottom:1px solid var(--nt-line)}#nt-project .nt-logo{background:var(--nt-selected);color:var(--nt-accent);border-radius:8px;padding:4px 9px;font-size:18px;font-weight:600}#nt-project .nt-brand{font-size:16px;font-weight:600}#nt-project .nt-caption{font-size:12px;color:var(--nt-muted)}#nt-project .nt-shell{display:grid;grid-template-columns:140px minmax(0,1fr);min-height:710px}#nt-project .nt-nav{padding:22px 12px;background:var(--nt-surface);border-right:1px solid var(--nt-line)}#nt-project .nt-nav span{display:block;padding:10px;margin-bottom:7px;color:var(--nt-muted);border-radius:7px}#nt-project .nt-nav .nt-active{background:var(--nt-selected);color:var(--nt-accent);font-weight:600}#nt-project .nt-main{padding:24px;min-width:0}#nt-project h2{font-size:23px;line-height:1.4;margin:0;font-weight:600}#nt-project h3{font-size:16px;margin:0;font-weight:600}#nt-project h4{font-size:13px;margin:0 0 10px;font-weight:500;color:var(--nt-muted)}#nt-project p{margin:6px 0 0}#nt-project .nt-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}#nt-project .nt-between{justify-content:space-between}#nt-project .nt-muted{color:var(--nt-muted);font-size:12px}#nt-project button,#nt-project select,#nt-project input{font:inherit;color:var(--nt-text);background:var(--nt-surface);border:1px solid var(--nt-line);border-radius:6px;padding:7px 10px;max-width:100%}#nt-project button{cursor:pointer}#nt-project button:hover{background:var(--nt-selected);color:var(--nt-accent)}#nt-project .nt-primary{background:var(--nt-accent);color:var(--nt-surface);border-color:var(--nt-accent)}#nt-project .nt-link{border:0;background:none;color:var(--nt-accent);padding:2px 0;text-align:left}#nt-project .nt-tools{margin:20px 0 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}#nt-project .nt-project{background:var(--nt-surface);border:1px solid var(--nt-line);border-radius:10px;margin-bottom:18px}#nt-project .nt-project-head{padding:15px 18px;border-bottom:1px solid var(--nt-line)}#nt-project .nt-columns{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(200px,1fr)}#nt-project .nt-section{padding:15px 18px;min-width:0}#nt-project .nt-section+.nt-section{border-left:1px solid var(--nt-line);background:var(--nt-bg);border-radius:0 0 10px 0}#nt-project .nt-stacked .nt-columns{display:block}#nt-project .nt-stacked .nt-section+.nt-section{border-left:0;border-top:1px solid var(--nt-line);background:var(--nt-surface);border-radius:0 0 10px 10px}#nt-project .nt-table{width:100%;border-collapse:collapse;font-size:12px}#nt-project .nt-table th{color:var(--nt-muted);font-weight:400;text-align:left;background:var(--nt-bg)}#nt-project .nt-table th,#nt-project .nt-table td{padding:var(--nt-cell,11px) 8px;border-bottom:1px solid var(--nt-line);vertical-align:middle}#nt-project .nt-table tr:last-child td{border-bottom:0}#nt-project .nt-table td:first-child{min-width:130px}#nt-project .nt-table button{font-size:13px}#nt-project .nt-scroll{overflow-x:auto;max-width:100%}#nt-project .nt-badge{display:inline-block;padding:3px 7px;background:var(--nt-selected);color:var(--nt-accent);border-radius:5px;font-size:12px;white-space:nowrap}#nt-project .nt-done{color:var(--nt-good);background:var(--nt-bg)}#nt-project .nt-backlog{padding:10px 0;border-bottom:1px solid var(--nt-line);display:flex;gap:8px;align-items:flex-start;justify-content:space-between}#nt-project .nt-backlog:last-child{border:0}#nt-project .nt-prio{font-size:12px;color:var(--nt-muted);white-space:nowrap}#nt-project .nt-tabs{display:flex;gap:24px;border-bottom:1px solid var(--nt-line);margin-top:20px}#nt-project .nt-tabs button{border:0;border-radius:0;padding:10px 0;background:none;color:var(--nt-muted)}#nt-project .nt-tabs button[aria-pressed=true]{color:var(--nt-accent);border-bottom:2px solid var(--nt-accent)}#nt-project .nt-panel{background:var(--nt-surface);border:1px solid var(--nt-line);border-radius:10px;padding:18px;margin-top:16px}#nt-project .nt-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}#nt-project .nt-fields label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--nt-muted)}#nt-project .nt-fields .nt-wide{grid-column:1/-1}#nt-project .nt-fields input,#nt-project .nt-fields select{font-size:14px}#nt-project .nt-date{font-size:12px;white-space:nowrap}#nt-project .nt-empty{padding:25px 5px;color:var(--nt-muted);text-align:center}#nt-project .nt-milestone{border-left:2px solid var(--nt-line);padding:2px 0 18px 19px;margin:0 0 0 6px}#nt-project .nt-toast{color:var(--nt-accent);font-size:12px;min-height:22px;margin-top:10px}#nt-project .nt-batch input{min-width:100px;width:100%}#nt-project .nt-batch select{min-width:90px}#nt-project .nt-app button:focus-visible,#nt-project .nt-app select:focus-visible,#nt-project .nt-app input:focus-visible{outline:2px solid var(--nt-accent);outline-offset:3px}
+@media(max-width:800px){#nt-project .nt-shell{grid-template-columns:110px minmax(0,1fr)}#nt-project .nt-main{padding:16px}#nt-project .nt-columns{display:block}#nt-project .nt-section+.nt-section{border-left:0;border-top:1px solid var(--nt-line)}#nt-project .nt-nav{padding:16px 6px}}
+@media(max-width:520px){#nt-project .nt-top{padding:0 12px}#nt-project .nt-shell{display:block}#nt-project .nt-nav{display:flex;flex-wrap:wrap;gap:3px;border-right:0;border-bottom:1px solid var(--nt-line);padding:6px}#nt-project .nt-nav span{padding:6px;margin:0;font-size:12px}#nt-project .nt-main{padding:12px}#nt-project .nt-fields{grid-template-columns:1fr}#nt-project .nt-fields .nt-wide{grid-column:auto}#nt-project .nt-top .nt-caption{display:none}#nt-project .nt-project-head,#nt-project .nt-section{padding:12px}#nt-project .nt-app{min-height:980px}#nt-project .nt-tools select{width:100%;font-size:12px}#nt-project h2{font-size:21px}}
+
+#nt-project .nt-app{position:relative;overflow:visible}
+#nt-project .nt-columns.nt-full{grid-template-columns:minmax(0,1fr)}
+#nt-project .nt-task-fields{border:1px solid var(--nt-line);background:var(--nt-bg);border-radius:9px;padding:14px;margin-bottom:14px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+#nt-project .nt-task-fields label{font-size:12px;color:var(--nt-muted);display:flex;flex-direction:column;gap:6px;min-width:0}
+#nt-project .nt-task-fields .nt-name{grid-column:1/-1}
+#nt-project .nt-task-fields .nt-period{grid-column:span 2}
+#nt-project .nt-task-fields input,#nt-project .nt-task-fields select{width:100%;min-width:0;font-size:13px}
+#nt-project .nt-task-fields .nt-record-head{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between}
+#nt-project .nt-task-fields .nt-record-head .nt-link{font-size:12px}
+#nt-project .nt-error{color:light-dark(#a13232,#ffb0ab);font-size:13px;margin-top:10px}
+#nt-project .nt-facts{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;margin:0 0 22px}
+#nt-project .nt-facts dt{color:var(--nt-muted)}#nt-project .nt-facts dd{margin:0}
+#nt-project .nt-fish-axis{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-template-rows:auto 60px auto;position:relative;margin:20px 0 28px;min-height:310px}
+#nt-project .nt-fish-day{padding:0 12px;display:grid;grid-row:1/4;grid-template-rows:subgrid;min-width:0}
+#nt-project .nt-fish-day::before{content:'';grid-row:2;grid-column:1;align-self:center;border-top:2px solid var(--nt-line);margin-inline:-12px}
+#nt-project .nt-fish-date{grid-row:2;grid-column:1;align-self:center;justify-self:center;display:flex;align-items:center;gap:6px;background:var(--nt-surface);padding:5px 10px;border:1px solid var(--nt-line);border-radius:24px;position:relative}
+#nt-project .nt-fish-date time{font-size:14px;font-weight:500}#nt-project .nt-fish-date small{font-size:11px;display:block;color:var(--nt-muted)}
+#nt-project .nt-fish-date button{padding:0 5px;border:0;color:var(--nt-accent);min-height:28px}
+#nt-project .nt-fish-branch{border-left:2px solid var(--nt-line);margin-left:22px;padding:14px 0 14px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+#nt-project .nt-fish-day.above .nt-fish-branch{grid-row:1;grid-column:1;align-self:end}
+#nt-project .nt-fish-day.below .nt-fish-branch{grid-row:3;grid-column:1;align-self:start}
+#nt-project button.nt-fish-node{display:flex;flex-direction:column;gap:7px;text-align:left;width:100%;padding:12px;border-radius:10px;white-space:normal;overflow-wrap:anywhere;background:var(--nt-surface)}
+#nt-project .nt-fish-node strong{font-size:14px;font-weight:500}#nt-project .nt-fish-node.done{border-color:var(--nt-good)}
+#nt-project .nt-fish-unplanned{border-top:1px dashed var(--nt-line);padding-top:16px}
+#nt-project .nt-fish-unplanned-nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:12px}
+#nt-project .nt-link-list{list-style:none;margin:12px 0 0;padding:0}
+#nt-project .nt-link-list li{padding:10px 0;border-bottom:1px solid var(--nt-line);display:flex;justify-content:space-between;gap:10px}
+#nt-project [hidden]{display:none!important}
+#nt-project .nt-history{margin-top:18px;border:1px solid var(--nt-line);border-radius:8px;background:var(--nt-bg)}
+#nt-project .nt-history summary{padding:12px 14px;color:var(--nt-muted);list-style-position:inside}
+#nt-project .nt-history summary strong{font-weight:500;color:var(--nt-accent)}
+#nt-project .nt-history-list{padding:0 14px 14px;display:grid;gap:12px}
+#nt-project .nt-history-day{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;border-top:1px solid var(--nt-line);padding-top:12px}
+#nt-project .nt-history-day time{color:var(--nt-muted);font-size:12px}
+#nt-project .nt-history-nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+#nt-project .nt-date-scroll{overflow-x:auto;padding:2px 0 16px;scroll-behavior:smooth;scroll-snap-type:x proximity}
+#nt-project .nt-date-columns{display:grid;grid-auto-flow:column;grid-auto-columns:224px;gap:14px;width:max-content;min-width:100%}
+#nt-project .nt-date-column{scroll-snap-align:start;width:224px;min-width:0}
+#nt-project .nt-date-heading{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:2px solid var(--nt-accent);margin-bottom:12px;background:var(--nt-selected);border-radius:7px 7px 0 0}
+#nt-project .nt-date-heading time{font-size:14px;font-weight:500}
+#nt-project .nt-date-heading small{display:block;font-size:12px;color:var(--nt-muted)}
+#nt-project .nt-date-cards{display:grid;gap:10px}
+#nt-project .nt-lane-card{padding:14px;border:1px solid var(--nt-line);border-radius:9px;background:var(--nt-surface)}
+#nt-project .nt-lane-card.done{border-color:var(--nt-good)}
+#nt-project .nt-lane-card .nt-link{font-weight:500;min-height:42px;display:block;font-size:14px}
+#nt-project .nt-lane-card p{font-size:12px;color:var(--nt-muted);margin:10px 0 12px}
+#nt-project .nt-lane-card footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#nt-project .nt-lane-card footer button{font-size:12px;padding:4px 7px}
+#nt-project button:disabled{opacity:.52;cursor:not-allowed}
+#nt-project .nt-pager{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 0;font-size:12px;color:var(--nt-muted)}
+#nt-project .nt-history-table{padding:0 14px 14px}
+#nt-project .nt-history-table .nt-table{background:var(--nt-surface)}
+#nt-project .nt-link-list li{flex-wrap:wrap}
+#nt-project button.nt-quiet{border:0;background:transparent;color:var(--nt-muted);font-size:12px;padding:6px 4px}
+#nt-project button.nt-quiet:hover{color:var(--nt-accent);background:var(--nt-selected)}
+#nt-project .nt-unplanned-list{display:grid;gap:12px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+@media(prefers-reduced-motion:reduce){#nt-project .nt-date-scroll{scroll-behavior:auto}}
+@media(max-width:640px){#nt-project .nt-history-day{grid-template-columns:1fr}}
+@media(max-width:800px){#nt-project .nt-fish-day{padding:0 8px}#nt-project .nt-fish-branch{margin-left:8px;padding-left:8px}}
+@media(max-width:640px){#nt-project .nt-task-fields{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px}#nt-project .nt-task-fields .nt-period{grid-column:1/-1}#nt-project .nt-task-fields input,#nt-project .nt-task-fields select{font-size:16px}#nt-project .nt-fish-axis{display:flex;flex-direction:column;min-height:0}#nt-project .nt-fish-axis::before{content:'';position:absolute;top:0;bottom:0;left:12px;border-left:2px solid var(--nt-line)}#nt-project .nt-fish-day{display:flex;flex-direction:column;padding-left:28px;margin-bottom:12px}#nt-project .nt-fish-day::before{display:none}#nt-project .nt-fish-date{align-self:flex-start}#nt-project .nt-fish-branch{border:0;padding:12px 0 0;margin:0;width:100%}}
+
+#nt-project button.nt-history-entry{width:100%;text-align:left;margin-top:18px;padding:12px 14px;background:var(--nt-bg);color:var(--nt-muted);font-size:12px;border-radius:8px}
+</style>
+<div id="nt-project" aria-label="项目页面 · 并排概览">
+  <div class="nt-app" aria-label="项目并排布局"></div>
+</div>
+
+<!-- BEGIN V2 SHARED (generated by build-v2.py) -->
+<style>
+/* 所有 V2.0 原型共用的控件基线；作用域不影响旧工作区。 */
+.v2-scope{--v2-accent:light-dark(#5066a6,#a8b9ee);--v2-on-accent:light-dark(#fff,#17191e);--v2-bg:light-dark(#fff,#20232a);--v2-canvas:light-dark(#f5f6f9,#17191e);--v2-text:light-dark(#242730,#edf0f5);--v2-muted:light-dark(#686e7c,#a3aab7);--v2-line:light-dark(#e3e6ed,#363b47);--v2-selected:light-dark(#eef1fa,#292f43);--v2-danger:light-dark(#a63232,#f2a0a0);font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif;color-scheme:light dark}
+.v2-scope{--nt-accent:var(--v2-accent);--nt-surface:var(--v2-bg);--nt-bg:var(--v2-canvas);--nt-text:var(--v2-text);--nt-muted:var(--v2-muted);--nt-line:var(--v2-line);--nt-selected:var(--v2-selected);--nt-good:light-dark(#28643a,#a2d5b0);--w-accent:var(--v2-accent);--w-surface:var(--v2-bg);--w-canvas:var(--v2-canvas);--w-text:var(--v2-text);--w-muted:var(--v2-muted);--w-line:var(--v2-line);--w-selected:var(--v2-selected);--w-on-accent:var(--v2-on-accent);--w-green:light-dark(#28643a,#9bd5aa);--w-green-bg:light-dark(#eaf4ed,#23372c)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button{border-radius:7px;min-height:36px;font-size:13px;cursor:pointer}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button:disabled{cursor:not-allowed;opacity:.52}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(button,input,select,textarea):focus-visible{outline:2px solid var(--v2-accent);outline-offset:3px}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.nt-primary,.mw-primary,.w-button.primary){background:var(--v2-accent);color:var(--v2-on-accent);border-color:var(--v2-accent)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.nt-primary,.mw-primary,.w-button.primary):hover{filter:brightness(.95)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-danger{background:var(--v2-bg);color:var(--v2-danger);border:1px solid var(--v2-line);margin:0}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-danger:hover{background:var(--v2-selected);border-color:var(--v2-danger)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog.v2-dialog{position:fixed;inset:0;margin:auto;padding:0;width:min(680px,calc(100% - 24px));max-width:calc(100% - 24px);max-height:calc(100dvh - 32px);min-height:0;overflow:hidden;box-sizing:border-box;border:1px solid var(--v2-line);border-radius:12px;background:var(--v2-bg);color:var(--v2-text);box-shadow:0 20px 70px light-dark(#17203333,#0008);font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog.v2-wide{width:min(960px,calc(100% - 24px))}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog::backdrop{background:light-dark(#17203366,#05080dbb)}
+.v2-scope .v2-dialog-layout{display:flex;flex-direction:column;max-height:calc(100dvh - 34px);min-height:0}
+.v2-scope .v2-dialog-header{display:flex;align-items:flex-start;gap:10px;flex-wrap:nowrap;flex-shrink:0;padding:16px 20px;border-bottom:1px solid var(--v2-line);background:var(--v2-bg)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header h2{font-size:18px;font-weight:500;line-height:1.5;margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.v2-scope .v2-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) button,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-unsaved button{display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;font:inherit;font-size:13px;background:var(--v2-bg);color:var(--v2-text);border:1px solid var(--v2-line);border-radius:7px}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) :is(.nt-primary,.mw-primary,.primary){background:var(--v2-accent);color:var(--v2-on-accent);border-color:var(--v2-accent)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) .v2-danger,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-unsaved .v2-danger{color:var(--v2-danger);background:var(--v2-bg);border-color:var(--v2-line)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{font-size:22px;width:36px;padding:0;border:0;background:transparent;margin-left:2px;flex-shrink:0}
+.v2-scope .v2-content{flex:1 1 auto;overflow:auto;overscroll-behavior:contain;padding:20px;min-height:0}
+.v2-scope .v2-content [data-records],.v2-scope .v2-content [data-batch-rows]{display:grid;gap:14px}
+.v2-scope .v2-context{font-size:12px;color:var(--v2-muted);margin:0 0 16px}
+.v2-scope .v2-unsaved{padding:12px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--v2-line);background:var(--v2-selected)}
+.v2-scope .v2-unsaved[hidden],.v2-scope [data-v2-back][hidden]{display:none!important}
+.v2-scope .v2-content :is(input,select,textarea){box-sizing:border-box;max-width:100%;font:inherit;border:1px solid var(--v2-line);background:var(--v2-bg);color:var(--v2-text);border-radius:7px;padding:8px 10px}
+.v2-scope .v2-content :is(.nt-task-fields,.w-batch-row){display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px;border:1px solid var(--v2-line);border-radius:10px;background:var(--v2-canvas);margin:0}
+.v2-scope .v2-content :is(.nt-name,.nt-record-head,.nt-period,.w-batch-row .w-full){grid-column:1/-1}
+.v2-scope .v2-content :is(.nt-fields,.w-form-grid,.mw-grid){gap:16px}
+.v2-scope .v2-content :is(.nt-error,.mw-error,.w-error){color:var(--v2-danger)}
+.v2-scope .v2-content .v2-section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}
+.v2-scope .v2-content .v2-section-head h3{font-size:14px;font-weight:500;margin:0}
+@media(max-width:600px){.v2-scope .v2-dialog-header{padding:12px;gap:8px}.v2-scope .v2-dialog-footer{padding:12px;gap:12px}.v2-scope .v2-dialog-footer .v2-actions{flex-wrap:wrap}.v2-scope .v2-content{padding:16px}.v2-scope .v2-content :is(.nt-task-fields,.w-batch-row,.nt-fields,.w-form-grid,.mw-grid){grid-template-columns:minmax(0,1fr)}.v2-scope .v2-content :is(input,select,textarea){font-size:16px}.v2-scope .v2-unsaved{padding:12px}}
+@media(pointer:coarse){:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{min-height:44px}:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{width:44px}}
+
+.v2-scope .v2-dialog-footer{display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0;padding:16px 20px;border-top:1px solid var(--v2-line);background:var(--v2-bg)}
+.v2-scope .v2-footer-actions{justify-content:center;gap:8px;max-width:100%}
+
+@media(max-width:600px){.v2-scope .v2-dialog-footer{padding:12px;gap:12px}}
+
+</style>
+<script>
+/* V2.0 原型共用交互；由 build-v2.py 内联到各维护源及预览，不接入业务接口。 */
+(() => {
+  /** 在一个原生对话框内切换内容，保留上一步表单、滚动位置和焦点。 */
+  function createDialog(root, { restore, exit } = {}) {
+    root.classList.add('v2-scope');
+    const host = document.createElement('dialog');
+    host.className = 'v2-dialog';
+    root.append(host);
+    let current = null, stack = [], origin = null, pending = null;
+    const signature = node => JSON.stringify([...node.querySelectorAll('input,select,textarea')].map(input => [input.name || input.dataset.edit, input.value, input.checked]));
+    const dirty = entry => entry && signature(entry.node) !== entry.original;
+
+    function mount(entry) {
+      host.replaceChildren(entry.node);
+      host.setAttribute('aria-label', entry.title);
+      host.classList.toggle('v2-wide', entry.wide);
+      entry.node.querySelector('[data-v2-back]').hidden = !stack.length;
+      if (!host.open) host.showModal();
+      entry.node.querySelector('.v2-content').scrollTop = entry.scroll || 0;
+      const focus = entry.focus?.isConnected ? entry.focus : entry.node.querySelector('.v2-content input:not(:disabled),.v2-content select:not(:disabled),.v2-content textarea:not(:disabled)') || entry.node.querySelector('[data-v2-back]:not([hidden]),[data-v2-close]');
+      focus?.focus({ preventScroll: true });
+    }
+
+    /** 未保存提示占用当前表面，不再增加遮罩；取消保留所有字段。 */
+    function guard(action, all = false) {
+      if (!dirty(current) && !(all && stack.some(dirty))) { action(); return; }
+      pending = action;
+      const warning = current.node.querySelector('.v2-unsaved');
+      warning.hidden = false;
+      warning.querySelector('button').focus();
+    }
+
+    function close(force = false) {
+      const perform = () => {
+        host.close(); host.replaceChildren(); current = null; stack = []; pending = null;
+        exit?.();
+        if (origin?.isConnected) origin.focus({ preventScroll: true });
+        else root.querySelector('main button,button')?.focus({ preventScroll: true });
+      };
+      if (force) perform(); else guard(perform, true);
+    }
+
+    function back(force = false) {
+      if (!stack.length) { close(force); return; }
+      const perform = () => { current = stack.pop(); mount(current); restore?.(current.context); };
+      if (force) perform(); else guard(perform);
+    }
+
+    /** 底部操作组居中，依次为关闭、其他操作、保存；右上角保留快捷关闭。 */
+    function show({ title, body, actions = '', context = {}, form = false, wide = false, key = '' }) {
+      const scroll = current && key && current.key === key ? current.node.querySelector('.v2-content').scrollTop : 0;
+      if (!current) origin = document.activeElement;
+      else if (!key || key !== current.key) {
+        current.scroll = current.node.querySelector('.v2-content').scrollTop;
+        current.focus = document.activeElement;
+        stack.push(current);
+      }
+      const node = document.createElement('section');
+      node.className = 'v2-dialog-layout';
+      node.innerHTML = `<header class="v2-dialog-header"><button type="button" data-v2-back aria-label="返回上一步">← 返回</button><h2></h2><button type="button" data-v2-close aria-label="关闭弹窗" class="v2-close">×</button></header><div class="v2-unsaved" role="alert" hidden><span>有未保存的修改，是否放弃？</span><button type="button" data-v2-keep>继续编辑</button><button type="button" data-v2-discard class="v2-danger">放弃修改</button></div><div class="v2-content"></div><footer class="v2-dialog-footer"><div class="v2-actions v2-footer-actions"><button type="button" data-v2-close>关闭</button></div></footer>`;
+      node.querySelector('h2').textContent = title;
+      const content = node.querySelector('.v2-content');
+      content.innerHTML = form ? `<form data-dialog-form>${body}</form>` : body;
+      const source = document.createElement('div'); source.innerHTML = actions;
+      // 操作区独立于内容滚动，表单外的保存按钮通过 form 属性继续提交。
+      const localActions = content.querySelector('.mw-form-footer');
+      if (localActions) { source.append(...localActions.childNodes); localActions.remove(); }
+      const formNode = content.querySelector('form');
+      if (formNode) formNode.id = root.id + '-v2-form';
+      const controls = node.querySelector('.v2-footer-actions');
+      const secondary = [], primary = [];
+      for (const button of [...source.querySelectorAll('button')]) {
+        if (/^(取消|关闭|返回详情|返回任务)$/.test(button.textContent.trim()) || ['cancelDelete','returnMilestone','back-task'].includes(button.dataset.action)) { button.remove(); continue; }
+        if (button.type === 'submit' && formNode) button.setAttribute('form', formNode.id);
+        if (/删除/.test(button.textContent)) button.classList.add('v2-danger');
+        const commits = button.type === 'submit' || button.matches('.nt-primary,.mw-primary,.primary') || /^(保存|确认|加入安排)/.test(button.textContent.trim());
+        (commits ? primary : secondary).push(button);
+      }
+      controls.append(...secondary, ...primary);
+      const note = source.textContent.trim();
+      if (note) { const info = document.createElement('p'); info.className = 'v2-context'; info.textContent = note; content.prepend(info); }
+      current = { title, node, context, wide, key, scroll, original: signature(node) };
+      mount(current);
+    }
+
+    host.addEventListener('click', event => {
+      if (event.target.closest('[data-v2-close]')) close();
+      if (event.target.closest('[data-v2-back]')) back();
+      if (event.target.closest('[data-v2-keep]')) { current.node.querySelector('.v2-unsaved').hidden = true; pending = null; current.node.querySelector('.v2-content input,.v2-content select,.v2-content textarea')?.focus(); }
+      if (event.target.closest('[data-v2-discard]')) { const action = pending; pending = null; action?.(); }
+    });
+    host.addEventListener('cancel', event => { event.preventDefault(); stack.length ? back() : close(); });
+    // 原生 dialog 负责焦点围栏与背景 inert；屏蔽旧页面的 Escape 处理器。
+    host.addEventListener('keydown', event => { if (event.key === 'Escape') event.stopPropagation(); });
+    return { show, close, back, host, get context() { return current?.context; } };
+  }
+  window.NtfsV2 = { createDialog };
+})();
+
+</script>
+<!-- END V2 SHARED -->
+<script>
+(()=>{
+const root=document.getElementById('nt-project');
+const app=root.querySelector('.nt-app');
+const periods=['2026年10月12日—2026年10月18日','2026年10月19日—2026年10月25日'];
+const projects=['项目管理平台','智能评审助手'];
+const people=['陈晨','李然','王宁'];
+const priorities=['最高','高','中','低','最低'];
+// 原型使用固定示例日期；正式实现应以团队时区的当天日期计算，不受任务筛选区间影响。
+const previewToday='2026-10-16';
+function weekStart(date){const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return d.toISOString().slice(0,10);}
+const currentWeekStart=weekStart(previewToday);
+const priorSunday=new Date(new Date(currentWeekStart+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
+const fullDate=date=>date.replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$1年$2月$3日');
+
+const historyPages=new Map();
+const s={page:'overview',project:0,tab:'任务',period:0,filter:'unfinished',range:'all',notice:'',tasks:[
+ {id:1,p:0,name:'系统库导入结果校验',person:'陈晨',priority:2,status:'进行中',period:0,milestone:21,creator:'王宁'},
+ {id:2,p:0,name:'完善项目详情展示',person:'李然',priority:3,status:'未开始',period:0,milestone:21,creator:'李然'},
+ {id:3,p:0,name:'修复附件下载异常',person:'王宁',priority:1,status:'已完成',period:0,milestone:20,creator:'王宁'},
+ {id:4,p:0,name:'联调项目成员权限',person:'陈晨',priority:2,status:'未开始',period:1,milestone:22,creator:'王宁'},
+ {id:5,p:1,name:'完善评审结果导出',person:'李然',priority:2,status:'进行中',period:0,milestone:24,creator:'王宁'},
+ {id:6,p:1,name:'核验模型调用记录',person:'王宁',priority:3,status:'未开始',period:0,milestone:null,creator:'王宁'}],
+ pending:[{id:11,p:0,name:'支持批量调整项目成员',priority:3,creator:'李然'},{id:12,p:0,name:'增加导入错误定位',priority:2,creator:'陈晨'}],
+ milestones:[{id:20,p:0,name:'导入流程联调',date:'2026-10-16',done:true},{id:21,p:0,name:'系统库试运行',date:'2026-10-23',done:false},{id:22,p:0,name:'项目成员权限验收',date:'2026-10-30',done:false},{id:23,p:0,name:'后续体验优化',date:'',done:false},{id:24,p:1,name:'评审流程验收',date:'2026-10-23',done:false},{id:25,p:1,name:'评审结果交付',date:'2026-10-30',done:false},{id:26,p:0,name:'项目基础配置完成',date:'2026-09-30',done:true},{id:27,p:0,name:'导入方案确认',date:'2026-10-09',done:true},{id:28,p:0,name:'历史数据核对',date:'2026-10-11',done:false},{id:29,p:1,name:'评审样本整理',date:'2026-10-09',done:true}]};
+let dialog=null,sequence=100,pageNeedsRefresh=false;
+const ui=NtfsV2.createDialog(root,{restore:context=>{dialog=context;if(pageNeedsRefresh){if(context.kind==='milestone')milestoneDialog(context.id);else if(context.kind==='history')historyDialog(context.p);else if(context.kind==='unplanned')unplannedDialog(context.p);}},exit:()=>{dialog=null;if(pageNeedsRefresh){pageNeedsRefresh=false;render();}}});
+// 补充模拟历史记录与远期目标，便于查看分页和横向滚动；不连接真实数据。
+['2026-09-29','2026-09-25','2026-09-23','2026-09-18','2026-09-15','2026-09-11','2026-09-07','2026-09-04','2026-09-01'].forEach((date,i)=>s.milestones.push({id:40+i,p:0,name:['基础权限核验','试用环境准备','接口契约确认','数据字典确认','交互稿评审','开发环境就绪','业务流程确认','项目范围确认','项目启动'][i],date,done:true}));
+s.milestones.push({id:30,p:0,name:'试运行问题复核',date:'2026-10-23',done:false},{id:31,p:0,name:'正式交付确认',date:'2026-11-06',done:false});
+s.tasks.push({id:7,p:0,name:'试运行问题清单核对',person:'陈晨',priority:2,status:'已完成',period:1,milestone:30,creator:'王宁'});
+s.page='detail';s.tab='里程碑';
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const button=(text,action,attrs='',cls='')=>`<button type="button" class="cursor-interaction ${cls}" data-action="${action}" ${attrs}>${text}</button>`;
+const badge=status=>`<span class="nt-badge ${status==='已完成'?'nt-done':''}">${status}</span>`;
+const options=(values,selected)=>values.map((v,i)=>`<option value="${i}" ${String(selected)===String(i)?'selected':''}>${esc(v)}</option>`).join('');
+const milestoneName=id=>s.milestones.find(m=>m.id===id)?.name||'未关联里程碑';
+const priorOptions=value=>priorities.map((p,i)=>`<option value="${i+1}" ${value===i+1?'selected':''}>${i+1} ${p}</option>`).join('');
+function restore(state){if(state?.version!==3)return;const v=state.view||{};if(['overview','detail','milestones'].includes(v.page))s.page=v.page;if([0,1].includes(v.project))s.project=v.project;if(['任务','里程碑','待建任务'].includes(v.tab))s.tab=v.tab;}
+restore(window.openai?.widgetState?.privateContent);
+const persist=()=>window.openai?.setWidgetState?.({modelContent:{page:s.page,project:projects[s.project],tab:s.tab,layout:'并排概览',taskForm:'共用弹窗'},privateContent:{version:3,view:{page:s.page,project:s.project,tab:s.tab}}})?.catch(()=>{});
+function summaryTable(tasks){return tasks.length?`<div class="nt-scroll"><table class="nt-table"><thead><tr><th>任务</th><th>执行人</th><th>优先级</th><th>状态</th></tr></thead><tbody>${tasks.map(t=>`<tr><td>${button(esc(t.name),'task',`data-id="${t.id}"`,'nt-link')}</td><td>${t.person}</td><td>${t.priority}</td><td>${badge(t.status)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="nt-empty">该区间暂无安排</div>';}
+function overview(){return `<div class="nt-row nt-between"><div><h2>项目</h2><p class="nt-muted">我负责的项目 · ${projects.length} 个</p></div>${button('里程碑总览','allMilestones')}</div><div class="nt-tools"><span class="nt-muted">任务执行情况</span><select aria-label="汇总日期区间" data-field="period">${options(periods,s.period)}</select></div>${projects.map((p,i)=>{const tasks=s.tasks.filter(t=>t.p===i&&t.period===s.period).sort((a,b)=>a.priority-b.priority),pending=s.pending.filter(t=>t.p===i).sort((a,b)=>a.priority-b.priority);return `<article class="nt-project" data-project-block="${i}"><header class="nt-project-head nt-row nt-between"><div><h3>${button(p+' →','project',`data-id="${i}"`,'nt-link')}</h3><p class="nt-muted">未开始 ${tasks.filter(t=>t.status==='未开始').length} · 进行中 ${tasks.filter(t=>t.status==='进行中').length} · 已完成 ${tasks.filter(t=>t.status==='已完成').length}</p></div><span class="nt-caption">研发负责人 陈晨</span></header><div class="nt-columns ${pending.length?'':'nt-full'}"><section class="nt-section"><h4>区间任务 · ${tasks.length}</h4>${summaryTable(tasks)}</section>${pending.length?`<section class="nt-section"><h4>待建任务 · ${pending.length}</h4>${pending.map(t=>`<div class="nt-backlog">${button(esc(t.name),'pending',`data-id="${t.id}"`,'nt-link')}<span class="nt-prio">${t.priority} ${priorities[t.priority-1]}</span></div>`).join('')}</section>`:''}</div></article>`}).join('')}`;}
+function taskPage(){const tasks=s.tasks.filter(t=>t.p===s.project&&(s.filter==='done'?t.status==='已完成':t.status!=='已完成')&&(s.range==='all'||t.period===Number(s.range))).sort((a,b)=>a.priority-b.priority);return `<div class="nt-tools"><div class="nt-row"><select aria-label="任务状态范围" data-field="filter"><option value="unfinished" ${s.filter==='unfinished'?'selected':''}>全部未完成</option><option value="done" ${s.filter==='done'?'selected':''}>已完成</option></select><select aria-label="任务日期区间" data-field="range"><option value="all">全部日期区间</option>${options(periods,s.range)}</select></div>${button('＋ 批量新增','batch','','nt-primary')}</div><div class="nt-project nt-scroll"><table class="nt-table"><thead><tr><th>任务名称</th><th>执行人</th><th>优先级</th><th>状态</th><th>日期区间 / 里程碑</th></tr></thead><tbody>${tasks.map(t=>`<tr><td>${button(esc(t.name),'task',`data-id="${t.id}"`,'nt-link')}</td><td>${t.person}</td><td>${t.priority}</td><td>${badge(t.status)}</td><td><span class="nt-date">${periods[t.period]}</span><br><span class="nt-muted">${esc(milestoneName(t.milestone))}</span></td></tr>`).join('')}</tbody></table>${tasks.length?'':'<div class="nt-empty">暂无符合条件的任务</div>'}</div>`;}
+function pendingPage(){const pending=s.pending.filter(t=>t.p===s.project).sort((a,b)=>a.priority-b.priority);return `<div class="nt-tools"><span class="nt-muted">明确执行人和日期区间后，可转为正式任务</span>${button('＋ 新增待建任务','newPending','','nt-primary')}</div><div class="nt-project nt-scroll"><table class="nt-table"><thead><tr><th>名称</th><th>优先级</th><th>创建人</th><th>操作</th></tr></thead><tbody>${pending.map(t=>`<tr><td>${button(esc(t.name),'pending',`data-id="${t.id}"`,'nt-link')}</td><td>${t.priority}</td><td>${t.creator}</td><td>${button('转为任务','convert',`data-id="${t.id}"`)}</td></tr>`).join('')}</tbody></table>${pending.length?'':'<div class="nt-empty">暂无待建任务</div>'}</div>`;}
+function completion(m){const tasks=s.tasks.filter(t=>t.milestone===m.id);return {tasks,unfinished:tasks.filter(t=>t.status!=='已完成').length};}
+function milestoneNode(m){const {tasks,unfinished}=completion(m);return `<article class="nt-lane-card ${m.done?'done':''}">${button(esc(m.name),'milestone',`data-id="${m.id}"`,'nt-link')}<p>${tasks.length?`关联任务 ${tasks.length-unfinished}/${tasks.length} 已完成`:'尚未关联任务'}</p><footer>${badge(m.done?'已完成':'未完成')}${m.done?'':button('标记完成','completeMilestone',`data-id="${m.id}" ${unfinished?'disabled':''}`)}</footer>${unfinished?`<p style="margin-bottom:0">还有 ${unfinished} 项任务未完成</p>`:''}</article>`;}
+/** 历史入口仅显示汇总，列表和分页均在弹窗内。 */
+function historyBlock(ms,p){const old=ms.filter(m=>m.date&&m.date<currentWeekStart);if(!old.length)return '';const unfinished=old.filter(m=>!m.done).length;return button(`历史里程碑 · 截至${fullDate(priorSunday)} · ${old.length} 项${unfinished?` · ${unfinished} 项未完成`:''}　查看`,'history',`data-project="${p}"`,'nt-history-entry');}
+/** 历史表格按日期倒序分页，页码在当前预览中保留。 */
+function historyDialog(p){
+ const old=s.milestones.filter(m=>m.p===p&&m.date&&m.date<currentWeekStart).sort((a,b)=>b.date.localeCompare(a.date));
+ const size=10,pages=Math.max(1,Math.ceil(old.length/size)),page=Math.max(0,Math.min(historyPages.get(p)||0,pages-1));historyPages.set(p,page);begin('history',{p});
+ const table=`<div class="nt-scroll"><table class="nt-table"><thead><tr><th>里程碑</th><th>预计完成日期</th><th>状态</th><th>关联任务</th></tr></thead><tbody>${old.slice(page*size,(page+1)*size).map(m=>{const c=completion(m);return `<tr><td>${button(esc(m.name),'milestone',`data-id="${m.id}"`,'nt-link')}</td><td class="nt-date">${fullDate(m.date)}</td><td>${badge(m.done?'已完成':'未完成')}</td><td>${c.tasks.length-c.unfinished} / ${c.tasks.length}</td></tr>`;}).join('')}</tbody></table>${old.length?'':'<div class="nt-empty">暂无历史里程碑</div>'}</div>`;
+ modal('历史里程碑',`<p class="nt-muted" style="margin-bottom:14px">${projects[p]} · 截至${fullDate(priorSunday)} · ${old.filter(m=>!m.done).length} 项未完成</p>${table}`,`<span class="nt-muted">共 ${old.length} 项 · 每页 ${size} 项</span><div class="nt-row">${button('上一页','historyPage',`data-project="${p}" data-page="${page-1}" ${page===0?'disabled':''}`)}<span class="nt-muted">第 ${page+1} / ${pages} 页</span>${button('下一页','historyPage',`data-project="${p}" data-page="${page+1}" ${page===pages-1?'disabled':''}`)}</div>`,{wide:true});
+}
+
+function milestonePanel(p){
+ const ms=s.milestones.filter(m=>m.p===p),dates=[...new Set(ms.filter(m=>m.date&&m.date>=currentWeekStart).map(m=>m.date))].sort();
+ return `<section class="nt-panel" data-milestone-project="${p}"><div class="nt-row nt-between"><div><h3>${s.page==='milestones'?projects[p]:'项目规划'} <span class="nt-muted">${ms.length} 项</span></h3><p class="nt-muted">${fullDate(currentWeekStart)}起的目标 · 早期目标在历史里程碑查看</p></div><div class="nt-row">${button('未规划节点','unplanned',`data-project="${p}"`,'nt-quiet')}${button('＋ 新增里程碑','newMilestone',`data-project="${p}"`)}</div></div>${historyBlock(ms,p)}<div class="nt-tools"><span class="nt-muted">按预计完成日期排列 · 同日目标在同一列</span><div class="nt-row">${button('←','scrollDates',`data-project="${p}" data-direction="-1" aria-label="查看较早日期"`)}${button('→','scrollDates',`data-project="${p}" data-direction="1" aria-label="查看后续日期"`)}</div></div>${dates.length?`<div class="nt-date-scroll" aria-label="按日期分列的里程碑"><div class="nt-date-columns">${dates.map(date=>`<section class="nt-date-column"><header class="nt-date-heading"><time datetime="${date}">${fullDate(date)}<small>${ms.filter(m=>m.date===date).length} 项目标</small></time></header><div class="nt-date-cards">${ms.filter(m=>m.date===date).map(milestoneNode).join('')}</div></section>`).join('')}</div></div>`:'<div class="nt-empty">当前及后续日期暂无已排期目标</div>'}</section>`;
+}
+function unplannedDialog(p){const nodes=s.milestones.filter(m=>m.p===p&&!m.date);begin('unplanned',{p});modal('未规划节点',`<p class="nt-muted">${projects[p]} · ${nodes.length} 项</p><div class="nt-unplanned-list">${nodes.map(milestoneNode).join('')||'<p class="nt-muted">暂无未规划节点。</p>'}</div>`,`${button('关闭','close')}${button('＋ 新增里程碑','newMilestone',`data-project="${p}"`)}`);}
+
+function detail(){return `${button('← 项目汇总','overview','','nt-link')}<div style="margin-top:12px"><h2>${projects[s.project]}</h2><p class="nt-muted">研发负责人 陈晨 · 项目经理 赵敏 · 3 位成员</p></div><div class="nt-tabs">${['任务','里程碑','待建任务'].map(t=>button(t,'tab',`data-tab="${t}" aria-pressed="${s.tab===t}"`)).join('')}</div>${s.tab==='任务'?taskPage():s.tab==='待建任务'?pendingPage():milestonePanel(s.project)}`;}
+function render(){app.innerHTML=`<div data-background><header class="nt-top"><span class="nt-logo">下</span><span class="nt-brand">下次一定</span><span class="nt-caption">研发工作空间 · 布局预览</span></header><div class="nt-shell"><aside class="nt-nav" aria-label="主导航"><span>我的工作</span><span>周报与周计划</span><span class="nt-active">项目</span><span>团队管理</span><p class="nt-caption" style="margin:32px 10px">陈晨<br>项目研发负责人</p></aside><main class="nt-main">${s.page==='overview'?overview():s.page==='milestones'?`${button('← 项目汇总','overview','','nt-link')}<h2 style="margin-top:12px">里程碑总览</h2>${projects.map((p,i)=>milestonePanel(i)).join('')}`:detail()}<div class="nt-toast" role="status">${esc(s.notice)}</div></main></div></div>`;}
+/** 共用对话框保留上下文；分页更新同一视图，不新增层级。 */
+function modal(title,body,footer,{wide=false,form=false}={}){
+ ui.show({title,body:body+'<div class="nt-error" role="alert" data-error></div>',actions:footer,wide,form,context:dialog,key:dialog.kind+':'+(dialog.id??dialog.p??'')});
+}
+function close(force=false){ui.close(force);}
+function begin(kind,context={}){dialog={kind,...context};}
+function finish(message){
+ const savedKind=dialog?.kind;pageNeedsRefresh=true;
+ if(savedKind==='milestoneEdit'||savedKind==='task'){
+  ui.back(true);
+  if(dialog){const previous={...dialog};if(previous.kind==='milestone')milestoneDialog(previous.id);else if(previous.kind==='history')historyDialog(previous.p);else if(previous.kind==='unplanned')unplannedDialog(previous.p);persist();return;}
+ }
+ close(true);s.notice=message;render();persist();
+}
+// 共用任务表单约定：项目、周报与周计划、我的工作使用相同核心字段与弹窗。
+// 编辑使用一个记录块，批量新增重复同一记录块；业务入口只提供默认值及权限。
+function taskFields(item,index,batch,p){return `<section class="nt-task-fields" data-record><div class="nt-record-head"><span class="nt-muted">${batch?`任务 ${index+1}`:'任务信息'}</span>${batch?button('移除此行','removeRow'):''}</div><label class="nt-name">任务名称 · 必填<input name="name" required maxlength="200" placeholder="输入任务名称" value="${esc(item.name)}"></label><label>执行人 · 必填<select name="person" required><option value="">请选择</option>${people.map(person=>`<option ${person===item.person?'selected':''}>${person}</option>`).join('')}</select></label><label>优先级<select name="priority">${priorOptions(item.priority??3)}</select></label><label class="nt-period">日期区间 · 必填<select name="period" required><option value="">请选择</option>${options(periods,item.period??s.period)}</select></label><label class="nt-period">关联里程碑 · 可选<select name="milestone"><option value="">不关联</option>${s.milestones.filter(m=>m.p===p).map(m=>`<option value="${m.id}" ${m.id===item.milestone?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>${item.status?`<label>执行状态<select name="status">${['未开始','进行中','已完成'].map(x=>`<option ${x===item.status?'selected':''}>${x}</option>`).join('')}</select></label>`:''}</section>`;}
+function taskDialog(kind,id){let item=kind==='batch'?null:(kind==='convert'?s.pending:s.tasks).find(t=>t.id===id);if(kind==='convert'&&dialog?.kind==='pending'){const form=root.querySelector('[data-dialog-form]');if(form){const draft=Object.fromEntries(new FormData(form));item={...item,name:draft.name,priority:Number(draft.priority)};}}const p=item?.p??s.project;begin(kind,{id,p});modal(kind==='batch'?'批量新增任务':kind==='convert'?'转为正式任务':'编辑任务',`<p class="nt-muted" style="margin:0 0 14px">${projects[p]}</p>${kind==='batch'?`<div class="v2-section-head"><h3>录入任务</h3>${button('＋ 添加一行','addRow')}</div>`:''}<div data-records>${taskFields(item||{name:'',priority:3},0,kind==='batch',p)}</div>`,`<span class="nt-muted">${item?'创建人 '+item.creator:'保存后直接进入执行人的工作列表'}</span><div class="nt-row">${kind==='task'?button('删除','deleteTask'):button('取消','close')}<button type="submit" class="nt-primary cursor-interaction">${kind==='batch'?'保存全部':kind==='convert'?'确认转换':'保存修改'}</button></div>`,{wide:kind==='batch',form:true});}
+function pendingDialog(id){const item=s.pending.find(t=>t.id===id);begin('pending',{id,p:item?.p??s.project});modal(item?'编辑待建任务':'新增待建任务',`<div class="nt-fields"><label class="nt-wide">名称<input name="name" required maxlength="200" value="${esc(item?.name||'')}"></label><label>优先级<select name="priority">${priorOptions(item?.priority??3)}</select></label></div>`,`<span class="nt-muted">创建人 ${item?.creator||'王宁'}</span><div class="nt-row">${item?button('删除','deletePending')+button('转为任务','convert',`data-id="${id}"`):button('取消','close')}<button type="submit" class="nt-primary cursor-interaction">保存</button></div>`,{form:true});}
+function milestoneDialog(id){
+ const m=s.milestones.find(m=>m.id===id);if(!m)return;begin('milestone',{id,p:m.p});const {tasks,unfinished}=completion(m);
+ modal(m.name,`<dl class="nt-facts"><dt>所属项目</dt><dd>${projects[m.p]}</dd><dt>状态</dt><dd>${badge(m.done?'已完成':'未完成')}</dd><dt>研发负责人</dt><dd>陈晨</dd><dt>预计完成日期</dt><dd>${m.date?fullDate(m.date):'未设置'}</dd></dl><h3>关联任务 · ${tasks.length}</h3>${tasks.length?`<ul class="nt-link-list">${tasks.map(t=>`<li>${button(esc(t.name),'task',`data-id="${t.id}"`,'nt-link')}<div class="nt-row">${badge(t.status)}${button('解除关联','unlinkTask',`data-id="${t.id}" data-milestone="${m.id}"`)}</div></li>`).join('')}</ul>`:'<p class="nt-muted">尚未关联任务。</p>'}<p class="nt-muted" style="margin-top:18px">${m.done?'目标已确认完成。':unfinished?`还有 ${unfinished} 项任务未完成，暂不能标记完成。`:tasks.length?'关联任务已全部完成，可确认目标完成。':'没有关联任务，可直接确认目标完成。'}</p>`,`<span class="nt-muted">当前身份：项目研发负责人</span><div class="nt-row">${button('编辑','editMilestone',`data-id="${id}"`)}${m.done?button('关闭','close'):button('标记完成','completeMilestone',`data-id="${id}" ${unfinished?'disabled':''}`,'nt-primary')}</div>`);
+}
+function unlinkDialog(taskId,milestoneId){const task=s.tasks.find(t=>t.id===taskId);if(!task||task.milestone!==milestoneId)return;begin('unlink',{id:taskId,milestoneId});modal('解除任务关联',`<p>将“${esc(task.name)}”移出此里程碑？</p><p class="nt-muted" style="margin-top:12px">只解除关联，保留任务及其执行人、日期区间和执行状态。</p>`,`${button('取消','returnMilestone',`data-id="${milestoneId}"`)}${button('确认解除关联','confirmUnlink','','nt-primary')}`);}
+function completeDialog(id){const m=s.milestones.find(m=>m.id===id);if(!m||m.done||completion(m).unfinished)return;begin('complete',{id});modal('确认里程碑完成',`<p>确认“${esc(m.name)}”的阶段目标已经达成？</p><p class="nt-muted" style="margin-top:12px">${completion(m).tasks.length?'关联任务已全部完成。':'此目标没有关联任务。'}</p>`,`${button('取消','returnMilestone',`data-id="${id}"`)}${button('确认完成','confirmComplete','','nt-primary')}`);}
+
+function milestoneEditor(id,p,date){const m=s.milestones.find(m=>m.id===id);begin('milestoneEdit',{id,p:m?.p??p});modal(m?'编辑里程碑':'新增里程碑',`<p class="nt-muted">${projects[dialog.p]}</p><div class="nt-fields"><label class="nt-wide">目标名称 · 必填<input name="name" required maxlength="200" value="${esc(m?.name||'')}"></label><label class="nt-wide">预计完成日期<input type="date" name="date" value="${m?.date||date||''}"><span>留空放入未规划节点</span></label></div>`,`${button('取消','close')}<button type="submit" class="nt-primary cursor-interaction">保存</button>`,{form:true});}
+function deletion(kind){const item=(kind==='task'?s.tasks:s.pending).find(t=>t.id===dialog.id);begin('delete',{id:item.id,target:kind});modal('删除'+(kind==='task'?'任务':'待建任务'),`<p>确认删除“${esc(item.name)}”？</p><p class="nt-muted">${kind==='task'?'删除整条任务及其区间安排，里程碑保留。':'删除此待建事项。'}未保存的编辑不会写入。</p>`,`${button('取消','cancelDelete')}${button('确认删除','confirmDelete','','nt-primary')}`);}
+root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.type==='submit'&&b.form){e.preventDefault();if(b.form.reportValidity())saveForm(b.form);return;}const a=b.dataset.action,id=Number(b.dataset.id);switch(a){
+ case'project':s.project=id;s.page='detail';s.tab='任务';render();persist();break;
+ case'overview':s.page='overview';render();persist();break;
+ case'allMilestones':s.page='milestones';render();persist();break;
+ case'tab':s.tab=b.dataset.tab;render();persist();break;
+ case'task':taskDialog('task',id);break;
+ case'batch':taskDialog('batch');break;
+ case'convert':taskDialog('convert',id);break;
+ case'pending':pendingDialog(id);break;
+ case'newPending':pendingDialog();break;
+ case'milestone':milestoneDialog(id);break;
+ case'historyPage':{const p=Number(b.dataset.project);historyPages.set(p,Number(b.dataset.page));historyDialog(p);break;}
+ case'history':historyDialog(Number(b.dataset.project));break;
+ case'scrollDates':{const track=root.querySelector(`[data-milestone-project="${b.dataset.project}"] .nt-date-scroll`);track?.scrollBy({left:Number(b.dataset.direction)*238});break;}
+ case'unlinkTask':unlinkDialog(id,Number(b.dataset.milestone));break;
+ case'returnMilestone':ui.back();break;
+ case'completeMilestone':completeDialog(id);break;
+ case'confirmUnlink':{const task=s.tasks.find(t=>t.id===dialog.id);if(task?.milestone===dialog.milestoneId)task.milestone=null;pageNeedsRefresh=true;ui.back(true);persist();break;}
+ case'confirmComplete':{const m=s.milestones.find(m=>m.id===dialog.id);if(m&&!m.done&&!completion(m).unfinished){m.done=true;pageNeedsRefresh=true;ui.back(true);if(!dialog){s.notice='里程碑已标记完成';render();}persist();}break;}
+ case'editMilestone':milestoneEditor(id);break;
+ case'newMilestone':milestoneEditor(undefined,Number(b.dataset.project),b.dataset.date);break;
+ case'unplanned':unplannedDialog(Number(b.dataset.project));break;
+ case'close':close();break;
+ case'addRow':root.querySelector('[data-records]').insertAdjacentHTML('beforeend',taskFields({name:'',priority:3},root.querySelectorAll('[data-record]').length,true,dialog.p));break;
+ case'removeRow':if(root.querySelectorAll('[data-record]').length>1){b.closest('[data-record]').remove();}else root.querySelector('[data-error]').textContent='至少保留一条任务。';break;
+ case'deleteTask':deletion('task');break;
+ case'deletePending':deletion('pending');break;
+ case'cancelDelete':ui.back();break;
+ case'confirmDelete':if(dialog.target==='task')s.tasks=s.tasks.filter(t=>t.id!==dialog.id);else s.pending=s.pending.filter(t=>t.id!==dialog.id);finish('已从示例中删除');break;
+}});
+function saveForm(form){if(!dialog)return;const data=Object.fromEntries(new FormData(form));const error=root.querySelector('[data-error]');
+ if(['task','batch','convert'].includes(dialog.kind)){
+  const rows=[...form.querySelectorAll('[data-record]')].map(row=>Object.fromEntries([...row.querySelectorAll('input,select')].map(input=>[input.name,input.value])));
+  if(rows.some(row=>!row.name.trim()||!row.person||row.period==='')){error.textContent='请填写任务名称、执行人和日期区间。';return;}
+  const current=(dialog.kind==='convert'?s.pending:s.tasks).find(t=>t.id===dialog.id);
+  for(const row of rows){const value={id:current?.id??sequence++,p:dialog.p,name:row.name.trim(),person:row.person,priority:Number(row.priority),period:Number(row.period),milestone:row.milestone?Number(row.milestone):null,status:row.status||'未开始',creator:current?.creator||'王宁'};if(dialog.kind==='task')Object.assign(current,value);else s.tasks.push(value);}
+  if(dialog.kind==='convert')s.pending=s.pending.filter(t=>t.id!==dialog.id);
+ }else if(dialog.kind==='pending'){
+  if(!data.name.trim()){error.textContent='请填写名称。';return;}const current=s.pending.find(t=>t.id===dialog.id);const value={name:data.name.trim(),priority:Number(data.priority)};if(current)Object.assign(current,value);else s.pending.push({id:sequence++,p:dialog.p,creator:'王宁',...value});
+ }else if(dialog.kind==='milestoneEdit'){
+  if(!data.name.trim()){error.textContent='请填写目标名称。';return;}const current=s.milestones.find(m=>m.id===dialog.id);const value={name:data.name.trim(),date:data.date};if(current)Object.assign(current,value);else s.milestones.push({id:sequence++,p:dialog.p,done:false,...value});
+ }finish('已保存到当前示例');
+}
+root.addEventListener('submit',e=>{e.preventDefault();if(e.target.reportValidity())saveForm(e.target);});
+root.addEventListener('change',e=>{if(e.target.dataset.field){const field=e.target.dataset.field;s[field]=field==='period'?Number(e.target.value):e.target.value;render();persist();}});
+root.addEventListener('keydown',e=>{if(!dialog)return;if(e.key==='Enter'&&e.target.matches('input')){e.preventDefault();const form=e.target.form;if(form?.reportValidity())saveForm(form);return;}});
+window.addEventListener('openai:set_globals',event=>{if(dialog)return;restore(event.detail?.globals?.widgetState?.privateContent);render();});
+
+render();
+if(globalThis.Tweak){const design={dense:false};const tw=new Tweak({container:app,onChange:()=>app.style.setProperty('--nt-cell',design.dense?'7px':'11px')});tw.addToggle(design,'dense',{label:'紧凑表格'});}
+})();
+
+</script>
