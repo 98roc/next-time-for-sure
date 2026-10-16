@@ -1,4 +1,4 @@
-"""本机构建、通过 SSH 上传并执行 Docker 部署；配置不进入镜像或日志。"""
+"""本机编译并上传产物，通过基础镜像挂载部署；配置不进入产物或日志。"""
 import argparse
 import getpass
 import gzip
@@ -80,7 +80,12 @@ def ensure_image(image):
 def pack_context(context, archive):
     """将 Windows junction 转为 Linux 相对符号链接，避免循环展开与打包外部文件。"""
     root = context.resolve()
-    # Docker CLI 的 stdin 类型探测不能识别首条记录为 PAX 扩展头的归档。
+    # 固定元数据，让相同内容的生产依赖可按摘要复用，不受编译时间影响。
+    def normalize(entry):
+        entry.mtime = 946684800
+        entry.uid = entry.gid = 0
+        entry.uname = entry.gname = ''
+        return entry
     with tarfile.open(archive, 'w', dereference=False, format=tarfile.GNU_FORMAT) as output:
         def add(path):
             name = path.relative_to(root).as_posix()
@@ -95,12 +100,12 @@ def pack_context(context, archive):
                 entry.type = tarfile.SYMTYPE
                 entry.linkname = pathlib.Path(os.path.relpath(target, path.parent)).as_posix()
                 entry.mode = 0o777
-                output.addfile(entry)
+                output.addfile(normalize(entry))
             else:
                 # 本地环境和私钥永不进入构建上下文，包括包目录下未来新增的配置。
                 if path.name.startswith('.env') or path.name.endswith(('.local', '.pem', '.key', '.p12', '.pfx')) or path.name in ['.npmrc', '.git']:
                     return
-                output.add(path, arcname=name, recursive=False)
+                output.add(path, arcname=name, recursive=False, filter=normalize)
                 if path.is_dir():
                     for child in sorted(path.iterdir()):
                         add(child)
@@ -108,8 +113,8 @@ def pack_context(context, archive):
             add(child)
 
 
-def build_images(directory, release):
-    """仅打包 API 的生产依赖与前端产物；不携带源码、开发配置或桌面程序。"""
+def build_artifacts(directory):
+    """分离可复用生产依赖与版本产物；无需本机 Docker，不打包应用镜像。"""
     for package in ['@ntfs/contracts', '@ntfs/ui', '@ntfs/api', '@ntfs/web']:
         pnpm('--filter', package, 'build')
     context = directory / 'context'
@@ -128,26 +133,33 @@ def build_images(directory, release):
         if not resolved.is_relative_to(api.resolve()):
             raise RuntimeError('Workspace export must contain its own contracts package')
         shutil.rmtree(resolved)
-    shutil.copytree(ROOT / 'apps/web/dist', context / 'web')
-    for name in ['Dockerfile.api', 'Dockerfile.web', 'nginx.conf']:
-        shutil.copyfile(ROOT / 'deploy' / name, context / name)
-    shutil.copyfile(ROOT / 'pnpm-workspace.yaml', context / 'pnpm-workspace.yaml')
+    application = directory / 'application'
+    runtime_api = application / 'apps/api'
+    runtime_api.mkdir(parents=True)
+    shutil.move(str(api / 'dist'), runtime_api / 'dist')
+    shutil.move(str(api / 'package.json'), runtime_api / 'package.json')
+    (runtime_api / 'node_modules').mkdir()
+    shutil.copytree(ROOT / 'apps/web/dist', application / 'web')
+    shutil.copyfile(ROOT / 'deploy/nginx.conf', application / 'nginx.conf')
+    shutil.copyfile(ROOT / 'pnpm-workspace.yaml', application / 'pnpm-workspace.yaml')
+    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    dirty = bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT))
+    version = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['version']
+    (application / 'source.json').write_text(json.dumps({'version': version, 'commit': revision, 'dirty': dirty}) + '\n', encoding='utf-8')
 
-    # 保留依赖图，Linux 镜像不保留 Windows 的绝对路径。
-    archive = directory / 'context.tar'
-    pack_context(context, archive)
-    environment = {**os.environ, 'DOCKER_BUILDKIT': '1'}
-    for component in ['api', 'web']:
-        with archive.open('rb') as source:
-            run(['docker', 'build', '--pull=false', '-f', 'Dockerfile.' + component,
-                 '-t', 'ntfs-' + component + ':' + release, '-'], stdin=source, env=environment)
-    raw = directory / 'images.tar'
-    run(['docker', 'save', '-o', raw, 'ntfs-api:' + release, 'ntfs-web:' + release])
-    result = directory / 'images.tar.gz'
-    with raw.open('rb') as source, gzip.open(result, 'wb', compresslevel=3) as destination:
-        shutil.copyfileobj(source, destination)
-    raw.unlink()
-    return result
+    archives = []
+    dependency_id = None
+    for name, source_directory in [('application', application), ('dependencies', context)]:
+        raw = directory / (name + '.tar')
+        pack_context(source_directory, raw)
+        if name == 'dependencies':
+            dependency_id = hashlib.sha256(raw.read_bytes()).hexdigest()
+        result = directory / (name + '.tar.gz')
+        with raw.open('rb') as source, gzip.open(result, 'wb', compresslevel=3) as destination:
+            shutil.copyfileobj(source, destination)
+        raw.unlink()
+        archives.append(result)
+    return archives, dependency_id
 
 
 def remote(client, command, private_input=None):
@@ -243,15 +255,16 @@ def main():
                     target.chmod(0o600)
                 print('Initial credentials saved to .deploy.production.account.local (not printed).')
             return
-        run(['docker', 'info'], stdout=subprocess.DEVNULL)
-        ensure_image(NODE_IMAGE)
-        ensure_image(WEB_IMAGE)
+        if args.action == 'Prepare':
+            run(['docker', 'info'], stdout=subprocess.DEVNULL, timeout=30)
+            ensure_image(NODE_IMAGE)
+            ensure_image(WEB_IMAGE)
         with tempfile.TemporaryDirectory(prefix='ntfs-', dir=cache) as scratch:
             directory = pathlib.Path(scratch)
             write_configs(directory, values)
             server_script = directory / 'server.sh'
             server_script.write_text((ROOT / 'scripts/deployment/server.sh').read_text(encoding='utf-8'), encoding='utf-8', newline='\n')
-            remote(client, 'umask 077; mkdir -p ' + ' '.join(shlex.quote(base + suffix) for suffix in ['', '/shared', '/runtime', '/releases', '/backups']))
+            remote(client, 'umask 077; mkdir -p ' + ' '.join(shlex.quote(base + suffix) for suffix in ['', '/shared', '/runtime', '/releases', '/backups', '/dependencies']))
             with client.open_sftp() as sftp:
                 upload(sftp, server_script, base + '/deploy.sh', 0o700)
                 if args.action == 'Prepare':
@@ -265,21 +278,27 @@ def main():
                     run(['docker', 'save', '-o', archive, NODE_IMAGE, WEB_IMAGE])
                     upload(sftp, archive, base + '/runtime/runtime.tar')
                 else:
-                    archive = build_images(directory, release)
+                    archives, dependency_id = build_artifacts(directory)
                     destination = base + '/releases/' + release
                     sftp.mkdir(destination, 0o700)
-                    upload(sftp, archive, destination + '/images.tar.gz')
-                    for name in ['production.env', 'mysql.cnf']:
+                    try:
+                        sftp.stat(base + '/dependencies/' + dependency_id + '/.ready')
+                        archives = archives[:1]
+                        print('Production dependencies unchanged; reusing server cache.', flush=True)
+                    except FileNotFoundError:
+                        print('Uploading new production dependencies.', flush=True)
+                    checksums = []
+                    for archive in archives:
+                        print('Uploading ' + archive.name + ': ' + str(round(archive.stat().st_size / 1048576, 2)) + ' MiB', flush=True)
+                        upload(sftp, archive, destination + '/' + archive.name)
+                        checksums.append(hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
+                    (directory / 'artifacts.sha256').write_text(''.join(checksums), encoding='ascii', newline='\n')
+                    (directory / 'dependencies.id').write_text(dependency_id + '\n', encoding='ascii', newline='\n')
+                    for name in ['production.env', 'mysql.cnf', 'artifacts.sha256', 'dependencies.id']:
                         upload(sftp, directory / name, destination + '/' + name)
-                    (directory / 'images.sha256').write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + '  images.tar.gz\n', encoding='ascii', newline='\n')
-                    upload(sftp, directory / 'images.sha256', destination + '/images.sha256')
             remote(client, command)
     finally:
         client.close()
-        if args.action == 'Validate':
-            # 验证镜像不作为发布产物保留；删除精确版本标签，不清理其他镜像或缓存。
-            subprocess.run(['docker', 'rmi', 'ntfs-api:' + release, 'ntfs-web:' + release],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 if __name__ == '__main__':

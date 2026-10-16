@@ -1,4 +1,4 @@
-"""验证生产配置不被执行、链接不逃逸、私有文件不会进入 Docker 上下文。"""
+"""验证配置隔离、链接边界及依赖归档可复用性。"""
 import importlib.util
 import os
 import pathlib
@@ -22,6 +22,18 @@ def directory_link(source, target):
 
 
 class DeploymentSafetyTest(unittest.TestCase):
+    def test_archive_is_stable_when_only_file_times_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = pathlib.Path(directory)
+            context = base / 'context'
+            context.mkdir()
+            file = context / 'index.js'
+            file.write_text('export const value = 1;', encoding='utf-8')
+            DEPLOY.pack_context(context, base / 'first.tar')
+            os.utime(file, (1900000000, 1900000000))
+            DEPLOY.pack_context(context, base / 'second.tar')
+            self.assertEqual((base / 'first.tar').read_bytes(), (base / 'second.tar').read_bytes())
+
     def test_private_files_are_excluded_and_internal_links_are_relative(self):
         with tempfile.TemporaryDirectory() as directory:
             base = pathlib.Path(directory)

@@ -25,7 +25,7 @@ async function initialPassword(): Promise<string> {
 /** 仅在无账号时初始化超管，初始密码写入忽略的本地文件，不输出终端。 */
 async function bootstrap(): Promise<void> {
   const source = createDataSource(loadEnvironment());
-  const path = fileURLToPath(new URL('../../../../.bootstrap-credentials.local', import.meta.url));
+  const path = process.env.BOOTSTRAP_CREDENTIALS_FILE ?? fileURLToPath(new URL('../../../../.bootstrap-credentials.local', import.meta.url));
   let wroteFile = false;
   try {
     await source.initialize();

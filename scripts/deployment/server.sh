@@ -84,15 +84,27 @@ case "$ACTION" in
     initadmin)
         exists "$API" || fail 'Deploy the API first.'
         owned "$API"
-        # 复用应用初始化程序；凭据从容器复制到仅 root 可读目录后删除容器内副本。
+        current=$(cat "$ROOT/current-release")
+        [[ "$current" =~ ^[0-9]{8}-[0-9]{6}-[a-f0-9]{6}$ ]] || fail 'Invalid current release.'
+        current_directory="$ROOT/releases/$current"
+        dependency_id=$(cat "$current_directory/dependencies.id")
+        [[ "$dependency_id" =~ ^[a-f0-9]{64}$ ]] || fail 'Invalid dependency identifier.'
+        [[ ! -e "$ROOT/shared/.bootstrap-credentials.local" ]] || fail 'Initial credential file already exists.'
+        mkdir -p "$ROOT/runtime/bootstrap"
+        bootstrap_flags=()
         if [[ "${6:-}" == stdin ]]; then
-            docker exec -i --user 0 "$API" node /app/apps/api/dist/identity/bootstrap.js --password-stdin
-        else
-            docker exec --user 0 "$API" node /app/apps/api/dist/identity/bootstrap.js
+            bootstrap_flags=(--password-stdin)
         fi
-        docker cp "$API:/app/.bootstrap-credentials.local" "$ROOT/shared/.bootstrap-credentials.local"
+        # 独立的一次性容器只写凭据目录；运行中的 API 不获得该目录的挂载。
+        docker run --rm -i --network "$NETWORK" --memory 512m --env-file "$current_directory/production.env" \
+            -e BOOTSTRAP_CREDENTIALS_FILE=/run/bootstrap/.bootstrap-credentials.local \
+            -v "$current_directory/app:/app:ro" \
+            -v "$ROOT/dependencies/$dependency_id/api/node_modules:/app/apps/api/node_modules:ro" \
+            -v "$ROOT/runtime/bootstrap:/run/bootstrap" -w /app "$NODE_IMAGE" \
+            node apps/api/dist/identity/bootstrap.js "${bootstrap_flags[@]}"
+        mv "$ROOT/runtime/bootstrap/.bootstrap-credentials.local" "$ROOT/shared/.bootstrap-credentials.local"
         chmod 600 "$ROOT/shared/.bootstrap-credentials.local"
-        docker exec --user 0 "$API" rm /app/.bootstrap-credentials.local
+        rmdir "$ROOT/runtime/bootstrap"
         echo "Initial credentials: $ROOT/shared/.bootstrap-credentials.local (not printed)."
         exit 0
         ;;
@@ -103,36 +115,54 @@ esac
 DIRECTORY="$ROOT/releases/$RELEASE"
 [[ -d "$DIRECTORY" ]] || fail 'Release directory missing.'
 cd "$DIRECTORY"
-sha256sum -c images.sha256
+sha256sum -c artifacts.sha256
 check_port
-[[ $(df -Pk /var/lib/docker | awk 'NR==2 {print $4}') -gt 2097152 ]] || fail 'Docker filesystem needs at least 2 GiB free before deployment.'
-docker load -i images.tar.gz
-rm -f images.tar.gz
+docker image inspect "$NODE_IMAGE" "$WEB_IMAGE" "$MYSQL_IMAGE" >/dev/null
+[[ $(df -Pk "$ROOT" | awk 'NR==2 {print $4}') -gt 1048576 ]] || fail 'Deployment filesystem needs at least 1 GiB free.'
+dependency_id=$(cat dependencies.id)
+[[ "$dependency_id" =~ ^[a-f0-9]{64}$ ]] || fail 'Invalid dependency identifier.'
+DEPENDENCIES="$ROOT/dependencies/$dependency_id"
+if [[ ! -f "$DEPENDENCIES/.ready" ]]; then
+    [[ -f dependencies.tar.gz ]] || fail 'Missing dependency archive; upload it before deployment.'
+    [[ "$(gzip -dc dependencies.tar.gz | sha256sum | awk '{print $1}')" == "$dependency_id" ]] || fail 'Dependency content checksum mismatch.'
+    staging="$ROOT/dependencies/$dependency_id-$RELEASE"
+    mkdir "$staging"
+    tar -xzf dependencies.tar.gz -C "$staging"
+    chmod -R a+rX "$staging"
+    touch "$staging/.ready"
+    mv "$staging" "$DEPENDENCIES"
+fi
+mkdir app
+tar -xzf application.tar.gz -C app
+chmod -R a+rX app
+rm -f application.tar.gz dependencies.tar.gz
+API_MOUNTS=(-v "$DIRECTORY/app:/app:ro" -v "$DEPENDENCIES/api/node_modules:/app/apps/api/node_modules:ro")
+WEB_MOUNTS=(-v "$DIRECTORY/app/web:/usr/share/nginx/html:ro" -v "$DIRECTORY/app/nginx.conf:/etc/nginx/conf.d/default.conf:ro")
+API_HEALTH="node -e \"fetch('http://127.0.0.1:3100/api/v1/health/ready',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
 
 if [[ "$ACTION" == validate ]]; then
-    # 临时网络与回环随机端口验证真实镜像；仅查询生产数据库，不执行迁移或业务写入。
+    # 使用与正式部署一致的只读挂载验证产物，不执行业务迁移。
     probe_network="ntfs-probe-$RELEASE"
     probe_api="ntfs-api-probe-$RELEASE"
     probe_web="ntfs-web-probe-$RELEASE"
     cleanup_probe() {
         docker rm -f "$probe_web" "$probe_api" >/dev/null 2>&1 || true
         docker network rm "$probe_network" >/dev/null 2>&1 || true
-        docker rmi "ntfs-api:$RELEASE" "ntfs-web:$RELEASE" >/dev/null 2>&1 || true
-        rm -f "$DIRECTORY/production.env" "$DIRECTORY/mysql.cnf" "$DIRECTORY/images.sha256"
-        rmdir "$DIRECTORY" 2>/dev/null || true
+        [[ "$DIRECTORY" == "$ROOT/releases/$RELEASE" ]] && rm -rf -- "$DIRECTORY"
     }
     trap cleanup_probe EXIT
     docker network create --label ntfs.owner="$OWNER" "$probe_network" >/dev/null
     docker run --rm --network "$probe_network" --memory 256m --env-file "$DIRECTORY/production.env" \
-        -w /app/apps/api "ntfs-api:$RELEASE" node --input-type=module -e '
+        "${API_MOUNTS[@]}" -w /app/apps/api "$NODE_IMAGE" node --input-type=module -e '
         import mysql from "mysql2/promise";
         const c=await mysql.createConnection({host:process.env.DB_HOST,port:Number(process.env.DB_PORT),user:process.env.DB_USERNAME,password:process.env.DB_PASSWORD,connectTimeout:10000});
         try { const [rows]=await c.query("SELECT VERSION() AS version"); console.log("API production dependencies and database connection OK",rows[0].version); } finally { await c.end(); }'
     docker run -d --name "$probe_api" --label ntfs.owner="$OWNER" --network "$probe_network" --network-alias ntfs-api \
         --memory 512m --security-opt no-new-privileges --cap-drop ALL --env-file "$DIRECTORY/production.env" \
-        --log-driver json-file --log-opt max-size=5m --log-opt max-file=2 "ntfs-api:$RELEASE" >/dev/null
+        --user node "${API_MOUNTS[@]}" -w /app \
+        --log-driver json-file --log-opt max-size=5m --log-opt max-file=2 "$NODE_IMAGE" node apps/api/dist/main.js >/dev/null
     docker run -d --name "$probe_web" --label ntfs.owner="$OWNER" --network "$probe_network" --memory 128m \
-        -p 127.0.0.1::80 --log-driver json-file --log-opt max-size=5m --log-opt max-file=2 "ntfs-web:$RELEASE" >/dev/null
+        "${WEB_MOUNTS[@]}" -p 127.0.0.1::80 --log-driver json-file --log-opt max-size=5m --log-opt max-file=2 "$WEB_IMAGE" >/dev/null
     probe_port=$(docker port "$probe_web" 80/tcp | awk -F: '{print $NF}')
     probe_ready=false
     for attempt in $(seq 1 24); do
@@ -214,7 +244,7 @@ fi
 
 migration_started=true
 docker run --rm --network "$NETWORK" --memory 512m --env-file "$DIRECTORY/production.env" \
-    "ntfs-api:$RELEASE" node apps/api/dist/database/cli.js migrate 2>&1 | tee "$DIRECTORY/migration.log"
+    "${API_MOUNTS[@]}" -w /app "$NODE_IMAGE" node apps/api/dist/database/cli.js migrate 2>&1 | tee "$DIRECTORY/migration.log"
 if grep -qx 'Applied migrations: 0' "$DIRECTORY/migration.log"; then schema_unchanged=true; fi
 
 if $old_api; then docker rename "$API" "$API-before-$RELEASE"; fi
@@ -223,7 +253,9 @@ new_api=true
 docker run -d --name "$API" --label ntfs.owner="$OWNER" --label ntfs.release="$RELEASE" \
     --network "$NETWORK" --network-alias ntfs-api --restart unless-stopped --memory 512m \
     --security-opt no-new-privileges --cap-drop ALL --env-file "$DIRECTORY/production.env" \
-    --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 "ntfs-api:$RELEASE" >/dev/null
+    --user node "${API_MOUNTS[@]}" -w /app \
+    --health-cmd "$API_HEALTH" --health-interval 10s --health-timeout 6s --health-retries 6 \
+    --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 "$NODE_IMAGE" node apps/api/dist/main.js >/dev/null
 
 ready=false
 for attempt in $(seq 1 24); do
@@ -235,7 +267,8 @@ $ready || { echo 'API readiness failed.' >&2; false; }
 new_web=true
 docker run -d --name "$WEB" --label ntfs.owner="$OWNER" --label ntfs.release="$RELEASE" \
     --network "$NETWORK" --restart unless-stopped --memory 128m \
-    -p "$HTTP_BIND:$HTTP_PORT:80" --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 "ntfs-web:$RELEASE" >/dev/null
+    "${WEB_MOUNTS[@]}" --health-cmd 'curl -fsS http://127.0.0.1/healthz || exit 1' --health-interval 10s --health-timeout 5s --health-retries 6 \
+    -p "$HTTP_BIND:$HTTP_PORT:80" --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 "$WEB_IMAGE" >/dev/null
 ready=false
 for attempt in $(seq 1 12); do
     if curl -fsS --max-time 6 "http://$HTTP_BIND:$HTTP_PORT/api/v1/health/ready" >/dev/null && \
@@ -250,7 +283,7 @@ mv "$ROOT/shared/mysql.cnf.next" "$ROOT/shared/mysql.cnf"
 printf '%s\n' "$RELEASE" > "$ROOT/current-release"
 trap - ERR
 
-# 成功后清理旧容器；镜像、配置、备份保留用于人工恢复，绝不执行全局 prune。
+# 成功后清理旧容器；版本产物、配置与备份保留用于人工恢复，不删除共用依赖。
 if $old_web; then docker rm "$WEB-before-$RELEASE" >/dev/null; fi
 if $old_api; then docker rm "$API-before-$RELEASE" >/dev/null; fi
 docker ps --filter label=ntfs.owner="$OWNER" --format '{{.Names}} {{.Status}} {{.Ports}}'

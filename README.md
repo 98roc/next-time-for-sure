@@ -61,7 +61,8 @@
 
 - [工程基线与验收对照](docs/development/工程基线与验收对照.md)：对象关系、权限设计及实现状态。
 - [本地开发与启动](docs/development/本地开发与启动.md)：nvm、配置、迁移、运行及Codex探针接入。
-- [Docker生产部署](docs/development/Docker部署.md)：本地私有配置、镜像上传、环境验证、一键发布与备份恢复边界。
+- [Docker生产部署](docs/development/Docker部署.md)：本地私有配置、基础镜像准备、产物挂载、一键发布与备份恢复边界。
+- [数据库脚本](database/README.md)：空库初始化 SQL、只读校验与版本化迁移说明；不包含真实账号凭据。
 
 在根目录配置被Git忽略的`.env.local`后，可通过PowerShell运行：
 

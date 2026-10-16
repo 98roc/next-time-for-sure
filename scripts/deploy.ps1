@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-Build and upload production Docker images from Windows PowerShell 5.1.
+Build and upload production artifacts for Docker bind-mount deployment.
 .DESCRIPTION
 Prepare configures the server without publishing business code. Check is read-only.
-Validate builds images and tests them in temporary loopback-only containers, without migrations.
+Validate tests compiled artifacts in temporary loopback-only containers, without migrations.
 Deploy backs up the database, migrates, starts containers and checks readiness.
 InitAdmin is an explicit, separate first-account operation.
 #>

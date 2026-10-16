@@ -1,4 +1,0 @@
-FROM nginx:1.30.6
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY web/ /usr/share/nginx/html/
-HEALTHCHECK --interval=10s --timeout=5s --retries=6 CMD curl -fsS http://127.0.0.1/healthz || exit 1
