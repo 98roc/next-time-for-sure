@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, HttpCode, Post, Query, Req } from '@nestjs/common';
 import type { IncomingMessage } from 'node:http';
 import { z } from 'zod';
-import { v2IdSchema, v2ImpactIntentSchema, v2MemberImpactInputSchema, v2PeriodPairSchema, v2PersonalCommandSchema, v2PlanningCommandSchema, v2ProjectCommandSchema, v2ReportCommandSchema, v2TaskCommandSchema, v2TeamCommandSchema } from '@ntfs/contracts';
+import { v2AddExistingSchema, v2IdSchema, v2ImpactIntentSchema, v2MemberImpactInputSchema, v2PeriodPairSchema, v2PersonalCommandSchema, v2PlanningCommandSchema, v2ProjectCommandSchema, v2ReportCommandSchema, v2TaskCommandSchema, v2TaskEditSchema, v2TeamCommandSchema } from '@ntfs/contracts';
 import { assertBusinessOrigin, businessToken, csrfHeader, parseBody } from '../identity/http.js';
 import { V2WorkspaceService } from './workspace.service.js';
 
@@ -15,6 +15,9 @@ export class V2WorkspaceController {
   /** 查询单条任务历史。 */
   @Get('history') @Header('Cache-Control', 'no-store')
   history(@Req() request: IncomingMessage, @Query() query: unknown) { return this.service.history(businessToken(request), parseBody(z.object({ taskId: v2IdSchema }).strict(), query).taskId); }
+  /** 总览包含区间安排和实际执行，不把后来状态写入历史。 */
+  @Get('summary') @Header('Cache-Control', 'no-store')
+  summary(@Req() request: IncomingMessage, @Query() query: unknown) { return this.service.summary(businessToken(request), parseBody(z.object({ periodId: v2IdSchema }).strict(), query).periodId); }
   /** 只读影响预览不需要 CSRF 写入令牌，但仍验证业务来源。 */
   @Post('impact') @HttpCode(200) @Header('Cache-Control', 'no-store')
   impact(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.impact(businessToken(request), parseBody(v2ImpactIntentSchema, body)); }
@@ -42,4 +45,10 @@ export class V2WorkspaceController {
   /** 团队文案及多人项目负责人配置。 */
   @Post('team') @HttpCode(200)
   team(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.team(businessToken(request), csrfHeader(request), parseBody(v2TeamCommandSchema, body)); }
+  /** 编辑弹窗一次保存。 */
+  @Post('edit') @HttpCode(200)
+  edit(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.edit(businessToken(request), csrfHeader(request), parseBody(v2TaskEditSchema, body)); }
+  /** 批量选择既有任务沿用原任务标识。 */
+  @Post('add-existing') @HttpCode(200)
+  addExisting(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.addExisting(businessToken(request), csrfHeader(request), parseBody(v2AddExistingSchema, body)); }
 }

@@ -1,9 +1,9 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import type { V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2TaskCommand, V2TeamCommand, V2Workspace } from '@ntfs/contracts';
+import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2Task, V2TaskCommand, V2TaskEdit, V2TeamCommand, V2Workspace } from '@ntfs/contracts';
 import { DatabaseService } from '../database/database.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { loadV2Context, requireVersion } from './context.js';
-import { shanghaiDate } from './calendar.js';
+import { naturalWeek, shanghaiDate } from './calendar.js';
 import { canCreateProjectTask, canManageProject } from './permissions.js';
 import { authorizeProjectCommand, authorizeTaskCommand, requireTask } from './authorization.js';
 import { V2TaskRepository } from './task.repository.js';
@@ -18,6 +18,8 @@ import { authorizePlanning, mutatePlanning, mutateReport } from './planning-muta
 import { previewImpact, requireConfirmation } from './impact.js';
 import { buildWeeklyState } from './weekly-state.js';
 import { memberImpact, mutateTeam, requireTeamLeader } from './team-management.js';
+import { authorizeEdit, saveTask } from './task-edit.js';
+import { summarizePeriod } from './history.js';
 
 /** V2 工作区统一事务边界，所有入口包含 Token 都重读当前身份与权限。 */
 @Injectable()
@@ -34,7 +36,7 @@ export class V2WorkspaceService {
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { message: '', version: 0 };
       return {
-        team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessage: settings.message, teamVersion: settings.version, teamLeader: context.teamLeader, today,
+        team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessage: settings.message, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,
         accounts: context.organization.accounts.filter((account) => account.teamId === context.teamId && context.teamId !== null),
         projects: context.projects.map((project) => ({ id: project.id, teamId: project.teamId, name: context.organization.projects.find((entry) => entry.id === project.id)?.name ?? '', version: context.organization.projects.find((entry) => entry.id === project.id)?.version ?? 0, members: project.members, canManage: canManageProject(context.actor, project), canCreate: canCreateProjectTask(context.actor, project, context.actor.id) || canManageProject(context.actor, project), canConfirmMilestone: project.members.some((member) => member.accountId === context.actor.id && member.roles.includes('project_lead')) })),
         periods: context.teamId ? await planning.periods(context.teamId) : [], tasks: visible, arrangements: await tasks.arrangements(visible.map((task) => task.id)), milestones: await projects.milestones(projectIds), backlog: await projects.backlog(projectIds),
@@ -58,6 +60,7 @@ export class V2WorkspaceService {
       return executeOnce(manager, context.actor.id, command, async () => {
         if (task && 'version' in command) requireVersion(task.version, command.version);
         const today = shanghaiDate(new Date().toISOString());
+        if (command.action === 'update_project' && task?.milestoneId && task.milestoneId !== command.milestoneId) await requireConfirmation(manager, context, { action: 'unlink_milestone', taskId: task.id, version: command.version }, command.milestoneConfirmation ?? '', today);
         if (command.action === 'delete') await requireConfirmation(manager, context, { action: 'delete_task', taskId: command.taskId, version: command.version }, command.confirmation, today);
         if (command.action === 'remove_arrangement') await requireConfirmation(manager, context, { action: command.action, taskId: command.taskId, version: command.version, periodId: command.periodId }, command.confirmation, today);
         if (command.action === 'change_arrangement') await requireConfirmation(manager, context, { action: command.action, taskId: command.taskId, version: command.version, periodId: command.periodId, targetPeriodId: command.targetPeriodId }, command.confirmation, today);
@@ -83,6 +86,17 @@ export class V2WorkspaceService {
   /** 周报只读事实与安排，切换区间不会创建任务或自动结转。 */
   async weekly(token: string, summaryPeriodId: string, planPeriodId: string) { return this.database.transaction(async (manager) => (await buildWeeklyState(manager, await loadV2Context(manager, this.identity, token), summaryPeriodId, planPeriodId)).state); }
 
+  /** 项目总览与周报使用同一历史计算，不以当前状态覆盖已结束区间。 */
+  async summary(token: string, periodId: string) {
+    return this.database.transaction(async (manager) => {
+      const context = await loadV2Context(manager, this.identity, token), tasks = new V2TaskRepository(manager), planning = new V2PlanningRepository(manager);
+      const period = context.teamId ? (await planning.periods(context.teamId)).find((row) => row.id === periodId) : undefined;
+      if (!period) throw new ConflictException('日期区间不存在。');
+      const ids = await tasks.projectTaskIds(context.projects.map((row) => row.id));
+      return summarizePeriod(period, await tasks.history(ids), await planning.arrangementHistory(ids), new Date().toISOString());
+    });
+  }
+
   /** 共享排序及日期修改在同一事务检查作用域、影响与版本。 */
   async planning(token: string, csrf: string, command: V2PlanningCommand) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf); authorizePlanning(context, command); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutatePlanning(manager, context, command, shanghaiDate(new Date().toISOString())) })); }); }
 
@@ -94,4 +108,36 @@ export class V2WorkspaceService {
 
   /** 团队配置与任务分配共享事务锁，每次提交重算移出限制。 */
   async team(token: string, csrf: string, command: V2TeamCommand) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf); requireTeamLeader(context); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutateTeam(manager, context, command) })); }); }
+
+  /** 共用弹窗的业务字段、状态和区间一次原子提交。 */
+  async edit(token: string, csrf: string, command: V2TaskEdit) {
+    return this.database.transaction(async (manager) => {
+      const context = await loadV2Context(manager, this.identity, token, csrf), task = requireTask(context, await new V2TaskRepository(manager).get(command.taskId));
+      authorizeEdit(context, task, command);
+      return executeOnce(manager, context.actor.id, command, async () => {
+        requireVersion(task.version, command.version);
+        if (command.details?.kind === 'project' && task.milestoneId && task.milestoneId !== command.details.milestoneId) await requireConfirmation(manager, context, { action: 'unlink_milestone', taskId: task.id, version: command.version }, command.milestoneConfirmation ?? '', shanghaiDate(new Date().toISOString()));
+        if (command.arrangement) await requireConfirmation(manager, context, { action: 'change_arrangement', taskId: task.id, version: command.version, periodId: command.arrangement.periodId, targetPeriodId: command.arrangement.targetPeriodId }, command.arrangement.confirmation, shanghaiDate(new Date().toISOString()));
+        await saveTask(manager, context, task, command); return { objectIds: [task.id] };
+      });
+    });
+  }
+
+  /** 选择已有任务整批加入同一区间；已有关系不覆盖，预计投入统一留空。 */
+  async addExisting(token: string, csrf: string, command: V2AddExisting) {
+    return this.database.transaction(async (manager) => {
+      const context = await loadV2Context(manager, this.identity, token, csrf), repository = new V2TaskRepository(manager);
+      if (new Set(command.tasks.map((row) => row.taskId)).size !== command.tasks.length) throw new ConflictException('任务不能重复选择。');
+      const selected: { task: V2Task; action: Extract<V2TaskCommand, { action: 'add_arrangement' }> }[] = [];
+      for (const item of command.tasks) {
+        const task = requireTask(context, await repository.get(item.taskId));
+        const action: Extract<V2TaskCommand, { action: 'add_arrangement' }> = { ...item, operationId: command.operationId, action: 'add_arrangement', periodId: command.periodId, plannedDays: null };
+        authorizeTaskCommand(context, action, task); selected.push({ task, action });
+      }
+      return executeOnce(manager, context.actor.id, command, async () => {
+        for (const item of selected) { requireVersion(item.task.version, item.action.version); await mutateTask(manager, context, item.action, item.task); }
+        return { objectIds: selected.map((row) => row.task.id) };
+      });
+    });
+  }
 }

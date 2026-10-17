@@ -1,0 +1,28 @@
+import { useId, useState } from 'react';
+import type { V2Backlog } from '@ntfs/contracts';
+import { createOperationId } from '../identity/operation-id';
+import { useWorkspace } from './workspace';
+import { ModalPage, useModal } from './modal';
+import { Feedback, Field, useAction } from './controls';
+import { PriorityField } from './task-fields';
+import { TaskCreate } from './task-create';
+import { Confirmation } from './confirmation';
+
+/** 待建列表只展示事项、优先级和创建人，不保留旧需求审批字段。 */
+export function BacklogList({ projectId }: { projectId: string }) {
+  const { data } = useWorkspace(), modal = useModal(), project = data.projects.find((row) => row.id === projectId);
+  const rows = data.backlog.filter((row) => row.projectId === projectId);
+  return <><div className="nt-tools"><span className="nt-muted">明确执行人和日期区间后，可转为正式任务</span><button className="nt-primary" onClick={() => modal.open(<BacklogForm projectId={projectId} />)}>＋ 新增待建任务</button></div><div className="nt-project nt-scroll"><table className="nt-table"><thead><tr><th>名称</th><th>优先级</th><th>创建人</th><th>操作</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><button className="nt-link" onClick={() => modal.open(<BacklogForm projectId={projectId} backlog={row} />)}>{row.title}</button></td><td>{row.priority}</td><td>{data.accounts.find((account) => account.id === row.creatorId)?.displayName ?? '历史成员'}</td><td><button disabled={!project?.canCreate} title={!project?.canCreate ? '仅项目经理角色不能安排正式任务，请由项目研发负责人转换' : undefined} onClick={() => modal.open(<TaskCreate projectId={projectId} backlog={row} />)}>转为任务</button></td></tr>)}</tbody></table>{!rows.length && <div className="nt-empty">暂无待建任务</div>}</div></>;
+}
+
+/** 创建人可以维护自己提出的事项，项目管理者可以维护项目内全部待建。 */
+export function BacklogForm({ projectId, backlog }: { projectId: string; backlog?: V2Backlog }) {
+  const { data, user, run } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
+  const project = data.projects.find((row) => row.id === projectId), editable = !backlog || backlog.creatorId === user.id || project?.canManage;
+  const [title, setTitle] = useState(backlog?.title ?? ''), [priority, setPriority] = useState(backlog?.priority ?? 3);
+  return <ModalPage title={backlog ? '待建任务' : '新增待建任务'} dirty={title !== (backlog?.title ?? '') || priority !== (backlog?.priority ?? 3)} busy={action.busy} actions={<>
+    {backlog && editable && <button className="v2-danger" disabled={action.busy} onClick={() => modal.push(<Confirmation label="删除待建任务" danger intent={{ action: 'delete_backlog', backlogId: backlog.id, version: backlog.version }} onConfirm={(confirmation) => run('projects', { action: 'delete_backlog', backlogId: backlog.id, version: backlog.version, operationId: createOperationId(), confirmation })} onDone={modal.finish} />)}>删除待建任务</button>}
+    {backlog && <button disabled={!project?.canCreate} title={!project?.canCreate ? '请由项目研发负责人安排' : undefined} onClick={() => modal.push(<TaskCreate projectId={projectId} backlog={{ ...backlog, title, priority }} onDone={modal.finish} />)}>转为任务</button>}
+    {editable && <button className="nt-primary" form={formId} type="submit" disabled={action.busy}>保存</button>}
+  </>}><p className="v2-context">项目：{project?.name} · 创建人：{backlog ? data.accounts.find((row) => row.id === backlog.creatorId)?.displayName ?? '历史成员' : user.displayName}</p><form id={formId} onSubmit={(event) => { event.preventDefault(); void action.act(async () => { await run('projects', backlog ? { action: 'edit_backlog', operationId: createOperationId(), backlogId: backlog.id, version: backlog.version, title, priority } : { action: 'create_backlog', operationId: createOperationId(), projectId, title, priority }); modal.finish(); }); }}><fieldset disabled={action.busy || !editable}><div className="v2-fields"><Field label="事项名称" full><input required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></Field><PriorityField value={priority} onChange={setPriority} /></div></fieldset><Feedback error={action.error} /></form></ModalPage>;
+}

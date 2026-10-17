@@ -1,0 +1,32 @@
+/* 正式页面的语义化元素重置；业务版式在对应原型样式中维护。 */
+.v2-scope { color:var(--text); }
+.v2-scope header { display:block;justify-content:normal;align-items:normal;gap:normal;margin:0; }
+.v2-scope a { text-decoration:none; color:inherit; }
+.v2-scope i { font-style:normal; }
+.v2-scope fieldset { border:0; padding:0; margin:0; min-width:0; }
+.v2-scope .v2-fields { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:16px 0; }
+.v2-scope .v2-field { display:grid;gap:7px;min-width:0;font-size:12px;color:var(--v2-muted);margin:0; }
+.v2-scope .v2-field input,.v2-scope .v2-field select { width:100%;min-width:0; }
+.v2-scope .v2-full { grid-column:1/-1; }
+.v2-scope .v2-check { display:flex;gap:8px;align-items:center;font-size:13px; }
+.v2-scope .v2-check input { width:16px;min-height:16px; }
+.v2-scope .v2-records { display:grid;gap:16px; }
+.v2-scope .v2-record { padding:16px;border:1px solid var(--v2-line);border-radius:10px;background:var(--v2-canvas); }
+.v2-scope .v2-facts { display:grid;grid-template-columns:100px minmax(0,1fr);gap:14px; }
+.v2-scope .v2-facts dt { color:var(--v2-muted); }
+.v2-scope .v2-facts dd { margin:0;overflow-wrap:anywhere; }
+.v2-scope .v2-error { color:var(--v2-danger);font-size:13px;padding:8px 0; }
+.v2-loading { padding:36px; }
+.v2-toast { position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2000;padding:10px 16px;max-width:90vw;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--accent);box-shadow:0 5px 20px #0002;font-size:13px; }
+.v2-scope .v2-history { padding-left:20px; }
+.v2-scope .v2-history li { padding:12px 0;border-bottom:1px solid var(--v2-line); }
+.v2-scope .v2-history p,.v2-scope .v2-history small { color:var(--v2-muted);font-size:12px; }
+.v2-mark { display:inline-block;position:relative;width:28px;height:30px;flex-shrink:0; }
+.v2-mark::before { content:'';position:absolute;width:16px;height:16px;left:0;bottom:0;border:1.5px solid currentColor;border-radius:3px; }
+.v2-mark::after { content:'';position:absolute;width:20px;height:20px;right:0;top:0;background:currentColor;border:3px solid var(--surface);border-radius:5px; }
+.v2-avatar { display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--selected);color:var(--accent);flex-shrink:0; }
+.v2-scope .v2-profile { display:flex;gap:9px;margin-top:32px;font-size:13px;align-items:center; }
+.v2-scope .v2-profile small { display:block;font-size:11px;color:var(--muted); }
+.v2-scope .v2-drag-ghost { position:fixed!important;left:0!important;top:0!important;margin:0!important;z-index:1500;pointer-events:none;opacity:.94;box-shadow:0 12px 30px #0003;will-change:transform; }
+.v2-scope .v2-drag-source { display:none!important; }
+@media(max-width:600px) { .v2-scope .v2-fields { grid-template-columns:minmax(0,1fr); }.v2-scope .v2-field input,.v2-scope .v2-field select { font-size:16px; } }

@@ -10,6 +10,7 @@ import { shiftDate } from './calendar.js';
 import { requireConfirmation } from './impact.js';
 import { confirmReport, editReport, reorderScoped } from './shared-report.js';
 import { buildWeeklyState } from './weekly-state.js';
+import { summarizePeriod } from './history.js';
 
 /** 团队负责人管日期与跨项目排序，项目负责人只能管理本项目区间内顺序。 */
 export function authorizePlanning(context: V2Context, command: V2PlanningCommand): void {
@@ -35,16 +36,22 @@ export async function mutatePlanning(manager: EntityManager, context: V2Context,
     const proposed = periods.map((period) => { const change = command.periods.find((row) => row.periodId === period.id); return change ? { ...period, startOn: change.startOn, endOn: change.endOn } : period; });
     await repository.updatePeriods(periods, proposed, teamId, context.actor.id); return command.periods.map((row) => row.periodId);
   }
-  let scope: string, ids: string[], requested: string[];
-  if (command.action === 'reorder_projects') { scope = 'projects'; ids = context.organization.projects.filter((project) => project.teamId === teamId).map((project) => project.id); requested = command.projectIds; }
+  let scope: string, ids: string[], allowed: string[], requested: string[];
+  if (command.action === 'reorder_projects') { scope = 'projects'; ids = context.organization.projects.filter((project) => project.teamId === teamId).map((project) => project.id); allowed = ids; requested = command.projectIds; }
   else {
-    if (!(await repository.periods(teamId)).some((row) => row.id === command.periodId)) throw new ConflictException('日期区间不存在。');
+    const period = (await repository.periods(teamId)).find((row) => row.id === command.periodId);
+    if (!period) throw new ConflictException('日期区间不存在。');
     const tasks = new V2TaskRepository(manager), projectTasks = await tasks.visible(context.actor.id, [command.projectId]);
     const rows = await tasks.arrangements(projectTasks.filter((task) => task.kind === 'project').map((task) => task.id));
-    ids = rows.filter((row) => row.periodId === command.periodId).map((row) => row.taskId); requested = command.taskIds; scope = `tasks:${command.projectId}:${command.periodId}`;
+    const historyIds = await tasks.projectTaskIds([command.projectId]);
+    const summary = summarizePeriod(period, await tasks.history(historyIds), await repository.arrangementHistory(historyIds), new Date().toISOString());
+    const planIds = rows.filter((row) => row.periodId === command.periodId).map((row) => row.taskId);
+    ids = [...new Set([...summary.map((row) => row.taskId), ...planIds])];
+    allowed = command.view === 'summary' ? summary.filter((row) => !command.executorId || row.executorId === command.executorId).map((row) => row.taskId) : planIds.filter((id) => !command.executorId || projectTasks.find((task) => task.id === id)?.executorId === command.executorId);
+    requested = command.taskIds; scope = `tasks:${command.projectId}:${command.periodId}`;
   }
   const current = await repository.order(teamId, scope, ids);
-  const next = checkRule(() => reorderScoped(current.ids, ids, requested, current.version, command.version));
+  const next = checkRule(() => reorderScoped(current.ids, allowed, requested, current.version, command.version));
   await repository.saveOrder(teamId, scope, next); return [teamId];
 }
 

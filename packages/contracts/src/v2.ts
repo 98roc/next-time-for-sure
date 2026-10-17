@@ -80,7 +80,7 @@ export const v2TaskCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...command, action: z.literal('create_private'), task: v2PrivateTaskInputSchema }).strict(),
   z.object({ ...command, action: z.literal('create_batch'), tasks: z.array(v2ProjectTaskInputSchema).min(1).max(100) }).strict(),
   z.object({ ...command, ...existing, action: z.literal('set_status'), status: v2StatusSchema, categoryId: v2IdSchema.optional() }).strict(),
-  z.object({ ...command, ...existing, action: z.literal('update_project'), title, executorId: v2IdSchema, priority: v2PrioritySchema, milestoneId: v2IdSchema.nullable() }).strict(),
+  z.object({ ...command, ...existing, action: z.literal('update_project'), title, executorId: v2IdSchema, priority: v2PrioritySchema, milestoneId: v2IdSchema.nullable(), milestoneConfirmation: z.string().regex(/^[a-f0-9]{64}$/u).optional() }).strict(),
   z.object({ ...command, ...existing, action: z.literal('update_private'), title, priority: v2PrioritySchema }).strict(),
   z.object({ ...command, ...existing, action: z.literal('delete'), confirmation: z.string().length(64) }).strict(),
   z.object({ ...command, ...existing, action: z.literal('add_arrangement'), periodId: v2IdSchema, plannedDays: v2PlannedDaysSchema }).strict(),

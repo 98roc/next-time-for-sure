@@ -4,7 +4,7 @@ import { periodWindow } from './calendar.js';
 /** 历史结果不会以当前任务状态补全缺失历史；调用者先按当前项目权限裁剪来源。 */
 export type V2SummaryRow = {
   taskId: string; title: string | null; executorId: string | null; executorName: string | null; projectId: string | null;
-  status: V2Status | null; arranged: boolean; executed: boolean;
+  status: V2Status | null; priority: number | null; arranged: boolean; executed: boolean;
   planning: 'planned' | 'unplanned' | 'unknown'; historyIncomplete: boolean;
 };
 
@@ -36,7 +36,6 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
   const window = periodWindow(period);
   const currentExclusive = new Date(new Date(now).getTime() + 1).toISOString();
   const end = window.endExclusive < currentExclusive ? window.endExclusive : currentExclusive;
-  if (end <= window.start) return [];
   const grouped = new Map<string, V2TaskEvent[]>();
   for (const event of events) {
     // 私人事件即使误传入，也不能出现在团队总结。
@@ -51,7 +50,7 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const snapshot = known.at(-1)?.snapshot;
     const relevant = arrangements.filter((arrangement) => arrangement.taskId === taskId && arrangement.periodId === period.id && arrangement.validFrom < end && (arrangement.validUntil === null || arrangement.validUntil > window.start));
     const arranged = relevant.length > 0;
-    const executed = executedDuring(known, window.start, end);
+    const executed = end > window.start && executedDuring(known, window.start, end);
     if (!arranged && !executed) continue;
 
     // “计划内”要求区间开始前已经生效且开始时未撤销的真实安排。
@@ -60,7 +59,7 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const historyIncomplete = known.length === 0 || (first?.action === 'migrated' && first.occurredAt > window.start);
     const unknownPlanning = relevant.some((arrangement) => arrangement.provenance === 'migration_unknown');
     const supplemented = relevant.some((arrangement) => arrangement.provenance === 'migration_supplement');
-    rows.push({ taskId, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, arranged, executed, planning: planned ? 'planned' : unknownPlanning ? 'unknown' : supplemented || !historyIncomplete ? 'unplanned' : 'unknown', historyIncomplete });
+    rows.push({ taskId, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: planned ? 'planned' : unknownPlanning ? 'unknown' : supplemented || !historyIncomplete ? 'unplanned' : 'unknown', historyIncomplete });
   }
   return rows;
 }
