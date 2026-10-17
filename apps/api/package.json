@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "db:migrate": "tsc -p tsconfig.json && node dist/database/cli.js migrate",
     "db:status": "tsc -p tsconfig.json && node dist/database/cli.js status",
-    "test": "tsc -p tsconfig.json && node --test dist/**/*.test.js",
+    "test": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/**/*.test.js",
     "admin:init": "tsc -p tsconfig.json && node dist/identity/bootstrap.js",
     "identity:smoke": "tsc -p tsconfig.json && node dist/identity/integration-smoke.js",
     "organization:smoke": "tsc -p tsconfig.json && node dist/organization/integration-smoke.js",

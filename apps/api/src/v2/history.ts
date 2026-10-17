@@ -3,7 +3,7 @@ import { periodWindow } from './calendar.js';
 
 /** 历史结果不会以当前任务状态补全缺失历史；调用者先按当前项目权限裁剪来源。 */
 export type V2SummaryRow = {
-  taskId: string; title: string | null; executorId: string | null; projectId: string | null;
+  taskId: string; title: string | null; executorId: string | null; executorName: string | null; projectId: string | null;
   status: V2Status | null; arranged: boolean; executed: boolean;
   planning: 'planned' | 'unplanned' | 'unknown'; historyIncomplete: boolean;
 };
@@ -60,7 +60,7 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const historyIncomplete = known.length === 0 || (first?.action === 'migrated' && first.occurredAt > window.start);
     const unknownPlanning = relevant.some((arrangement) => arrangement.provenance === 'migration_unknown');
     const supplemented = relevant.some((arrangement) => arrangement.provenance === 'migration_supplement');
-    rows.push({ taskId, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, projectId: snapshot?.projectId ?? null, status: snapshot?.status ?? null, arranged, executed, planning: planned ? 'planned' : unknownPlanning ? 'unknown' : supplemented || !historyIncomplete ? 'unplanned' : 'unknown', historyIncomplete });
+    rows.push({ taskId, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, arranged, executed, planning: planned ? 'planned' : unknownPlanning ? 'unknown' : supplemented || !historyIncomplete ? 'unplanned' : 'unknown', historyIncomplete });
   }
   return rows;
 }

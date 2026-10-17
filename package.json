@@ -19,6 +19,7 @@
     "admin:init": "pnpm --filter @ntfs/api admin:init",
     "identity:smoke": "pnpm --filter @ntfs/api identity:smoke",
     "organization:smoke": "pnpm --filter @ntfs/api organization:smoke",
+    "v2:smoke": "pnpm --filter @ntfs/contracts build && pnpm --filter @ntfs/api build && node apps/api/dist/v2/api.integration.js",
     "work:smoke": "pnpm --filter @ntfs/api work:smoke",
     "personal:smoke": "pnpm --filter @ntfs/api build && node apps/api/dist/work/personal-workflow.integration.js",
     "token:smoke": "pnpm --filter @ntfs/api token:smoke",
