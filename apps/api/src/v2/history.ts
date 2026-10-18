@@ -48,7 +48,12 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const history = orderedHistory(group);
     const known = history.filter((event) => event.occurredAt < end);
     const snapshot = known.at(-1)?.snapshot;
-    const relevant = arrangements.filter((arrangement) => arrangement.taskId === taskId && arrangement.periodId === period.id && arrangement.validFrom < end && (arrangement.validUntil === null || arrangement.validUntil > window.start));
+    const relevant = arrangements.filter((arrangement) => {
+      if (arrangement.taskId !== taskId || arrangement.periodId !== period.id || (arrangement.validUntil !== null && arrangement.validUntil <= window.start)) return false;
+      // 迁移可在区间结束后承接旧安排；展示该关联但不把补录时刻倒填为提前计划。
+      const lateMigration = arrangement.provenance !== 'scheduled' && arrangement.validFrom >= window.endExclusive && arrangement.validFrom <= now;
+      return arrangement.validFrom < end || lateMigration;
+    });
     const arranged = relevant.length > 0;
     const executed = end > window.start && executedDuring(known, window.start, end);
     if (!arranged && !executed) continue;

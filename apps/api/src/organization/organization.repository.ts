@@ -103,7 +103,12 @@ export class OrganizationRepository {
 
   /** 仅用于本文件固定表列清单，不接受外部输入作为SQL标识符。 */
   private async hasReferences(references: string[][], id: string): Promise<boolean> {
+    // 旧表仅在转换过渡期存在；切换后不查询已删除表，也不恢复取消功能。
+    const existing = z.array(z.object({ name: z.string() })).parse(await this.manager.query("SELECT TABLE_NAME name FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE'"));
+    const names = new Set(existing.map((row) => row.name));
     for (const [table, column] of references) {
+      if (!table) throw new Error('Missing reference table');
+      if (!names.has(table)) { if (table.startsWith('v2_')) throw new Error('V2 schema incomplete'); continue; }
       const rows: unknown = await this.manager.query(`SELECT 1 AS found FROM ${table} WHERE ${column} = ? LIMIT 1`, [id]);
       if (z.array(z.object({ found: z.coerce.number() })).parse(rows).length) return true;
     }

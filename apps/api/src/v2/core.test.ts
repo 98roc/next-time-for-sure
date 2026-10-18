@@ -143,6 +143,18 @@ test('撤销安排不伪造计划内，迁移补录不补造历史状态，私�
   assert.equal(summarizePeriod(period, [event(privateTask, privateTask.createdAt, 'created', null)], [arrangement(privateTask, period)], '2026-10-20T00:00:00.000Z').length, 0);
 });
 
+test('区间结束后迁移仍承接该区间安排，补录不补造历史状态或提前计划', () => {
+  const at = '2026-10-20T04:00:00.000Z';
+  const migrated = { ...initial, version: 1, updatedAt: at };
+  const history = [event(migrated, at, 'migrated', null)];
+  const supplement: V2ArrangementHistory = { ...arrangement(migrated, period, at), provenance: 'migration_supplement' };
+  const row = summarizePeriod(period, history, [supplement], '2026-10-21T00:00:00.000Z')[0];
+  assert.equal(row?.arranged, true); assert.equal(row?.status, null); assert.equal(row?.historyIncomplete, true); assert.equal(row?.planning, 'unplanned');
+  assert.equal(summarizePeriod(period, history, [{ ...supplement, provenance: 'migration_unknown' }], '2026-10-21T00:00:00.000Z')[0]?.planning, 'unknown');
+  assert.equal(summarizePeriod(period, history, [supplement], '2026-10-19T00:00:00.000Z').length, 0);
+  assert.equal(summarizePeriod(period, history, [{ ...supplement, provenance: 'scheduled' }], '2026-10-21T00:00:00.000Z').length, 0);
+});
+
 test('默认分类唯一、手动分类优先、同状态字段编辑保持位置，删除接收默认职责', () => {
   const categories: V2Category[] = ['not_started', 'in_progress', 'completed'].map((status, position) => ({ id: randomUUID(), ownerId: executor, name: status, status: status === 'not_started' ? 'not_started' : status === 'in_progress' ? 'in_progress' : 'completed', isDefault: true, position, version: 0 }));
   const ongoing = categories.find((category) => category.status === 'in_progress'); assert.ok(ongoing);

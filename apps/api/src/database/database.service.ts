@@ -30,10 +30,13 @@ export class DatabaseService implements OnModuleDestroy {
     try {
       await this.connect();
       const rows: unknown = await this.source.query("SELECT metadata_value FROM platform_metadata WHERE metadata_key = 'schema_baseline'");
-      const metadata = z.array(z.object({ metadata_value: z.literal('foundation-v1') })).parse(rows);
+      const metadata = z.array(z.object({ metadata_value: z.enum(['foundation-v1', 'v2']) })).parse(rows);
       const migrationRows: unknown = await this.source.query('SELECT name FROM schema_migrations ORDER BY id');
       const names = z.array(z.object({ name: z.string() })).parse(migrationRows).map((row) => row.name);
-      if (metadata.length !== 1 || names.join(',') !== requiredMigrationNames.join(',')) throw new Error('Schema not current');
+      const retired = metadata[0]?.metadata_value === 'v2';
+      const expected = retired ? [...requiredMigrationNames, 'V2RetireLegacy1792281600000'] : requiredMigrationNames;
+      const pending = z.array(z.object({ metadata_key: z.string() })).parse(await this.source.query("SELECT metadata_key FROM platform_metadata WHERE metadata_key='v2_retirement_ready'"));
+      if (metadata.length !== 1 || names.join(',') !== expected.join(',') || (!retired && pending.length > 0)) throw new Error('Schema not current');
       return { status: 'ready', database: 'connected', migrations: 'current' };
     } catch {
       throw new ServiceUnavailableException('数据库尚未就绪，请检查连接配置并执行迁移。');
