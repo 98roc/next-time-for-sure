@@ -52,10 +52,10 @@ export async function saveConfig(path: string, value: unknown): Promise<DesktopC
   return config;
 }
 
-/** 按站点隔离会话及通知去重记录，默认本机站点保留原有用户数据。 */
-export function siteStorage(webUrl: string): { partition: string; ledger: string } {
+/** 按站点隔离会话，默认本机站点保留原有用户数据。 */
+export function siteStorage(webUrl: string): { partition: string } {
   const origin = parseAddress(webUrl, '网页地址', true);
-  if (origin === DEFAULT_WEB_URL) return { partition: '', ledger: 'notification-ledger.json' };
+  if (origin === DEFAULT_WEB_URL) return { partition: '' };
   const key = createHash('sha256').update(origin).digest('hex');
-  return { partition: `persist:site-${key}`, ledger: `notification-ledger-${key}.json` };
+  return { partition: `persist:site-${key}` };
 }

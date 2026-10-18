@@ -23,8 +23,8 @@ test('拒绝可执行协议、内嵌凭据、查询、锚点及错误字段类�
   assert.throws(() => parseConfig({ webUrl: DEFAULT_WEB_URL, updateUrl: '', checkOnStartup: 'true' }));
 });
 
-test('环境切换隔离Cookie与通知ID，同一origin稳定且默认保留历史', () => {
-  assert.deepEqual(siteStorage(DEFAULT_WEB_URL), { partition: '', ledger: 'notification-ledger.json' });
+test('环境切换隔离Cookie，同一origin稳定且默认保留历史', () => {
+  assert.deepEqual(siteStorage(DEFAULT_WEB_URL), { partition: '' });
   assert.deepEqual(siteStorage('https://WORK.example.com/'), siteStorage('https://work.example.com'));
   assert.notDeepEqual(siteStorage('http://work.example.com'), siteStorage('https://work.example.com'));
   assert.notDeepEqual(siteStorage('http://127.0.0.1:5174'), siteStorage('http://127.0.0.1:5175'));

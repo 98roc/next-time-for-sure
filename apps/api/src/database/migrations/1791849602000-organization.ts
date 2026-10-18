@@ -1,5 +1,5 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
-import { defaultPermissions } from '@ntfs/contracts';
+import { defaultPermissions } from './legacy-contracts.js';
 
 /** 建立多小组及项目角色结构；账号只允许一个当前团队。 */
 export class Organization1791849602000 implements MigrationInterface {

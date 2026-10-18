@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { MigrationInterface, QueryRunner } from 'typeorm';
-import { personalStatusLabels, personalStatusSchema } from '@ntfs/contracts';
+import { personalStatusLabels, personalStatusSchema } from './legacy-contracts.js';
 
 /** 旧分类按原执行状态拆列，迁移只改归类，不重写状态或实际时间。 */
 export class PersonalWorkflow1792022401000 implements MigrationInterface {

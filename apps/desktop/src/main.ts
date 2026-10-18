@@ -1,6 +1,5 @@
 import { app, BrowserWindow, dialog, Menu, nativeImage, session, Tray, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
-import { startNotifications } from './notifications.js';
 import { DEFAULT_UPDATE_URL, DEFAULT_WEB_URL, loadConfig, siteStorage, type DesktopConfig } from './config.js';
 import { createSettings } from './settings.js';
 import { createUpdater } from './updater.js';
@@ -14,7 +13,6 @@ app.setPath('userData', existingUserData);
 let window: BrowserWindow | undefined;
 let tray: Tray | undefined;
 let quitting = false;
-let stopNotifications: (() => void) | undefined;
 let configured = new URL(DEFAULT_WEB_URL);
 let updater: UpdateController | undefined;
 let openSettings: (() => void) | undefined;
@@ -26,7 +24,7 @@ function appIcon() {
   return nativeImage.createFromPath(join(__dirname, '../assets/icon.png'));
 }
 
-/** 通知与托盘只能打开当前配置的业务站点，页面本身重新加载权限。 */
+/** 托盘只能打开当前配置的业务站点，页面本身重新加载权限。 */
 function show(path?: string): void {
   if (!window) return;
   if (path) {
@@ -42,7 +40,6 @@ function show(path?: string): void {
 function refreshMenus(): void {
   const actions: MenuItemConstructorOptions[] = [
     { label: '打开下次一定', click: () => show('/') },
-    { label: '查看通知', click: () => show('/collaboration') },
     { label: '刷新网页', accelerator: 'CmdOrCtrl+R', click: () => window?.webContents.reload() },
     { type: 'separator' },
     { label: '客户端设置', click: () => openSettings?.() },
@@ -66,7 +63,7 @@ async function start(): Promise<void> {
   }
   configured = new URL(config.webUrl);
 
-  // 不同环境可能有相同账号与事件ID，登录Cookie及通知去重必须按站点隔离。
+  // 不同环境可能有相同账号与事件ID，登录Cookie必须按站点隔离。
   const storage = siteStorage(config.webUrl);
   const businessSession = storage.partition ? session.fromPartition(storage.partition) : session.defaultSession;
   businessSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
@@ -83,7 +80,6 @@ async function start(): Promise<void> {
   refreshMenus();
   if (configError) { openSettings(); return; }
 
-  stopNotifications = await startNotifications(configured.origin, join(app.getPath('userData'), storage.ledger), show, businessSession);
   void window.loadURL(configured.href).catch(async () => {
     if (quitting) return;
     await dialog.showMessageBox({ type: 'warning', title: '无法连接网页服务', message: '请检查服务是否启动、网络是否可用，或在客户端设置中修改网页地址。' });
@@ -96,6 +92,6 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => show());
   app.on('activate', () => show());
-  app.on('before-quit', () => { quitting = true; clearTimeout(startupTimer); stopNotifications?.(); tray?.destroy(); });
-  void app.whenReady().then(start).catch(() => { console.error('桌面启动失败，请检查服务或通知记录文件。'); app.quit(); });
+  app.on('before-quit', () => { quitting = true; clearTimeout(startupTimer); tray?.destroy(); });
+  void app.whenReady().then(start).catch(() => { console.error('桌面启动失败，请检查服务与客户端配置。'); app.quit(); });
 }

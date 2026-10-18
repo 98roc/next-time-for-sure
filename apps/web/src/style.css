@@ -12,5 +12,4 @@ h3 { font-size: 16px; font-weight: 600; }
 .panel-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .panel small { display: block; font-size: 12px; color: var(--muted); }
 .footnote { color: var(--muted); font-size: 12px; line-height: 1.9; margin-top: 24px; }
-.notification-indicator { font-size: 12px; }
 button { touch-action: manipulation; }

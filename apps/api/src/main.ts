@@ -12,7 +12,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api/v1');
   app.useGlobalFilters(new SafeExceptionFilter());
   app.enableShutdownHooks();
-  const description = new DocumentBuilder().setTitle('下次一定 API').setDescription('账号与组织、需求、团队任务、个人执行、周计划、周报和协作接口。').setVersion('1.0.0').build();
+  const description = new DocumentBuilder().setTitle('下次一定 API').setDescription('V2.0 账号与团队、项目任务、待建事项、个人看板和周报与周计划接口。').setVersion('2.0.0').build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, description));
   await app.listen(environment.API_PORT, environment.API_HOST);
 }

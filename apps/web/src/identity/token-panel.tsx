@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuedTokenSchema, personalTokensSchema, permanentTokenWarning } from '@ntfs/contracts';
 import type { Identity } from '@ntfs/contracts';
 import { Dialog } from '../layout/dialog';
-import { reportingRequest } from '../weekly-plans/reporting-api';
+import { accountRequest } from './api';
 
 /** 令牌默认展示列表；创建与撤销独立确认，明文仅在当前组件内短暂保留。 */
 export function TokenPanel({ identity }: { identity: Identity }) {
@@ -11,16 +11,16 @@ export function TokenPanel({ identity }: { identity: Identity }) {
   const [creating, setCreating] = useState(false); const [permanent, setPermanent] = useState(false);
   const [issued, setIssued] = useState(''); const [inputError, setInputError] = useState('');
   const [target, setTarget] = useState<{ id: string; name: string } | null>(null);
-  const list = useQuery({ queryKey: ['tokens', identity.id], queryFn: async () => personalTokensSchema.parse(await reportingRequest('tokens')) });
+  const list = useQuery({ queryKey: ['tokens', identity.id], queryFn: async () => personalTokensSchema.parse(await accountRequest('tokens')) });
   const create = useMutation({
     mutationFn: async (input: object) => {
-      const result = issuedTokenSchema.parse(await reportingRequest('tokens', input, identity.csrfToken));
+      const result = issuedTokenSchema.parse(await accountRequest('tokens', input, identity.csrfToken));
       setIssued(result.token);
     },
     onSuccess: async () => { setCreating(false); await client.invalidateQueries({ queryKey: ['tokens'] }); },
   });
   const revoke = useMutation({
-    mutationFn: (id: string) => reportingRequest('tokens/revoke', { id }, identity.csrfToken),
+    mutationFn: (id: string) => accountRequest('tokens/revoke', { id }, identity.csrfToken),
     onSuccess: async () => { setTarget(null); setIssued(''); await client.invalidateQueries({ queryKey: ['tokens'] }); },
   });
   return <div className="account-tokens"><header className="account-section-heading token-heading"><div><h2>Agent 访问令牌</h2><p>让外部 Agent 在你的当前权限范围内访问系统。</p></div><button className="primary-button" disabled={Boolean(issued) || creating} onClick={() => { setPermanent(false); setInputError(''); create.reset(); setCreating(true); }}>新建令牌</button></header>

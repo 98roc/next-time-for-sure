@@ -2,7 +2,7 @@
 
 面向小型研发团队的任务协同平台，将项目安排、个人执行、里程碑与区间总结连接起来。
 
-**当前状态：V2.0 规则与原型已落地，正式应用和数据库仍为 V1。** 本轮完成文档整理，不代表已开发、迁移或上线 V2.0。
+**当前状态：V2.0 开发分支已接入新版页面、API 与 MCP，旧业务入口已移除；生产仍为 V1。** 数据转换、恢复及完整多端验收尚未完成，详见[V2.0 实施记录](docs/development/V2.0实施记录.md)。
 
 ## 产品愿景
 
@@ -39,11 +39,11 @@ TypeScript 严格模式；React/Vite 前端、NestJS 模块化后端、MySQL、E
 .\scripts\pnpm.ps1 dev
 ```
 
-默认网页为 `http://127.0.0.1:5174`；上述命令运行当前代码和当前迁移，尚不是 V2.0 建库流程。首次超管初始化使用 `.\scripts\pnpm.ps1 admin:init`，已有账号时拒绝执行，凭据仅写入忽略的本地文件。
+默认网页为 `http://127.0.0.1:5174`；上述命令建立当前结构，不自动转换已有 V1 业务数据。首次超管初始化使用 `.\scripts\pnpm.ps1 admin:init`，已有账号时拒绝执行，凭据仅写入忽略的本地文件。
 
 - [本地开发与启动](docs/development/本地开发与启动.md)：环境、入口、检查及真实 API 验收。
 - [账号与组织使用说明](docs/development/账号与组织使用说明.md)：当前运行版本。
-- [桌面与 Agent 使用说明](docs/development/桌面与Agent使用说明.md)：当前客户端配置、Token 和 MCP；V1 命令待按 V2.0 替换。
+- [桌面与 Agent 使用说明](docs/development/桌面与Agent使用说明.md)：当前客户端配置、Token 和 V2 MCP。
 - [Docker 部署](docs/development/Docker部署.md) / [数据库脚本](database/README.md)：现有服务的部署、备份及迁移限制。
 - [V1 压缩基线与验收摘要](docs/archive/v1/README.md)：旧模型、历史证据及未验证边界。
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
-import { fixedPermissions, organizationSnapshotSchema, projectRoleSchema } from '@ntfs/contracts';
+import { organizationSnapshotSchema, projectRoleSchema } from '@ntfs/contracts';
 import type { OrganizationSnapshot } from '@ntfs/contracts';
 import { z } from 'zod';
 
@@ -16,20 +16,14 @@ export class OrganizationRepository {
     // 账号与成员目录统一按创建时间倒序；同一毫秒创建时用ID稳定排序。
     const accounts: unknown = await this.manager.query('SELECT id, login_name AS loginName, display_name AS displayName, team_id AS teamId, disabled, version FROM accounts WHERE is_super_admin = 0 ORDER BY created_at DESC, id ASC FOR UPDATE');
     const teams: unknown = await this.manager.query('SELECT id, name, leader_id AS leaderId, version FROM teams');
-    const groups: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, leader_id AS leaderId, version FROM work_groups');
-    const memberships: unknown = await this.manager.query('SELECT group_id AS groupId, account_id AS accountId FROM group_members');
-    const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version, archived FROM projects');
+    const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version FROM projects');
     const projectMemberships: unknown = await this.manager.query('SELECT project_id AS projectId, account_id AS accountId, roles_json FROM project_members');
-    const gm = z.array(z.object({ groupId: z.string(), accountId: z.string() })).parse(memberships);
     const pm = z.array(z.object({ projectId: z.string(), accountId: z.string(), roles_json: z.unknown() })).parse(projectMemberships);
-    const groupRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), leaderId: z.string(), version: z.number() })).parse(groups);
-    const projectRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), version: z.number(), archived: z.number() })).parse(projects);
+    const projectRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), version: z.number() })).parse(projects);
     const accountRows = z.array(z.object({ id: z.string(), loginName: z.string(), displayName: z.string(), teamId: z.string().nullable(), disabled: z.number(), version: z.number() })).parse(accounts);
     return organizationSnapshotSchema.parse({
       accounts: accountRows.map((row) => ({ ...row, disabled: Boolean(row.disabled) })), teams,
-      groups: groupRows.map((row) => ({ ...row, memberIds: gm.filter((member) => member.groupId === row.id).map((member) => member.accountId) })),
-      projects: projectRows.map((row) => ({ ...row, archived: Boolean(row.archived), members: pm.filter((member) => member.projectId === row.id).map((member) => ({ accountId: member.accountId, roles: z.array(projectRoleSchema).parse(decodeJson(member.roles_json)) })) })),
-      policies: Object.entries(fixedPermissions).map(([role, permissions]) => ({ role, permissions, version: 0 })),
+      projects: projectRows.map((row) => ({ ...row, members: pm.filter((member) => member.projectId === row.id).map((member) => ({ accountId: member.accountId, roles: z.array(projectRoleSchema).parse(decodeJson(member.roles_json)) })) })),
     });
   }
 
@@ -54,27 +48,11 @@ export class OrganizationRepository {
   /** 显式交接负责人并递增团队版本，不承接执行工作。 */
   async setLeader(team: string, account: string): Promise<void> { await this.manager.query('UPDATE teams SET leader_id = ?, version = version + 1 WHERE id = ?', [account, team]); }
 
-  /** 小组成员多对多；替换成员列表不会触碰其他小组关系。 */
-  async saveGroup(id: string | null, team: string, name: string, leader: string, members: string[]): Promise<string> {
-    const target = id ?? randomUUID();
-    if (id) await this.manager.query('UPDATE work_groups SET name = ?, leader_id = ?, version = version + 1 WHERE id = ?', [name, leader, target]);
-    else await this.manager.query('INSERT INTO work_groups (id, team_id, name, leader_id) VALUES (?, ?, ?, ?)', [target, team, name, leader]);
-    await this.manager.query('DELETE FROM group_members WHERE group_id = ?', [target]);
-    for (const account of new Set(members)) await this.manager.query('INSERT INTO group_members (group_id, account_id) VALUES (?, ?)', [target, account]);
-    return target;
-  }
-
-  /** 项目由团队归集，角色在成员关系上分别记录。 */
+  /** 新版项目服务在校验整份成员配置后创建项目基础记录。 */
   async createProject(team: string, name: string): Promise<string> {
     const id = randomUUID();
     await this.manager.query('INSERT INTO projects (id, team_id, name) VALUES (?, ?, ?)', [id, team, name]);
     return id;
-  }
-
-  /** 允许一人兼任多个项目角色；项目版本统一保护成员编辑。 */
-  async setProjectMember(project: string, account: string, roles: string[]): Promise<void> {
-    await this.manager.query('INSERT INTO project_members (project_id, account_id, roles_json) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE roles_json = VALUES(roles_json)', [project, account, JSON.stringify([...new Set(roles)])]);
-    await this.manager.query('UPDATE projects SET version = version + 1 WHERE id = ?', [project]);
   }
 
   /** 管理员重置密码后要求本人改密，并撤销原会话。 */
@@ -108,7 +86,8 @@ export class OrganizationRepository {
   /** 检查业务关联及无外键历史；只返回存在性，不暴露私人内容。 */
   async accountInUse(id: string): Promise<boolean> {
     const references = [
-      ['teams', 'leader_id'], ['work_groups', 'leader_id'], ['group_members', 'account_id'], ['project_members', 'account_id'],
+      ['v2_arrangement_history', 'actor_id'], ['v2_backlog', 'converted_by'], ['v2_report_texts', 'updated_by'], ['v2_personal_views', 'owner_id'],
+      ['v2_tasks', 'creator_id'], ['v2_tasks', 'executor_id'], ['v2_backlog', 'creator_id'], ['v2_milestones', 'owner_id'], ['v2_categories', 'owner_id'], ['v2_task_events', 'actor_id'], ['v2_object_events', 'actor_id'], ['v2_operations', 'actor_id'], ['teams', 'leader_id'], ['work_groups', 'leader_id'], ['group_members', 'account_id'], ['project_members', 'account_id'],
       ['work_requests', 'submitter_id'], ['team_tasks', 'owner_id'], ['project_milestones', 'owner_id'], ['task_assignments', 'account_id'],
       ['personal_categories', 'owner_id'], ['personal_items', 'owner_id'], ['personal_events', 'owner_id'],
       ['work_events', 'actor_id'], ['work_operations', 'actor_id'], ['weekly_events', 'actor_id'],
@@ -119,7 +98,7 @@ export class OrganizationRepository {
 
   /** 团队的项目、小组及历史存在时拒绝删除，避免级联清理业务数据。 */
   async teamInUse(id: string): Promise<boolean> {
-    return this.hasReferences(['work_groups', 'projects', 'weekly_drafts', 'weekly_publications', 'report_drafts', 'weekly_events', 'lifecycle_events', 'notification_outbox'].map((table) => [table, 'team_id']), id);
+    return this.hasReferences(['v2_team_settings', 'v2_periods', 'v2_tasks', 'v2_report_texts', 'v2_object_events', 'work_groups', 'projects', 'weekly_drafts', 'weekly_publications', 'report_drafts', 'weekly_events', 'lifecycle_events', 'notification_outbox'].map((table) => [table, 'team_id']), id);
   }
 
   /** 仅用于本文件固定表列清单，不接受外部输入作为SQL标识符。 */

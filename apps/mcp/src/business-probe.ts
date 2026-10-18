@@ -3,54 +3,38 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { workSnapshotSchema, lifecyclePreviewSchema, personalSnapshotSchema, personalTeamWorkSchema } from '@ntfs/contracts';
+import { identitySchema, v2WorkspaceSchema, v2ImpactSchema } from '@ntfs/contracts';
 import { z } from 'zod';
 
-/** 使用真实API夹具启动stdio进程，不把协议通过误报为Codex兼容验收。 */
+/** 真实 stdio MCP 客户端调用 V2 API；协议证据不等同于真实外部模型客户端。 */
 const environment = z.object({ MCP_API_URL: z.string().url(), NTFS_ACCESS_TOKEN: z.string(), NTFS_TEST_PROJECT: z.string().uuid(), NTFS_TEST_FOREIGN_PROJECT: z.string().uuid() }).parse(process.env);
+const client = new Client({ name: 'v2-protocol-smoke', version: '2.0.0' });
 const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('./main.js', import.meta.url))], env: environment, stderr: 'inherit' });
-const client = new Client({ name: 'business-protocol-smoke', version: '0.1.0' });
-const text = z.array(z.object({ type: z.literal('text'), text: z.string() }));
-/** 检查协议结果后解析业务JSON，不输出凭据或完整业务响应。 */
+
+/** 解析结构化协议结果，错误只比对状态，不输出凭据或完整业务响应。 */
 async function call(name: string, args: Record<string, unknown>, error = false): Promise<unknown> {
-  const result = await client.callTool({ name, arguments: args });
-  assert.equal(result.isError === true, error);
-  const first = text.parse(result.content)[0]; assert.ok(first);
-  return JSON.parse(first.text);
+  const result = await client.callTool({ name, arguments: args }); assert.equal(result.isError === true, error);
+  const first = z.array(z.object({ type: z.literal('text'), text: z.string() })).parse(result.content)[0]; assert.ok(first); return JSON.parse(first.text);
 }
 try {
   await client.connect(transport);
-  assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name).sort(), ['business_command', 'business_query', 'lifecycle_preview', 'system_health']);
-  await call('business_query', { request: { path: 'agent/me', query: {} } });
-  const refused = await call('business_query', { request: { path: 'work', query: { projectId: environment.NTFS_TEST_FOREIGN_PROJECT } } }, true);
-  assert.equal(z.object({ status: z.number() }).parse(refused).status, 403);
-  const body = { action: 'create_task', projectId: environment.NTFS_TEST_PROJECT, title: 'MCP协议验收任务', description: '', acceptance: '', operationId: randomUUID() };
-  await call('business_command', { request: { path: 'work/commands', body } });
-  await call('business_command', { request: { path: 'work/commands', body } });
-  const snapshot = workSnapshotSchema.parse(await call('business_query', { request: { path: 'work', query: { projectId: body.projectId } } }));
-  const tasks = snapshot.tasks.filter((entry) => entry.title === body.title); assert.equal(tasks.length, 1);
-  const task = tasks[0]; assert.ok(task);
-  const intent = { action: 'delete_task', objectId: task.id };
-  const preview = lifecyclePreviewSchema.parse(await call('lifecycle_preview', { intent }));
-  assert.equal(preview.blockers.length, 0);
-  const stale = await call('business_command', { request: { path: 'lifecycle/commands', body: { intent, confirmation: '0'.repeat(64), reason: '验收拒绝过期确认', operationId: randomUUID() } } }, true);
+  assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name).sort(), ['business_command', 'business_preview', 'business_query', 'system_health']);
+  const identity = identitySchema.parse(await call('business_query', { request: { path: 'agent/me', query: {} } }));
+  const workspace = async () => v2WorkspaceSchema.parse(await call('business_query', { request: { path: 'v2/workspace', query: {} } }));
+  const initial = await workspace(); assert.equal(initial.projects.some((row) => row.id === environment.NTFS_TEST_FOREIGN_PROJECT), false);
+  const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
+  const body = { action: 'create_project', operationId: randomUUID(), task: { projectId: environment.NTFS_TEST_PROJECT, title: 'MCP V2真实任务', executorId: identity.id, periodId: period.id, priority: 3, plannedDays: null, milestoneId: null } };
+  await call('business_command', { request: { path: 'v2/tasks', body } }); await call('business_command', { request: { path: 'v2/tasks', body } });
+  const tasks = (await workspace()).tasks.filter((row) => row.title === body.task.title); assert.equal(tasks.length, 1); const task = tasks[0]; assert.ok(task);
+  const denied = await call('business_command', { request: { path: 'v2/tasks', body: { ...body, operationId: randomUUID(), task: { ...body.task, projectId: environment.NTFS_TEST_FOREIGN_PROJECT } } } }, true);
+  assert.equal(z.object({ status: z.number() }).parse(denied).status, 403);
+  const intent = { action: 'delete_task', taskId: task.id, version: task.version };
+  const preview = v2ImpactSchema.parse(await call('business_preview', { request: { path: 'v2/impact', body: intent } })); assert.equal(preview.blockers.length, 0);
+  const command = { action: 'delete', taskId: task.id, version: task.version };
+  const stale = await call('business_command', { request: { path: 'v2/tasks', body: { ...command, operationId: randomUUID(), confirmation: '0'.repeat(64) } } }, true);
   assert.equal(z.object({ status: z.number() }).parse(stale).status, 409);
-  // 测试夹具已授权删除自己创建的任务；真实Agent需先在对话取得用户确认。
-  await call('business_command', { request: { path: 'lifecycle/commands', body: { intent, confirmation: preview.confirmation, reason: '验收清理', operationId: randomUUID() } } });
-  const remaining = workSnapshotSchema.parse(await call('business_query', { request: { path: 'work', query: { projectId: body.projectId } } }));
-  assert.equal(remaining.tasks.some((entry) => entry.id === task.id), false);
-  // 新个人工作流沿用同一个MCP命令契约，不经过网页也必须执行相同联动。
-  const personalTask = z.object({ objectId: z.string() }).parse(await call('business_command', { request: { path: 'work/commands', body: { ...body, title: 'MCP个人联动验收', operationId: randomUUID() } } }));
-  const claimed = z.object({ objectId: z.string() }).parse(await call('business_command', { request: { path: 'assignments/commands', body: { action: 'claim', taskId: personalTask.objectId, groupId: null, content: '', operationId: randomUUID() } } }));
-  const catalog = personalTeamWorkSchema.parse(await call('business_query', { request: { path: 'personal/team-work', query: {} } }));
-  assert.ok(catalog.tasks.some((entry) => entry.id === personalTask.objectId));
-  const imported = z.object({ objectId: z.string() }).parse(await call('business_command', { request: { path: 'personal/commands', body: { action: 'import_assignment', assignmentId: claimed.objectId, categoryId: null, split: false, operationId: randomUUID() } } }));
-  const personal = personalSnapshotSchema.parse(await call('business_query', { request: { path: 'personal', query: { scope: 'mine' } } }));
-  const item = personal.items.find((entry) => entry.id === imported.objectId); assert.ok(item);
-  await call('business_command', { request: { path: 'personal/commands', body: { action: 'complete_personal', itemId: item.id, version: item.version } } });
-  const completed = personalTeamWorkSchema.parse(await call('business_query', { request: { path: 'personal/team-work', query: {} } }));
-  assert.equal(completed.assignments.find((entry) => entry.id === claimed.objectId)?.status, 'completed');
-  assert.equal(completed.tasks.find((entry) => entry.id === personalTask.objectId)?.status, 'not_started');
-  console.log('PASS: MCP team catalog, import and personal completion automatically finish only the own assignment');
-  console.log('PASS: authenticated MCP stdio list/query/write, permissions, idempotency and confirmation rejection/execution');
+  // 此处仅清理本脚本创建的随机夹具；正式 Agent 必须先取得具体影响确认。
+  await call('business_command', { request: { path: 'v2/tasks', body: { ...command, operationId: randomUUID(), confirmation: preview.confirmation } } });
+  assert.equal((await workspace()).tasks.some((row) => row.id === task.id), false);
+  console.log('PASS: authenticated V2 MCP list/query/write, idempotence, scope rejection, preview and version-bound confirmation.');
 } finally { await client.close(); }

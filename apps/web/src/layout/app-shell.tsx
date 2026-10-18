@@ -18,7 +18,7 @@ export function AppShell() {
   const admin = identity.data.isSuperAdmin;
   if (admin && !['/organization', '/accounts'].includes(location.pathname)) return <Navigate to="/accounts" replace />;
   if (!admin) return <V2Shell user={identity.data} />;
-  return <div className="app-shell"><aside className="app-sidebar"><NavLink to={admin ? '/organization' : '/personal'} className="brand-link" aria-label={admin ? '下次一定，返回团队管理' : '下次一定，返回我的工作'}><Brand /></NavLink>
+  return <div className="app-shell"><aside className="app-sidebar"><NavLink to="/organization" className="brand-link" aria-label="下次一定，返回团队管理"><Brand /></NavLink>
     <nav aria-label="系统管理"><NavLink to="/accounts">账号管理</NavLink><NavLink to="/organization">团队管理</NavLink></nav>
     <NavLink to="/account" className="app-account"><span className="avatar">{identity.data.displayName.slice(0, 1)}</span><span>{identity.data.displayName}<small>账号与安全</small></span></NavLink>
   </aside><div className="app-body"><div className="app-topbar"><span>系统管理</span></div><Outlet /></div></div>;

@@ -33,14 +33,7 @@
 :is(.org-layout, .identity-layout) [aria-invalid=true] { border-color: var(--danger); }
 .org-layout details > form { margin-top: 16px; }
 .org-layout summary { padding: 8px 0; line-height: 1.6; }
-.org-layout .assignment-actions, .org-layout .org-feedback, .org-layout .org-header nav { flex-wrap: wrap; }
+.org-layout .org-feedback, .org-layout .org-header nav { flex-wrap: wrap; }
 .org-layout .org-header nav { gap: 10px; white-space: normal; }
 .org-layout .org-header { flex-wrap: wrap; }
-.org-layout .fish-node { background: var(--surface); color: var(--text); }
-.org-layout .fish-node[aria-pressed=true] { background: var(--selected); }
-/* 占位逐渐展开，让邻近卡片让位；减少动态效果偏好下直接显示。 */
-@media (prefers-reduced-motion: no-preference) {
-  .drop-placeholder, .personal-drop-placeholder, .fish-placeholder { animation: reveal-drop .16s ease-out; overflow: hidden; }
-  @keyframes reveal-drop { from { max-height: 0; opacity: 0; padding-block: 0; margin-block: 0; } to { max-height: 100px; opacity: 1; } }
-}
 @media (prefers-reduced-motion: reduce) { :is(.org-layout, .identity-layout) button { transition: none; } }

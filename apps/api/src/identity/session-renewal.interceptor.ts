@@ -17,7 +17,7 @@ export class SessionRenewalInterceptor implements NestInterceptor {
     const response = context.switchToHttp().getResponse<ServerResponse>();
     const token = sessionToken(request);
     const path = request.url?.split('?')[0];
-    const background = request.headers['x-ntfs-session-activity'] === 'passive' || (request.method === 'GET' && path === '/api/v1/notifications');
+    const background = request.headers['x-ntfs-session-activity'] === 'passive';
     if (!token || request.headers.authorization !== undefined || background || path?.startsWith('/api/v1/health/')) return next.handle();
 
     return next.handle().pipe(mergeMap(async (value: unknown) => {

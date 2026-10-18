@@ -21,7 +21,7 @@ export function createSettings(config: DesktopConfig, path: string, isUpdating: 
     saving = true;
     try {
       await saveConfig(path, value);
-      // 等IPC响应送达后重启，原窗口的正常退出流程负责停止通知并清理托盘。
+      // 等IPC响应送达后重启，原窗口的正常退出流程负责清理托盘。
       setTimeout(() => { app.relaunch(); app.quit(); }, 200);
       return { ok: true };
     } catch (error) {
