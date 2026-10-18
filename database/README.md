@@ -47,6 +47,8 @@ PowerShell 5.1 不使用上述 `<` 重定向语法；项目的 PowerShell 迁移
 
 该脚本不能直接对生产写入。正式切换仍须停写、重新盘点和备份，审核最新异常、执行人及恢复材料，再按授权执行转换、回读与独立切换。MySQL DDL 不支持整体回滚，恢复必须使用完整备份及匹配版本的应用。当前演练证据见[V2.0 实施记录](../docs/development/V2.0实施记录.md)。
 
+正式入口已接入 [Docker 部署](../docs/development/Docker部署.md) 的 `-V2Cutover` 参数，生产于 2026-10-18 完成切换。切换后的日常发布不再传该参数。`scripts/verify-v1-backup.mjs` 可将停写时生成的 gzip 备份恢复到独立临时 MySQL 并与审核来源核对；本次实际生产备份已通过该验证。备份内的旧认证和业务数据仅作恢复材料，不开放旧业务查询。
+
 ## 初始化管理员
 
 SQL 不创建管理员，也不提供公共默认密码。生产环境只初始化 `admin`：在忽略的 `.deploy.production.local` 中设置 `INITIAL_ADMIN_PASSWORD`，部署成功后执行：

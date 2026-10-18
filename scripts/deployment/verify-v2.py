@@ -4,6 +4,7 @@ import pathlib
 import json
 import http.cookiejar
 import urllib.request
+import argparse
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('deployment', pathlib.Path(__file__).with_name('deploy.py'))
@@ -13,6 +14,9 @@ SPEC.loader.exec_module(DEPLOY)
 
 def main():
     """复核源码版本、切换摘要、中文注释和公开入口；不打印凭据或业务正文。"""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--authenticate', action='store_true', help='显式使用本地配置的管理员密码核验身份；初始密码可能已失效')
+    args = parser.parse_args()
     values = DEPLOY.configuration(ROOT / '.deploy.production.local')
     client = DEPLOY.paramiko.SSHClient()
     client.load_system_host_keys()
@@ -58,7 +62,7 @@ try {
             if not path.startswith('/api/'):
                 assert b'<div id="root">' in body
             print('PASS HTTP ' + path, flush=True)
-        if values.get('INITIAL_ADMIN_PASSWORD'):
+        if args.authenticate and values.get('INITIAL_ADMIN_PASSWORD'):
             status, body = request('/api/v1/auth/login', {'loginName': 'admin', 'password': values['INITIAL_ADMIN_PASSWORD']})
             identity = json.loads(body)
             try:
