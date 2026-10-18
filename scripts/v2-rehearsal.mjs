@@ -81,10 +81,17 @@ async function main() {
         console.log('Converted HTTP API readback, missing-approval rejection and transaction rollback passed.');
         const { readSource } = await import('../apps/api/dist/database/v2-transition/source.js');
         const legacy = await readSource(source.manager);
-        const { prepareRetirement } = await import('../apps/api/dist/database/v2-transition/retire.js');
-        await prepareRetirement(source, decisions, createHash('sha256').update(await readFile(backup)).digest('hex'));
+        const { runCutover } = await import('../apps/api/dist/database/v2-transition/cutover.js');
+        const input = { decisions, sourceHash: conversion.sourceHash, counts: conversion.counts };
+        const backupSha256 = createHash('sha256').update(await readFile(backup)).digest('hex');
         const cutover = createDataSource(environment, true); await cutover.initialize();
-        try { retired = (await cutover.runMigrations()).map((row) => row.name); assert.deepEqual(retired, ['V2RetireLegacy1792281600000']); assert.deepEqual(await cutover.runMigrations(), []); } finally { await cutover.destroy(); }
+        try {
+          await assert.rejects(() => runCutover(cutover, { ...input, sourceHash: '0'.repeat(64) }, backupSha256), /SOURCE_DIFFERS_FROM_REHEARSAL/);
+          assert.deepEqual(await manifest(connection), converted);
+          retired = (await runCutover(cutover, input, backupSha256)).applied;
+          assert.deepEqual(retired, ['V2RetireLegacy1792281600000']);
+          assert.deepEqual((await runCutover(cutover, input, backupSha256)).applied, []);
+        } finally { await cutover.destroy(); }
         await verifyConverted(source, legacy);
         const { OrganizationRepository } = await import('../apps/api/dist/organization/organization.repository.js');
         assert.equal(await new OrganizationRepository(source.manager).accountInUse('00000000-0000-4000-a000-000000000000'), false);

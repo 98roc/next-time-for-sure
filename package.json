@@ -1,6 +1,6 @@
 {
   "name": "next-time-for-sure",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "engines": {
@@ -21,7 +21,8 @@
     "organization:smoke": "pnpm --filter @ntfs/api organization:smoke",
     "v2:smoke": "pnpm --filter @ntfs/contracts build && pnpm --filter @ntfs/api build && node apps/api/dist/v2/api.integration.js",
     "token:smoke": "pnpm --filter @ntfs/api token:smoke",
-    "agent:smoke": "pnpm --filter @ntfs/mcp build && pnpm --filter @ntfs/api token:smoke --mcp"
+    "agent:smoke": "pnpm --filter @ntfs/mcp build && pnpm --filter @ntfs/api token:smoke --mcp",
+    "desktop:smoke": "pnpm --filter @ntfs/api build && pnpm --filter @ntfs/desktop build && node scripts/desktop-smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

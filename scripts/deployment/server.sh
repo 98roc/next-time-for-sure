@@ -192,6 +192,10 @@ if exists "$WEB"; then owned "$WEB"; fi
 version=$(mysql_query "$DIRECTORY/mysql.cnf" 'SELECT VERSION()')
 [[ "$version" == 5.7.* ]] || fail 'Current migrations require MySQL 5.7.'
 database_exists=$(mysql_query "$DIRECTORY/mysql.cnf" "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='next_time_for_sure'")
+if [[ "$database_exists" == 1 ]]; then
+    baseline=$(mysql_query "$DIRECTORY/mysql.cnf" "SELECT metadata_value FROM next_time_for_sure.platform_metadata WHERE metadata_key='schema_baseline'")
+    [[ "$baseline" == v2 || -f "$DIRECTORY/v2-cutover.json" ]] || fail 'V1 production requires reviewed V2 cutover material before deployment.'
+fi
 
 if docker network inspect "$NETWORK" >/dev/null 2>&1; then
     [[ "$(docker network inspect --format '{{index .Labels "ntfs.owner"}}' "$NETWORK")" == "$OWNER" ]] || fail 'Docker network name is owned by another application.'
@@ -246,6 +250,18 @@ migration_started=true
 docker run --rm --network "$NETWORK" --memory 512m --env-file "$DIRECTORY/production.env" \
     "${API_MOUNTS[@]}" -w /app "$NODE_IMAGE" node apps/api/dist/database/cli.js migrate 2>&1 | tee "$DIRECTORY/migration.log"
 if grep -qx 'Applied migrations: 0' "$DIRECTORY/migration.log"; then schema_unchanged=true; fi
+
+if [[ -f "$DIRECTORY/v2-cutover.json" ]]; then
+    [[ -s "$ROOT/backups/$RELEASE.sql.gz" ]] || fail 'V2 cutover requires a complete pre-migration backup.'
+    schema_unchanged=false
+    mkdir "$DIRECTORY/cutover-evidence"
+    docker run --rm --network "$NETWORK" --memory 512m --env-file "$DIRECTORY/production.env" \
+        "${API_MOUNTS[@]}" -v "$DIRECTORY/v2-cutover.json:/run/v2-input.json:ro" \
+        -v "$ROOT/backups/$RELEASE.sql.gz:/run/v2-backup.sql.gz:ro" \
+        -v "$DIRECTORY/cutover-evidence:/run/v2-evidence" -w /app "$NODE_IMAGE" \
+        node apps/api/dist/database/v2-transition/cutover-cli.js --input /run/v2-input.json \
+        --backup /run/v2-backup.sql.gz --evidence /run/v2-evidence/result.json 2>&1 | tee "$DIRECTORY/cutover.log"
+fi
 
 if $old_api; then docker rename "$API" "$API-before-$RELEASE"; fi
 if $old_web; then docker rename "$WEB" "$WEB-before-$RELEASE"; fi

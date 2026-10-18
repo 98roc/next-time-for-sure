@@ -226,7 +226,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['Prepare', 'Check', 'Validate', 'Deploy', 'InitAdmin'])
     parser.add_argument('--config', type=pathlib.Path, default=ROOT / '.deploy.production.local')
+    parser.add_argument('--v2-cutover', type=pathlib.Path)
     args = parser.parse_args()
+    if args.v2_cutover and args.action != 'Deploy':
+        raise RuntimeError('V2 cutover is only valid for explicit deployment')
+    cutover_input = args.v2_cutover.read_bytes() if args.v2_cutover else None
+    if cutover_input:
+        json.loads(cutover_input)
     values = configuration(args.config)
     base = values['DEPLOY_PATH']
     release = time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
@@ -299,6 +305,9 @@ def main():
                     (directory / 'dependencies.id').write_text(dependency_id + '\n', encoding='ascii', newline='\n')
                     for name in ['production.env', 'mysql.cnf', 'artifacts.sha256', 'dependencies.id']:
                         upload(sftp, directory / name, destination + '/' + name)
+                    if cutover_input:
+                        (directory / 'v2-cutover.json').write_bytes(cutover_input)
+                        upload(sftp, directory / 'v2-cutover.json', destination + '/v2-cutover.json')
             remote(client, command)
     finally:
         client.close()

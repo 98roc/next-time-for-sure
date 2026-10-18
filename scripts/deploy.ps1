@@ -11,6 +11,7 @@ param(
     [ValidateSet('Prepare', 'Check', 'Validate', 'Deploy', 'InitAdmin')]
     [string]$Action = 'Deploy',
     [string]$Config = '.deploy.production.local',
+    [string]$V2Cutover = '',
     [string]$Python = 'python'
 )
 $ErrorActionPreference = 'Stop'
@@ -22,6 +23,8 @@ try {
         & $Python -m pip install --target $dependencyRoot 'paramiko==5.0.0' --disable-pip-version-check
         if ($LASTEXITCODE -ne 0) { throw 'Cannot install deployment SSH dependency.' }
     }
-    & $Python scripts/deployment/deploy.py $Action --config $Config
+    $deployArguments = @('scripts/deployment/deploy.py', $Action, '--config', $Config)
+    if ($V2Cutover) { $deployArguments += @('--v2-cutover', $V2Cutover) }
+    & $Python @deployArguments
     if ($LASTEXITCODE -ne 0) { throw 'Deployment command failed; see the preceding diagnostic.' }
 } finally { Pop-Location }
