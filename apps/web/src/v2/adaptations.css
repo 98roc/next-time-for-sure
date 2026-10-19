@@ -12,6 +12,5 @@
 .v2-scope .v2-page-heading { margin-top:12px; }
 .v2-scope .v2-option-note { display:block;color:var(--muted);font-size:12px; }
 .v2-scope .v2-outside { display:block;color:var(--muted);font-size:11px; }
-.v2-scope .v2-sort-placeholder { min-height:44px;border:1px dashed var(--accent);background:var(--selected);border-radius:7px;margin:6px 0; }
 .v2-navigation-warning{position:fixed;z-index:10000;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:var(--surface,#fff);color:var(--text,#222);border:1px solid var(--line,#ddd);border-radius:12px;padding:18px;box-shadow:0 12px 40px #0003;max-width:95vw}
 #ntfs-my-work .mw-card-list>div:has(>.mw-task),#ntfs-weekly-demo .w-task-list>div:has(>.w-task-row){display:contents}

@@ -1,0 +1,52 @@
+/* 拖拽只改变合成层位移，原行保留尺寸，避免落点与占位相互干扰。 */
+.v2-scope .v2-sort-source { visibility:hidden; }
+.v2-scope .v2-drag-ghost { background:var(--v2-bg); border-radius:8px; overflow:hidden; }
+.v2-scope .v2-drag-ghost * { pointer-events:none!important; }
+.v2-scope .v2-project-sort-row { margin:10px 0; }
+:is(#nt-project,#ntfs-weekly-demo).v2-scope :is(.v2-project-sort-handle,.w-project-sort-handle) {
+  display:flex; align-items:center; gap:12px; width:100%; min-height:48px; padding:10px 14px;
+  border:1px solid var(--v2-line); border-radius:8px; background:var(--v2-bg); color:var(--v2-text);
+  text-align:left; cursor:grab; touch-action:none; user-select:none;
+}
+:is(#nt-project,#ntfs-weekly-demo).v2-scope :is(.v2-project-sort-handle,.w-project-sort-handle):active { cursor:grabbing; }
+.v2-scope .v2-project-sort-handle span { font-weight:600; }
+:is(#nt-project,#ntfs-weekly-demo).v2-scope button.v2-sort-handle { border:0; background:transparent; min-height:28px; padding:3px; color:var(--v2-muted); }
+.v2-scope .v2-order-menu { position:relative; display:inline-flex; flex-shrink:0; }
+:is(#nt-project,#ntfs-weekly-demo).v2-scope button.v2-more {
+  display:inline-flex; align-items:center; justify-content:center; width:30px; min-height:30px;
+  padding:0; border:0; background:transparent; color:var(--v2-muted); font-size:21px; line-height:1;
+}
+:is(#nt-project,#ntfs-weekly-demo).v2-scope button.v2-more:hover { background:var(--v2-selected); }
+.v2-scope .v2-order-popover {
+  position:absolute; z-index:40; right:0; top:calc(100% + 4px); width:230px; max-width:calc(100vw - 32px);
+  padding:5px; border:1px solid var(--v2-line); border-radius:8px; background:var(--v2-bg); box-shadow:0 8px 24px #0002;
+}
+:is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-order-popover button {
+  width:100%; padding:8px 10px; border:0; text-align:left; background:transparent; color:var(--v2-text);
+}
+.v2-scope .v2-order-popover small { display:block; margin-top:4px; font-size:11px; color:var(--v2-muted); }
+.v2-scope .v2-section-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:30px; margin-bottom:6px; }
+#nt-project .v2-section-heading h4 { margin:0; }
+#nt-project .v2-project-summary { gap:12px; }
+#nt-project .v2-project-summary p { margin:0; }
+#nt-project .nt-project-head { gap:10px; padding-block:12px; }
+#ntfs-weekly-demo .w-periods>.w-field { display:flex; align-items:center; gap:12px; padding:10px 14px; font-size:12px; white-space:nowrap; }
+#ntfs-weekly-demo .w-periods>.w-field select { flex:1; min-width:0; }
+#ntfs-weekly-demo .w-column-head { flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+#ntfs-weekly-demo .w-task-row { align-items:center; padding:9px 0; }
+#ntfs-weekly-demo .w-task-info { display:flex; align-items:center; flex-wrap:wrap; column-gap:10px; row-gap:3px; }
+#ntfs-weekly-demo .w-task-meta { margin:0; }
+#ntfs-weekly-demo .w-task-title { min-width:0; overflow-wrap:anywhere; }
+#ntfs-weekly-demo .w-task-person,#ntfs-weekly-demo .w-task-days { padding-top:0; }
+#ntfs-weekly-demo .w-plan-actions { margin:0 0 8px; }
+#ntfs-weekly-demo .v2-report-dialog.w-report { margin:0; padding:0; border:0; background:transparent; }
+.v2-scope .v2-report-meta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; color:var(--v2-muted); font-size:12px; }
+#ntfs-weekly-demo .v2-report-dialog textarea { width:100%; min-height:45vh; padding:14px; border:1px solid var(--v2-line); border-radius:8px; color:var(--v2-text); background:var(--v2-canvas); font:14px/1.8 'Segoe UI','Microsoft YaHei',sans-serif; resize:vertical; }
+#ntfs-weekly-demo .v2-report-dialog .w-report-copy { margin-bottom:0; font-size:14px; }
+@media(max-width:1100px) { #ntfs-weekly-demo .w-periods>.w-field { display:grid; gap:4px; } }
+@media(max-width:580px) {
+  #ntfs-weekly-demo .w-task-info { flex-basis:auto; }
+  #ntfs-weekly-demo .w-task-person { margin-left:0; }
+  #ntfs-weekly-demo .w-task-days { margin-left:0; }
+}
+@media(pointer:coarse) { :is(#nt-project,#ntfs-weekly-demo).v2-scope button.v2-more { min-width:44px; min-height:44px; } }
