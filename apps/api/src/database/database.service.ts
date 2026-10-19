@@ -5,6 +5,7 @@ import { loadEnvironment } from '../config/environment.js';
 import { createDataSource, requiredMigrationNames } from './data-source.js';
 import type { Readiness } from '@ntfs/contracts';
 import type { EntityManager } from 'typeorm';
+import { migrationsCurrent } from './migration-state.js';
 
 /** 管理单一连接池；数据库不可用时进程仍能报告存活，但就绪返回503。 */
 @Injectable()
@@ -34,9 +35,8 @@ export class DatabaseService implements OnModuleDestroy {
       const migrationRows: unknown = await this.source.query('SELECT name FROM schema_migrations ORDER BY id');
       const names = z.array(z.object({ name: z.string() })).parse(migrationRows).map((row) => row.name);
       const retired = metadata[0]?.metadata_value === 'v2';
-      const expected = retired ? [...requiredMigrationNames, 'V2RetireLegacy1792281600000'] : requiredMigrationNames;
       const pending = z.array(z.object({ metadata_key: z.string() })).parse(await this.source.query("SELECT metadata_key FROM platform_metadata WHERE metadata_key='v2_retirement_ready'"));
-      if (metadata.length !== 1 || names.join(',') !== expected.join(',') || (!retired && pending.length > 0)) throw new Error('Schema not current');
+      if (metadata.length !== 1 || !migrationsCurrent(names, requiredMigrationNames, retired) || (!retired && pending.length > 0)) throw new Error('Schema not current');
       return { status: 'ready', database: 'connected', migrations: 'current' };
     } catch {
       throw new ServiceUnavailableException('数据库尚未就绪，请检查连接配置并执行迁移。');
