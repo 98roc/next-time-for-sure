@@ -25,8 +25,6 @@
 .v2-mark::before { content:'';position:absolute;width:16px;height:16px;left:0;bottom:0;border:1.5px solid currentColor;border-radius:3px; }
 .v2-mark::after { content:'';position:absolute;width:20px;height:20px;right:0;top:0;background:currentColor;border:3px solid var(--surface);border-radius:5px; }
 .v2-avatar { display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--selected);color:var(--accent);flex-shrink:0; }
-.v2-scope .v2-profile { display:flex;gap:9px;margin-top:32px;font-size:13px;align-items:center; }
-.v2-scope .v2-profile small { display:block;font-size:11px;color:var(--muted); }
 .v2-scope .v2-drag-ghost { position:fixed!important;left:0!important;top:0!important;margin:0!important;z-index:1500;pointer-events:none;opacity:.94;box-shadow:0 12px 30px #0003;will-change:transform; }
 .v2-scope .v2-drag-source { display:none!important; }
 @media(max-width:600px) { .v2-scope .v2-fields { grid-template-columns:minmax(0,1fr); }.v2-scope .v2-field input,.v2-scope .v2-field select { font-size:16px; } }

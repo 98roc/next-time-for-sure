@@ -9,8 +9,16 @@ import './project.css';
 import './weekly.css';
 import './components.css';
 import './adaptations.css';
+import './shell.css';
 
-/** 三套原型保留各自布局，导航和身份行为共用，不复制认证逻辑。 */
+const navigation = [
+  { to: '/personal', label: '我的工作' },
+  { to: '/weekly-plans', label: '周报与周计划' },
+  { to: '/work', label: '项目' },
+  { to: '/organization', label: '团队管理' },
+];
+
+/** 四个业务入口共用外层布局和身份行为，页面内部保留各自业务版式。 */
 export function V2Shell({ user }: { user: Identity }) { return <WorkspaceProvider user={user}><Frame /></WorkspaceProvider>; }
 
 /** 根容器包住模态层以共享原型变量，业务数据由同一个工作区提供。 */
@@ -18,24 +26,32 @@ function Frame() {
   const path = useLocation().pathname;
   const variant = path === '/personal' ? 'personal' : path === '/weekly-plans' ? 'weekly' : 'project';
   const id = variant === 'personal' ? 'ntfs-my-work' : variant === 'weekly' ? 'ntfs-weekly-demo' : 'nt-project';
+  const pageClass = variant === 'weekly' ? 'w-app' : variant === 'project' ? 'nt-app' : '';
+  const pageLabel = navigation.find((link) => link.to === path)?.label ?? '工作空间';
   return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider>
-    {variant === 'personal' ? <div className="mw-shell"><Sidebar variant={variant} /><main className="mw-main"><Outlet /></main></div> : variant === 'weekly' ? <div className="w-app"><div className="w-shell"><Sidebar variant={variant} /><div className="w-body"><div className="w-topbar">工作空间 / 周报与周计划</div><main className="w-main"><Outlet /></main></div></div></div> : <div className="nt-app"><header className="nt-top"><span className="v2-mark" /><span className="nt-brand">下次一定</span><span className="nt-caption">研发工作空间</span></header><div className="nt-shell"><Sidebar variant={variant} /><main className="nt-main"><Outlet /></main></div></div>}
+    <div className="v2-frame">
+      <Sidebar />
+      <div className="v2-body">
+        <div className="v2-topbar">工作空间 / {pageLabel}</div>
+        <main key={path} className="v2-main" aria-label={pageLabel}>
+          <div className={`v2-page ${pageClass}`}><Outlet /></div>
+        </main>
+      </div>
+    </div>
   </ModalProvider></NavigationGuard></div>;
 }
 
 /** 四个入口顺序与原型一致，团队管理权限不足时保留原因说明。 */
-function Sidebar({ variant }: { variant: 'personal' | 'weekly' | 'project' }) {
+function Sidebar() {
   const { user, data } = useWorkspace();
-  const links = [{ to: '/personal', label: '我的工作' }, { to: '/weekly-plans', label: '周报与周计划' }, { to: '/work', label: '项目' }, { to: '/organization', label: '团队管理' }];
-  const aside = variant === 'personal' ? 'mw-nav' : variant === 'weekly' ? 'w-side' : 'nt-nav';
-  return <aside className={aside}>
-    {variant !== 'project' && <div className={variant === 'personal' ? 'mw-brand' : 'w-brand'}><span className="v2-mark" /><span>下次一定{variant === 'personal' && <small>团队协作工作台</small>}</span></div>}
-    <nav aria-label="主导航">{links.map((link, index) => {
-      const className = (active: boolean) => variant === 'personal' ? `mw-nav-item ${active ? 'active' : ''}` : variant === 'weekly' ? `w-nav ${active ? 'is-current' : ''}` : active ? 'nt-active' : '';
-      const content = <>{variant !== 'project' && <NavigationIcon index={index} />}{link.label}</>;
+  return <aside className="v2-sidebar">
+    <div className="v2-brand"><span className="v2-mark" aria-hidden="true" /><span>下次一定<small>团队协作工作台</small></span></div>
+    <nav aria-label="主导航">{navigation.map((link, index) => {
+      const className = (active: boolean) => `v2-nav-item${active ? ' is-current' : ''}`;
+      const content = <><NavigationIcon index={index} />{link.label}</>;
       return link.to === '/organization' && !data.teamLeader ? <span key={link.to} className={className(false)} aria-disabled="true" tabIndex={0} title="团队配置由团队负责人维护，请联系团队负责人">{content}</span> : <NavLink key={link.to} to={link.to} className={({ isActive }) => className(isActive)}>{content}</NavLink>;
     })}</nav>
-    <NavLink to="/account" className={variant === 'personal' ? 'mw-profile' : variant === 'weekly' ? 'w-account' : 'v2-profile'}><span className="v2-avatar">{user.displayName.slice(0, 1)}</span><span>{user.displayName}<small>{data.teamLeader ? '团队负责人' : '账号与安全'}</small></span></NavLink>
+    <NavLink to="/account" className="v2-account" aria-label={`${user.displayName}，账号与安全`}><span className="v2-avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span><span className="v2-account-info"><span title={user.displayName}>{user.displayName}</span><small>{data.teamLeader ? '团队负责人' : '账号与安全'}</small></span></NavLink>
   </aside>;
 }
 

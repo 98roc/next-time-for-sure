@@ -29,6 +29,7 @@ export function usePointerSort({ root, allowCrossScope, move }: { root: RefObjec
     const container = root.current;
     if (!(candidate instanceof HTMLElement) || !container) return;
     const source = candidate;
+    const scrollArea = container.closest<HTMLElement>('.v2-main');
     const initial = { x: event.clientX, y: event.clientY }, rect = source.getBoundingClientRect();
     let x = initial.x, y = initial.y, begun = false, ghost: HTMLElement | null = null, target: Target | null = null, frame = 0;
     const cancel = () => finish(false);
@@ -47,7 +48,10 @@ export function usePointerSort({ root, allowCrossScope, move }: { root: RefObjec
       if (!begun || !container) return;
       const bounds = container.getBoundingClientRect(), edge = 55;
       if (x > bounds.right - edge) container.scrollLeft += 14; else if (x < bounds.left + edge) container.scrollLeft -= 14;
-      if (y > window.innerHeight - edge) window.scrollBy(0, 14); else if (y < edge) window.scrollBy(0, -14);
+      // 工作区独立滚动后，边缘拖动必须跟随内容视口，不能再滚动整个窗口。
+      const viewport = scrollArea?.getBoundingClientRect();
+      const delta = y > (viewport?.bottom ?? window.innerHeight) - edge ? 14 : y < (viewport?.top ?? 0) + edge ? -14 : 0;
+      if (scrollArea) scrollArea.scrollBy(0, delta); else window.scrollBy(0, delta);
       locate(); setDrag((previous) => previous?.id === id && previous.target?.scope === target?.scope && previous.target?.beforeId === target?.beforeId ? previous : { id, scope, target, height: rect.height });
       frame = requestAnimationFrame(tick);
     }
