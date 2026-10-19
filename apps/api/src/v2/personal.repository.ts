@@ -64,6 +64,12 @@ export class V2PersonalRepository {
     await this.bump(ownerId);
   }
 
+  /** 调用方校验完整分类集合及个人版本后，只更新列位置，不触碰默认分类和任务顺序。 */
+  async reorderCategories(ownerId: string, ids: string[]): Promise<void> {
+    for (const [position, id] of ids.entries()) await this.manager.query('UPDATE v2_categories SET position=? WHERE id=? AND owner_id=?', [position, id, ownerId]);
+    await this.bump(ownerId);
+  }
+
   /** 保存分类集合时先清旧默认，避免唯一键在交换期间冲突；同事务原子提交。 */
   async saveCategories(ownerId: string, categories: V2Category[]): Promise<void> {
     await this.manager.query('UPDATE v2_categories SET is_default=0 WHERE owner_id=?', [ownerId]);

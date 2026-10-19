@@ -1,0 +1,19 @@
+/* 看板占位维持实际尺寸；跟手浮层脱离滚动容器，动画只改变 transform。 */
+#ntfs-my-work .mw-column { display:flex;flex-direction:column;min-width:240px; }
+#ntfs-my-work .mw-card-list { flex:1; }
+#ntfs-my-work .mw-task { cursor:grab; }
+#ntfs-my-work .mw-task-top { min-height:30px; }
+#ntfs-my-work .mw-category-title { flex:1;min-width:0; }
+#ntfs-my-work button.mw-category-handle { width:100%;justify-content:flex-start;white-space:normal;text-align:left;padding:3px 0;border:0;background:transparent;font-size:17px;cursor:grab;touch-action:none;user-select:none; }
+#ntfs-my-work .mw-category-grip { color:var(--mw-muted);font-size:14px;opacity:.6; }
+#ntfs-my-work .mw-category-handle:hover .mw-category-grip { color:var(--mw-accent);opacity:1; }
+#ntfs-my-work .mw-category-placeholder { border:1px dashed var(--mw-accent);background:var(--mw-selected);opacity:.65; }
+#ntfs-my-work .mw-placeholder { box-sizing:border-box;flex-shrink:0; }
+#ntfs-my-work .mw-card-list:has(>.mw-placeholder)>.mw-empty { display:none; }
+#ntfs-my-work .mw-board[data-drag-kind] { overflow-anchor:none; }
+#ntfs-my-work .mw-board[data-drag-kind],#ntfs-my-work .mw-board[data-drag-kind] * { cursor:grabbing!important; }
+#ntfs-my-work .mw-column:has(>.mw-card-list>.mw-placeholder) { border-color:var(--mw-accent); }
+#ntfs-my-work .v2-drag-ghost { border-color:var(--mw-accent);overflow:hidden;pointer-events:none!important; }
+#ntfs-my-work .v2-drag-ghost * { pointer-events:none!important; }
+@media(pointer:coarse) { #ntfs-my-work .mw-task-top,#ntfs-my-work button.mw-category-handle { min-height:44px; } }
+@media(prefers-reduced-motion:reduce) { #ntfs-my-work .mw-task,#ntfs-my-work .mw-column { transition:none!important; } }

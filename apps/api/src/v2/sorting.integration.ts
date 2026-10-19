@@ -27,6 +27,24 @@ export async function verifySorting(h: Harness): Promise<void> {
   const resetPersonal = async () => call('personal', developer, { action: 'reset_order', operationId: randomUUID(), version: (await state(developer)).personalVersion });
   const selected = (ids: string[], scope: string[]) => ids.filter((id) => scope.includes(id));
   await resetPersonal();
+  // 分类拖动只保存本人的完整列顺序，幂等重试与过期版本不能覆盖新结果。
+  const categoryBaseline = await state(developer), categoryIds = categoryBaseline.categories.map((row) => row.id);
+  const movedCategory = categoryIds[0]; assert.ok(movedCategory);
+  const categoryMove = { action: 'move_category', operationId: randomUUID(), version: categoryBaseline.personalVersion, categoryId: movedCategory, beforeCategoryId: null };
+  await call('personal', developer, categoryMove);
+  const categoryAfter = await state(developer);
+  assert.deepEqual(categoryAfter.categories.map((row) => row.id), [...categoryIds.slice(1), movedCategory]);
+  assert.deepEqual(categoryAfter.categories.find((row) => row.id === movedCategory), { ...categoryBaseline.categories[0], position: categoryIds.length - 1 });
+  await call('personal', developer, categoryMove);
+  assert.equal((await state(developer)).personalVersion, categoryAfter.personalVersion);
+  await call('personal', developer, { ...categoryMove, operationId: randomUUID() }, 409);
+  await call('personal', leader, { ...categoryMove, version: (await state()).personalVersion, operationId: randomUUID() }, 409);
+  await call('personal', developer, { ...categoryMove, version: categoryAfter.personalVersion, beforeCategoryId: randomUUID(), operationId: randomUUID() }, 409);
+  assert.equal((await state(developer)).personalVersion, categoryAfter.personalVersion);
+  const storedCategories = z.array(z.object({ id: z.string(), position: z.number() })).parse(await source.query('SELECT id,position FROM v2_categories WHERE owner_id=? ORDER BY position,id', [developer.id]));
+  assert.deepEqual(storedCategories.map((row) => row.id), [...categoryIds.slice(1), movedCategory]);
+  await call('personal', developer, { ...categoryMove, version: categoryAfter.personalVersion, beforeCategoryId: categoryIds[1], operationId: randomUUID() });
+  assert.deepEqual((await state(developer)).categories.map((row) => row.id), categoryIds);
   const a = await create(3), b = await create(1), pair = [a, b];
   const baseline = await state();
   assert.deepEqual(selected(order(baseline).ids, pair), [b, a]);

@@ -27,6 +27,7 @@ export const v2PersonalCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('default_category'), version, categoryId: id }).strict(),
   z.object({ ...operation, action: z.literal('delete_category'), version, categoryId: id, receiverId: id, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('move_task'), version, taskId: id, taskVersion: version, categoryId: id, beforeTaskId: id.nullable() }).strict(),
+  z.object({ ...operation, action: z.literal('move_category'), version, categoryId: id, beforeCategoryId: id.nullable() }).strict(),
   z.object({ ...operation, action: z.literal('reorder_priority'), version }).strict(),
   z.object({ ...operation, action: z.literal('reset_order'), version }).strict(),
 ]);

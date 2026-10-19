@@ -16,6 +16,17 @@ export async function mutatePersonal(manager: EntityManager, context: V2Context,
   await repository.ensure(ownerId); requireVersion(await repository.version(ownerId), command.version);
   const categories = await repository.categories(ownerId);
   if (command.action === 'reorder_priority' || command.action === 'reset_order') { await repository.resetOrder(ownerId); return [ownerId]; }
+  if (command.action === 'move_category') {
+    const category = categories.find((row) => row.id === command.categoryId);
+    const remaining = categories.filter((row) => row.id !== command.categoryId);
+    const index = command.beforeCategoryId === null ? remaining.length : remaining.findIndex((row) => row.id === command.beforeCategoryId);
+    if (!category || index < 0) throw new ConflictException('分类或目标位置已变化，请刷新。');
+
+    // 仅修改本人的列位置；分类状态、默认职责和任务顺序保持不变。
+    remaining.splice(index, 0, category);
+    await repository.reorderCategories(ownerId, remaining.map((row) => row.id));
+    return [category.id];
+  }
   if (command.action === 'move_task') {
     const task = requireTask(context, await new V2TaskRepository(manager).get(command.taskId));
     if (task.executorId !== ownerId || task.deletedAt) throw new ForbiddenException('只能整理本人当前工作。');
