@@ -31,6 +31,38 @@ owned() {
 
 exists() { docker inspect "$1" >/dev/null 2>&1; }
 
+# 在真实网关验证旧缓存请求，防止固定归档时间造成跨版本首页误返回304。
+check_web_cache() {
+    local origin=$1 web_root=$2 legacy_etag modified path condition response asset asset_headers asset_etag
+    legacy_etag=$(printf '"%x-%x"' "$(stat -c %Y "$web_root/index.html")" "$(stat -c %s "$web_root/index.html")")
+    modified=$(LC_ALL=C date -u -d "@$(stat -c %Y "$web_root/index.html")" '+%a, %d %b %Y %H:%M:%S GMT')
+
+    # 单独与同时发送两类旧校验头；所有SPA入口均须返回完整页面。
+    for path in / /index.html /reports /weekly-plans /account; do
+        for condition in etag modified both; do
+            local headers=()
+            if [[ "$condition" != modified ]]; then headers+=(-H "If-None-Match: $legacy_etag"); fi
+            if [[ "$condition" != etag ]]; then headers+=(-H "If-Modified-Since: $modified"); fi
+            response=$(curl -fsS --max-time 10 -D - "${headers[@]}" "$origin$path")
+            printf '%s\n' "$response" | grep -q '^HTTP/1.1 200 ' || fail "Cached entry did not return 200: $path ($condition)"
+            printf '%s\n' "$response" | grep -qi '^Cache-Control: no-store' || fail "Entry permits storage: $path"
+            if printf '%s\n' "$response" | grep -qi '^ETag:'; then fail "Entry still exposes a timestamp ETag: $path"; fi
+            printf '%s\n' "$response" | grep -q '<div id="root">' || fail "Entry body missing: $path"
+        done
+    done
+
+    # 内容哈希资源继续长期缓存；缺失资源不得回退到HTML。
+    asset=$(grep -oE '/assets/[^" ]+\.js' "$web_root/index.html" | head -n 1)
+    [[ -n "$asset" ]] || fail 'No hashed JavaScript asset found.'
+    asset_headers=$(curl -fsSI --max-time 10 "$origin$asset")
+    printf '%s\n' "$asset_headers" | grep -qi '^Cache-Control: public, immutable' || fail 'Hashed asset lost immutable caching.'
+    asset_etag=$(printf '%s\n' "$asset_headers" | sed -n 's/^[Ee][Tt][Aa][Gg]: //p' | tr -d '\r')
+    [[ -n "$asset_etag" ]] || fail 'Hashed asset ETag missing.'
+    [[ "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -H "If-None-Match: $asset_etag" "$origin$asset")" == 304 ]] || fail 'Unchanged hashed asset did not return 304.'
+    [[ "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$origin/assets/ntfs-cache-probe-missing.js")" == 404 ]] || fail 'Missing asset did not return 404.'
+    echo 'PASS: 15 legacy-cache entry requests returned fresh HTML; hashed assets retained 304 and immutable caching; missing asset returned 404.'
+}
+
 mysql_query() {
     docker run --rm --network bridge --memory 256m --log-driver json-file --log-opt max-size=5m --log-opt max-file=2 \
         -v "$1:/run/mysql.cnf:ro" "$MYSQL_IMAGE" mysql --defaults-extra-file=/run/mysql.cnf --connect-timeout=10 -N -e "$2"
@@ -175,6 +207,7 @@ if [[ "$ACTION" == validate ]]; then
     $probe_ready || fail 'Validation API did not become live.'
     curl -fsS --max-time 5 "http://127.0.0.1:$probe_port/" | grep -q '<div id="root">'
     curl -fsS --max-time 5 "http://127.0.0.1:$probe_port/account" | grep -q '<div id="root">'
+    check_web_cache "http://127.0.0.1:$probe_port" "$DIRECTORY/app/web"
     readiness_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$probe_port/api/v1/health/ready")
     [[ "$readiness_code" == 200 || "$readiness_code" == 503 ]] || fail 'Unexpected readiness response.'
     echo "PASS: API live, production dependencies, database query, Nginx proxy and SPA routes. Readiness HTTP $readiness_code (503 is expected before first migration)."
