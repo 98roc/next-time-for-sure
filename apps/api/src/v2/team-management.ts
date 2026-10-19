@@ -34,9 +34,9 @@ export async function memberImpact(manager: EntityManager, context: V2Context, i
 /** 完整成员及名称同事务保存；锁与任务分配共用，防止检查之后新增未完成任务。 */
 export async function mutateTeam(manager: EntityManager, context: V2Context, command: V2TeamCommand): Promise<string[]> {
   const teamId = requireTeamLeader(context), planning = new V2PlanningRepository(manager);
-  if (command.action === 'set_message') {
+  if (command.action === 'set_messages') {
     requireVersion((await planning.settings(teamId)).version, command.version);
-    await planning.setMessage(teamId, command.message); return [teamId];
+    await planning.setMessages(teamId, command.messages); return [teamId];
   }
   const repository = new OrganizationRepository(manager);
   const previous = command.action === 'update_project' ? context.organization.projects.find((row) => row.id === command.projectId && row.teamId === teamId) : undefined;

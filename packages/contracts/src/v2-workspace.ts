@@ -5,6 +5,9 @@ import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organiz
 const operation = { operationId: id };
 const confirmation = z.string().regex(/^[a-f0-9]{64}$/u);
 const name = z.string().trim().min(1).max(100);
+/** 首页标语按团队维护；限制列表大小，去除空白项，空列表表示隐藏。 */
+export const v2TeamMessageLimits = { count: 50, length: 500 };
+export const v2TeamMessagesSchema = z.array(z.string().trim().max(v2TeamMessageLimits.length)).max(v2TeamMessageLimits.count).transform((messages) => messages.filter(Boolean));
 export const v2ProjectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })), canManage: z.boolean(), canCreate: z.boolean(), canConfirmMilestone: z.boolean() });
 export const v2BacklogSchema = z.object({ id, createdAt: v2InstantSchema, projectId: id, creatorId: id, title: z.string(), priority: v2PrioritySchema, version, convertedTaskId: id.nullable(), deletedAt: v2InstantSchema.nullable() });
 export type V2Backlog = z.infer<typeof v2BacklogSchema>;
@@ -13,7 +16,7 @@ export type V2Arrangement = z.infer<typeof v2ArrangementSchema>;
 export const v2PlacementSchema = z.object({ taskId: id, categoryId: id, position: z.number().int() });
 export const v2OrderSchema = z.object({ ids: z.array(id), version, manual: z.boolean().default(false) });
 export const v2WorkspaceSchema = z.object({
-  team: teamSchema.nullable(), teamMessage: z.string(), teamVersion: version, teamLeader: z.boolean(), today: v2DateSchema, naturalWeekStart: v2DateSchema,
+  team: teamSchema.nullable(), teamMessages: v2TeamMessagesSchema, teamVersion: version, teamLeader: z.boolean(), today: v2DateSchema, naturalWeekStart: v2DateSchema,
   accounts: z.array(directoryAccountSchema), projects: z.array(v2ProjectSchema), periods: z.array(v2PeriodSchema),
   tasks: z.array(v2TaskSchema), arrangements: z.array(v2ArrangementSchema), milestones: z.array(v2MilestoneSchema), backlog: z.array(v2BacklogSchema),
   categories: z.array(v2CategorySchema), placements: z.array(v2PlacementSchema), personalVersion: version, orders: z.array(v2OrderSchema.extend({ scope: z.string() })),
@@ -91,7 +94,7 @@ export const v2ProjectMembersSchema = z.array(z.object({ accountId: id, roles: z
 export const v2TeamCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('create_project'), name, members: v2ProjectMembersSchema }).strict(),
   z.object({ ...operation, action: z.literal('update_project'), projectId: id, version, name, members: v2ProjectMembersSchema }).strict(),
-  z.object({ ...operation, action: z.literal('set_message'), version, message: z.string().trim().max(500) }).strict(),
+  z.object({ ...operation, action: z.literal('set_messages'), version, messages: v2TeamMessagesSchema }).strict(),
 ]);
 export type V2TeamCommand = z.infer<typeof v2TeamCommandSchema>;
 export const v2MemberImpactInputSchema = z.object({ projectId: id, version, members: v2ProjectMembersSchema }).strict();

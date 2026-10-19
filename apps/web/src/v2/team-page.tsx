@@ -1,3 +1,4 @@
+import { TeamMessages } from './team-messages';
 import { useId, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { projectRoleSchema, v2TeamCommandSchema, type V2Workspace } from '@ntfs/contracts';
@@ -13,14 +14,14 @@ import { MilestoneDetail } from './milestones';
 const roles = { project_manager: '项目经理', project_lead: '项目研发负责人', developer: '研发人员' };
 type Project = V2Workspace['projects'][number];
 
-/** 团队管理仅成员和项目两页签，团队文案在管理入口维护。 */
+/** 团队管理仅成员和项目两页签，首页标语在管理入口维护。 */
 export function TeamPageV2() {
   const { data, user } = useWorkspace(), modal = useModal(), [tab, setTab] = useState<'members' | 'projects'>('members'), [search, setSearch] = useState(''), [status, setStatus] = useState('all');
   if (!data.teamLeader || !data.team) return <Navigate to="/personal" replace />;
   const team = data.team;
   const accounts = data.accounts.filter((row) => `${row.loginName} ${row.displayName}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) && (status === 'all' || row.disabled === (status === 'disabled')));
   const name = (id: string) => data.accounts.find((row) => row.id === id)?.displayName ?? '历史成员';
-  return <><div className="nt-row nt-between"><div><h2>团队管理</h2><p className="nt-muted">{team.name}</p></div><button className="nt-quiet" onClick={() => modal.open(<TeamMessage />)}>团队文案</button></div><div className="nt-tabs"><button aria-pressed={tab === 'members'} onClick={() => { setTab('members'); setSearch(''); }}>成员</button><button aria-pressed={tab === 'projects'} onClick={() => { setTab('projects'); setSearch(''); }}>项目</button></div>
+  return <><div className="nt-row nt-between"><div><h2>团队管理</h2><p className="nt-muted">{team.name}</p></div><button className="nt-quiet" onClick={() => modal.open(<TeamMessages />)}>首页标语</button></div><div className="nt-tabs"><button aria-pressed={tab === 'members'} onClick={() => { setTab('members'); setSearch(''); }}>成员</button><button aria-pressed={tab === 'projects'} onClick={() => { setTab('projects'); setSearch(''); }}>项目</button></div>
     <div className="nt-tools"><div className="nt-row"><input aria-label="搜索" placeholder={tab === 'members' ? '账号或姓名' : '项目名称'} value={search} onChange={(event) => setSearch(event.target.value)} />{tab === 'members' && <select aria-label="账号状态" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已停用</option></select>}</div><div className="nt-row">{tab === 'members' ? <button className="nt-primary" onClick={() => modal.open(<AddMember />)}>新增成员</button> : <button className="nt-primary" onClick={() => modal.open(<ProjectForm />)}>新增项目</button>}</div></div>
     <div className="nt-project nt-scroll">{tab === 'members' ? <table className="nt-table"><thead><tr><th>账号</th><th>姓名</th><th>状态</th><th>操作</th></tr></thead><tbody>{accounts.map((account) => <tr key={account.id}><td>{account.loginName}</td><td>{account.displayName}{account.id === team.leaderId && <small className="v2-option-note">团队负责人</small>}</td><td>{account.disabled ? '已停用' : '已启用'}</td><td>{account.id !== user.id && <div className="nt-row"><button onClick={() => modal.open(<AccountForm action="reset_password" user={user} accounts={data.accounts} teams={[team]} accountId={account.id} />)}>重置密码</button><button onClick={() => modal.open(<AccountForm action="set_disabled" user={user} accounts={data.accounts} teams={[team]} accountId={account.id} />)}>{account.disabled ? '启用' : '停用'}</button></div>}</td></tr>)}</tbody></table> : <table className="nt-table"><thead><tr><th>项目名称</th><th>项目经理</th><th>项目研发负责人</th><th>成员数量</th><th>操作</th></tr></thead><tbody>{data.projects.filter((row) => row.name.includes(search)).map((project) => <tr key={project.id}><td>{project.name}</td><td>{project.members.filter((row) => row.roles.includes('project_manager')).map((row) => name(row.accountId)).join('、')}</td><td>{project.members.filter((row) => row.roles.includes('project_lead')).map((row) => name(row.accountId)).join('、')}</td><td>{project.members.length}</td><td><div className="nt-row"><button onClick={() => modal.open(<ProjectForm project={project} />)}>编辑</button><button onClick={() => modal.open(<ProjectForm project={project} membersOnly />)}>管理成员</button><Link to={`/work?project=${project.id}&tab=tasks`}>进入项目 →</Link></div></td></tr>)}</tbody></table>}</div>
   </>;
@@ -54,15 +55,6 @@ function ProjectForm({ project, membersOnly = false }: { project?: Project; memb
     <Feedback error={action.error} />{blockers.length > 0 && <section className="v2-blockers"><h3>移出前需要处理</h3><ul>{blockers.map((row) => <li key={`${row.kind}:${row.id}`}>{row.accountId && `${data.accounts.find((item) => item.id === row.accountId)?.displayName ?? '成员'}：`}{row.kind === 'task' ? <button type="button" className="nt-link" onClick={() => { const task = data.tasks.find((item) => item.id === row.id); if (task) modal.push(<TaskEditor task={task} />); }}>{row.title}</button> : row.kind === 'milestone' ? <button type="button" className="nt-link" onClick={() => modal.push(<MilestoneDetail milestoneId={row.id} />)}>{row.title}</button> : row.title}</li>)}</ul></section>}
   </fieldset></form></ModalPage>;
 }
-
-/** 空或纯空白团队文案保存为空，个人页面不制造替代句或空行。 */
-function TeamMessage() {
-  const { data, run } = useWorkspace(), modal = useModal(), action = useAction(), id = useId();
-  const [message, setMessage] = useState(data.teamMessage), [version] = useState(data.teamVersion), [original] = useState(data.teamMessage);
-  return <ModalPage title="团队文案" dirty={message !== original} busy={action.busy} actions={<button className="nt-primary" type="submit" form={id} disabled={action.busy}>保存</button>}><form id={id} onSubmit={(event) => { event.preventDefault(); void action.act(async () => { await run('team', { action: 'set_message', operationId: createOperationId(), version, message }); modal.finish(); }); }}><Field label="我的工作顶部文案（选填）"><input value={message} maxLength={500} disabled={action.busy} onChange={(event) => setMessage(event.target.value)} /></Field><p className="v2-context">团队共用一句纯文本；清空后不展示。</p><Feedback error={action.error} /></form></ModalPage>;
-}
-
-
 
 /** 新增成员入口集中选择创建账号或关联已有账号，避免并列重复入口。 */
 function AddMember() {

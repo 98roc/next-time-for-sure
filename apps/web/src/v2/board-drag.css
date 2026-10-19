@@ -2,9 +2,9 @@
 #ntfs-my-work .mw-column { display:flex;flex-direction:column;min-width:240px; }
 #ntfs-my-work .mw-card-list { flex:1; }
 #ntfs-my-work .mw-task { cursor:grab; }
-#ntfs-my-work .mw-task-top { min-height:30px; }
-#ntfs-my-work .mw-category-title { flex:1;min-width:0; }
-#ntfs-my-work button.mw-category-handle { width:100%;justify-content:flex-start;white-space:normal;text-align:left;padding:3px 0;border:0;background:transparent;font-size:17px;cursor:grab;touch-action:none;user-select:none; }
+#ntfs-my-work .mw-task-top { min-height:22px; }
+#ntfs-my-work .mw-category-title { display:flex;align-items:center;gap:8px;flex:1;min-width:0; }
+#ntfs-my-work button.mw-category-handle { min-width:0;justify-content:flex-start;white-space:normal;text-align:left;padding:3px 0;border:0;background:transparent;font-size:17px;cursor:grab;touch-action:none;user-select:none; }
 #ntfs-my-work .mw-category-grip { color:var(--mw-muted);font-size:14px;opacity:.6; }
 #ntfs-my-work .mw-category-handle:hover .mw-category-grip { color:var(--mw-accent);opacity:1; }
 #ntfs-my-work .mw-category-placeholder { border:1px dashed var(--mw-accent);background:var(--mw-selected);opacity:.65; }

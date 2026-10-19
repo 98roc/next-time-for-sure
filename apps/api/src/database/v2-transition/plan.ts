@@ -41,7 +41,7 @@ export function buildPlan(source: LegacySource, decisions: MigrationDecisions, n
   // 连续日期目录覆盖来源所有周及当前周前后二周；绝不根据旧标签自动排期。
   const periods = new Map<string, string>();
   for (const team of source.teams) {
-    put('v2_team_settings', { team_id: team.id, message: '', timezone: 'Asia/Shanghai', version: 0 });
+    put('v2_team_settings', { team_id: team.id, messages_json: '[]', timezone: 'Asia/Shanghai', version: 0 });
     const current = naturalWeek(shanghaiDate(now)).startOn;
     const weeks = [shiftDate(current, -14), shiftDate(current, 28), ...source.drafts.filter((row) => row.team_id === team.id).map((row) => row.week), ...source.reports.filter((row) => row.team_id === team.id).map((row) => shiftDate(row.week, -7)), ...source.publications.filter((row) => row.team_id === team.id).flatMap((row) => [shiftDate(row.week, -7), shiftDate(row.week, 7)]), ...decisions.supplements.map((row) => row.startOn)].sort();
     for (let day = requireValue(weeks[0], 'NO_PERIOD'); day <= requireValue(weeks.at(-1), 'NO_PERIOD'); day = shiftDate(day, 7)) {

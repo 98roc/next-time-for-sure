@@ -2,7 +2,7 @@ import { resolveOrder } from './sorting.js';
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
-import { v2ArrangementHistorySchema, v2PeriodSchema, type V2Period } from '@ntfs/contracts';
+import { v2ArrangementHistorySchema, v2PeriodSchema, v2TeamMessagesSchema, type V2Period } from '@ntfs/contracts';
 import { naturalWeek, shiftDate } from './calendar.js';
 import { decodeJson, instantColumn } from './repository-utils.js';
 import type { V2ReportText } from './shared-report.js';
@@ -15,7 +15,7 @@ export class V2PlanningRepository {
 
   /** 新团队初始化默认自然周目录；不产生任务、不结转旧工作。 */
   async ensure(teamId: string, today: string): Promise<void> {
-    await this.manager.query('INSERT IGNORE INTO v2_team_settings(team_id) VALUES (?)', [teamId]);
+    await this.manager.query('INSERT IGNORE INTO v2_team_settings(team_id,messages_json) VALUES (?,JSON_ARRAY())', [teamId]);
     if ((await this.periods(teamId)).length) return;
     const week = naturalWeek(today);
     for (let offset = -2; offset <= 4; offset++) await this.insertPeriod({ id: randomUUID(), teamId, startOn: shiftDate(week.startOn, offset * 7), endOn: shiftDate(week.endOn, offset * 7), version: 0 });
@@ -23,7 +23,10 @@ export class V2PlanningRepository {
   /** 完整目录按起始日期排序，相邻联动不能固定加减七天。 */
   async periods(teamId: string): Promise<V2Period[]> { return z.array(v2PeriodSchema).parse(await this.manager.query("SELECT id,team_id AS teamId,DATE_FORMAT(start_on,'%Y-%m-%d') AS startOn,DATE_FORMAT(end_on,'%Y-%m-%d') AS endOn,version FROM v2_periods WHERE team_id=? ORDER BY start_on", [teamId])); }
   /** 团队配置始终携带目录版本，避免日期调整和自动扩展互相覆盖。 */
-  async settings(teamId: string) { return z.array(z.object({ message: z.string(), version: z.number() })).parse(await this.manager.query('SELECT message,version FROM v2_team_settings WHERE team_id=?', [teamId]))[0] ?? { message: '', version: 0 }; }
+  async settings(teamId: string) {
+    const row = z.array(z.object({ messages: z.unknown(), version: z.number() })).parse(await this.manager.query('SELECT messages_json AS messages,version FROM v2_team_settings WHERE team_id=?', [teamId]))[0];
+    return { messages: row ? v2TeamMessagesSchema.parse(decodeJson(row.messages)) : [], version: row?.version ?? 0 };
+  }
   /** 扩展目录只插入经过连续性验证的新区间。 */
   async insertPeriod(period: V2Period): Promise<void> { await this.manager.query('INSERT INTO v2_periods(id,team_id,start_on,end_on,version) VALUES (?,?,?,?,?)', [period.id, period.teamId, period.startOn, period.endOn, period.version]); }
   /** 调整边界只更新有变动的行并递增目录版本。 */
@@ -36,8 +39,8 @@ export class V2PlanningRepository {
     await this.bump(teamId);
     await this.manager.query("INSERT INTO v2_object_events(id,team_id,object_id,actor_id,action,payload_json,occurred_at) VALUES (?,?,?,?,'periods.changed',?,UTC_TIMESTAMP(3))", [randomUUID(), teamId, teamId, actorId, JSON.stringify({ before: current, after: proposed })]);
   }
-  /** 团队文案空白标准化为空，前端不制造占位。 */
-  async setMessage(teamId: string, message: string): Promise<void> { await this.manager.query('UPDATE v2_team_settings SET message=?,version=version+1 WHERE team_id=?', [message.trim(), teamId]); }
+  /** 整份标语列表同事务保存并递增配置版本；空白项由共享契约去除。 */
+  async setMessages(teamId: string, messages: string[]): Promise<void> { await this.manager.query('UPDATE v2_team_settings SET messages_json=?,version=version+1 WHERE team_id=?', [JSON.stringify(v2TeamMessagesSchema.parse(messages)), teamId]); }
   /** 目录变更统一版本。 */
   async bump(teamId: string): Promise<void> { await this.manager.query('UPDATE v2_team_settings SET version=version+1 WHERE team_id=?', [teamId]); }
 

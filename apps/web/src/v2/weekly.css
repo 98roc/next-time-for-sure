@@ -36,7 +36,7 @@
 #ntfs-weekly-demo .w-status{min-height:24px;font-size:12px;color:var(--w-muted);margin-bottom:10px}
 #ntfs-weekly-demo .w-project{margin-bottom:24px}
 #ntfs-weekly-demo .w-project-head{padding:18px 0 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-#ntfs-weekly-demo .w-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--w-column-gap,28px)}
+#ntfs-weekly-demo .w-columns{display:grid;align-items:start;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--w-column-gap,28px)}
 #ntfs-weekly-demo .w-column{min-width:0;padding:16px;background:var(--w-surface);border:1px solid var(--w-line);border-radius:10px}
 #ntfs-weekly-demo .w-column-head{flex-wrap:wrap}
 #ntfs-weekly-demo .w-column-date{display:none;font-size:11px;color:var(--w-muted);margin-bottom:12px}
@@ -51,7 +51,7 @@
 #ntfs-weekly-demo .w-tag.done{background:var(--w-green-bg);color:var(--w-green)}
 #ntfs-weekly-demo .w-tag.doing{background:var(--w-selected);color:var(--w-accent)}
 #ntfs-weekly-demo .w-tag.outside{background:var(--w-amber-bg);color:var(--w-amber)}
-#ntfs-weekly-demo .w-plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:0;margin-bottom:14px}
+#ntfs-weekly-demo .w-plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0}
 #ntfs-weekly-demo .w-empty{padding:24px 10px;text-align:center;font-size:12px;color:var(--w-muted);background:var(--w-canvas);border-radius:6px;margin-top:10px}
 #ntfs-weekly-demo .w-person-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:18px 0 12px}
 #ntfs-weekly-demo .w-person-totals{font-size:12px;text-align:right}
@@ -99,3 +99,11 @@
 #ntfs-weekly-demo .w-project.is-sorting{margin:10px 0}
 #ntfs-weekly-demo .w-project-head .w-drag{width:32px;flex-basis:32px;min-height:36px;background:var(--w-surface);border-radius:6px}
 @media(max-width:580px){#ntfs-weekly-demo .w-project-sort-handle small{display:none}}
+
+/* 空项目收为一行，非空项目两侧独立撑高；安排操作与标题共用一行。 */
+#ntfs-weekly-demo .w-column-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#ntfs-weekly-demo .w-column .w-empty{background:transparent;text-align:left;padding:12px 0;margin:0}
+#ntfs-weekly-demo .w-project.is-empty{border-bottom:1px solid var(--w-line);margin-bottom:12px}
+#ntfs-weekly-demo .w-project.is-empty .w-project-head{padding:12px 0}
+#ntfs-weekly-demo .w-empty-project-toggle{display:flex;align-items:center;gap:8px;border:0;background:transparent;color:var(--w-muted);font:inherit;font-size:12px;padding:6px;cursor:pointer}
+#ntfs-weekly-demo .w-empty-project-toggle:hover{color:var(--w-accent)}

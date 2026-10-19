@@ -1,0 +1,6 @@
+.v2-message-fields { border: 0; padding: 0; min-width: 0; }
+.v2-message-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.v2-message-row > label { flex: 1; min-width: 0; }
+.v2-message-row textarea { width: 100%; resize: vertical; }
+.v2-message-row > button { flex: none; }
+#mw-team-phrase { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -38,6 +38,10 @@
 /* 保留原型内容的字体和颜色变量，取消它们对外框高度、边界与滚动的控制。 */
 :is(#ntfs-my-work, #ntfs-weekly-demo, #nt-project) .v2-page { min-height: 0; border: 0; border-radius: 0; background: transparent; overflow: visible; }
 
+/* 看板填满剩余工作区；随标题和标语自然排版，不用固定视口减数。 */
+#ntfs-my-work .v2-page { display: flex; flex-direction: column; min-height: 100%; }
+#ntfs-my-work .mw-board { flex: 1; }
+
 @media (max-width: 850px) {
   .v2-frame { grid-template-columns: 176px minmax(0, 1fr); }
   .v2-sidebar { padding-inline: 8px; }

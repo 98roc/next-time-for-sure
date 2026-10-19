@@ -1,4 +1,4 @@
-<div id="ntfs-my-work" aria-label="我的工作页面示例" data-team-message="今天一定，别让产品名赢了。">
+<div id="ntfs-my-work" aria-label="我的工作页面示例" data-team-messages='["今天一定，别让产品名赢了。","一步一步，把事情做好。"]'>
   <div class="mw-shell">
     <aside class="mw-nav">
       <div class="mw-brand"><span class="mw-logo">下</span><span>下次一定<small>团队协作工作台</small></span></div>
@@ -380,17 +380,23 @@ root.addEventListener('pointercancel',()=>stopDrag());
 root.addEventListener('keydown',e=>{if(e.key==='Escape'&&pointer){stopDrag();notice('已取消移动，任务保持原位。')}});
 window.addEventListener('blur',()=>{if(pointer)stopDrag()});
 window.addEventListener('openai:set_globals',e=>{if(dialog.open)return;if(restore(e.detail?.globals?.widgetState)){stopDrag();if(dialog.open)close(true);render()}});
-/** 展示时间问候及可选团队文案；空配置不生成替代句或占位区域。 */
+/** 标语只在打开原型时抽取一次，不随任务操作或问候更新切换。 */
+const teamMessages=JSON.parse(root.dataset.teamMessages||'[]').map(message=>message.trim()).filter(Boolean);
+const selectedTeamMessage=teamMessages[Math.floor(Math.random()*teamMessages.length)]||'';
 function renderGreeting(){
-  const greetingHour=Number(new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'numeric',hourCycle:'h23'}).format(new Date()));
-  $('#mw-greeting').textContent=(greetingHour<5?'夜深了':greetingHour<12?'早上好':greetingHour<18?'下午好':'晚上好')+'，解鹏';
-
-  // data-team-message 仅模拟团队配置，正式维护入口属于团队管理。
-  const message=root.dataset.teamMessage?.trim()??'';
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+  const minutes=Number(parts.find(part=>part.type==='hour').value)*60+Number(parts.find(part=>part.type==='minute').value);
+  $('#mw-greeting').textContent=(minutes<360||minutes>=1320?'夜深了':minutes<570?'早上好':minutes<720?'上午好':minutes<840?'中午好':minutes<1080?'下午好':'晚上好')+'，解鹏';
   const phrase=$('#mw-team-phrase');
-  phrase.textContent=message;
-  phrase.hidden=!message;
+  phrase.textContent=selectedTeamMessage;
+  phrase.hidden=!selectedTeamMessage;
 }
+let greetingTimer;
+function updateGreeting(){clearTimeout(greetingTimer);renderGreeting();greetingTimer=setTimeout(updateGreeting,60000-Date.now()%60000)}
+window.addEventListener('focus',updateGreeting);
+document.addEventListener('visibilitychange',updateGreeting);
+updateGreeting();
+
 render();
 if(globalThis.Tweak){const design={cardPadding:14};const tweak=new Tweak({container:root,onChange:()=>root.style.setProperty('--mw-pad',design.cardPadding+'px')});tweak.addSlider(design,'cardPadding',{label:'卡片留白',min:10,max:22,unit:'px'})}
 })();

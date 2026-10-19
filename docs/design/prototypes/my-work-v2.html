@@ -1787,7 +1787,7 @@ html&gt;body{padding:0}&lt;/style&gt;
   syncTheme();
 })();
 &lt;/script&gt;
-&lt;div id=&quot;ntfs-my-work&quot; aria-label=&quot;我的工作页面示例&quot; data-team-message=&quot;今天一定，别让产品名赢了。&quot;&gt;
+&lt;div id=&quot;ntfs-my-work&quot; aria-label=&quot;我的工作页面示例&quot; data-team-messages=&#x27;[&quot;今天一定，别让产品名赢了。&quot;,&quot;一步一步，把事情做好。&quot;]&#x27;&gt;
   &lt;div class=&quot;mw-shell&quot;&gt;
     &lt;aside class=&quot;mw-nav&quot;&gt;
       &lt;div class=&quot;mw-brand&quot;&gt;&lt;span class=&quot;mw-logo&quot;&gt;下&lt;/span&gt;&lt;span&gt;下次一定&lt;small&gt;团队协作工作台&lt;/small&gt;&lt;/span&gt;&lt;/div&gt;
@@ -2169,17 +2169,23 @@ root.addEventListener(&#x27;pointercancel&#x27;,()=&gt;stopDrag());
 root.addEventListener(&#x27;keydown&#x27;,e=&gt;{if(e.key===&#x27;Escape&#x27;&amp;&amp;pointer){stopDrag();notice(&#x27;已取消移动，任务保持原位。&#x27;)}});
 window.addEventListener(&#x27;blur&#x27;,()=&gt;{if(pointer)stopDrag()});
 window.addEventListener(&#x27;openai:set_globals&#x27;,e=&gt;{if(dialog.open)return;if(restore(e.detail?.globals?.widgetState)){stopDrag();if(dialog.open)close(true);render()}});
-/** 展示时间问候及可选团队文案；空配置不生成替代句或占位区域。 */
+/** 标语只在打开原型时抽取一次，不随任务操作或问候更新切换。 */
+const teamMessages=JSON.parse(root.dataset.teamMessages||&#x27;[]&#x27;).map(message=&gt;message.trim()).filter(Boolean);
+const selectedTeamMessage=teamMessages[Math.floor(Math.random()*teamMessages.length)]||&#x27;&#x27;;
 function renderGreeting(){
-  const greetingHour=Number(new Intl.DateTimeFormat(&#x27;zh-CN&#x27;,{timeZone:&#x27;Asia/Shanghai&#x27;,hour:&#x27;numeric&#x27;,hourCycle:&#x27;h23&#x27;}).format(new Date()));
-  $(&#x27;#mw-greeting&#x27;).textContent=(greetingHour&lt;5?&#x27;夜深了&#x27;:greetingHour&lt;12?&#x27;早上好&#x27;:greetingHour&lt;18?&#x27;下午好&#x27;:&#x27;晚上好&#x27;)+&#x27;，解鹏&#x27;;
-
-  // data-team-message 仅模拟团队配置，正式维护入口属于团队管理。
-  const message=root.dataset.teamMessage?.trim()??&#x27;&#x27;;
+  const parts=new Intl.DateTimeFormat(&#x27;en-GB&#x27;,{timeZone:&#x27;Asia/Shanghai&#x27;,hour:&#x27;2-digit&#x27;,minute:&#x27;2-digit&#x27;,hourCycle:&#x27;h23&#x27;}).formatToParts(new Date());
+  const minutes=Number(parts.find(part=&gt;part.type===&#x27;hour&#x27;).value)*60+Number(parts.find(part=&gt;part.type===&#x27;minute&#x27;).value);
+  $(&#x27;#mw-greeting&#x27;).textContent=(minutes&lt;360||minutes&gt;=1320?&#x27;夜深了&#x27;:minutes&lt;570?&#x27;早上好&#x27;:minutes&lt;720?&#x27;上午好&#x27;:minutes&lt;840?&#x27;中午好&#x27;:minutes&lt;1080?&#x27;下午好&#x27;:&#x27;晚上好&#x27;)+&#x27;，解鹏&#x27;;
   const phrase=$(&#x27;#mw-team-phrase&#x27;);
-  phrase.textContent=message;
-  phrase.hidden=!message;
+  phrase.textContent=selectedTeamMessage;
+  phrase.hidden=!selectedTeamMessage;
 }
+let greetingTimer;
+function updateGreeting(){clearTimeout(greetingTimer);renderGreeting();greetingTimer=setTimeout(updateGreeting,60000-Date.now()%60000)}
+window.addEventListener(&#x27;focus&#x27;,updateGreeting);
+document.addEventListener(&#x27;visibilitychange&#x27;,updateGreeting);
+updateGreeting();
+
 render();
 if(globalThis.Tweak){const design={cardPadding:14};const tweak=new Tweak({container:root,onChange:()=&gt;root.style.setProperty(&#x27;--mw-pad&#x27;,design.cardPadding+&#x27;px&#x27;)});tweak.addSlider(design,&#x27;cardPadding&#x27;,{label:&#x27;卡片留白&#x27;,min:10,max:22,unit:&#x27;px&#x27;})}
 })();

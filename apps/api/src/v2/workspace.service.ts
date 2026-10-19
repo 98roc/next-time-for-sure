@@ -35,10 +35,10 @@ export class V2WorkspaceService {
       await personal.ensure(context.actor.id);
       if (context.teamId) await planning.ensure(context.teamId, today);
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
-      const settings = context.teamId ? await planning.settings(context.teamId) : { message: '', version: 0 };
+      const settings = context.teamId ? await planning.settings(context.teamId) : { messages: [], version: 0 };
       return {
         orders: await readProjectOrders(manager, context),
-        team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessage: settings.message, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,
+        team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessages: settings.messages, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,
         accounts: context.organization.accounts.filter((account) => account.teamId === context.teamId && context.teamId !== null),
         projects: context.projects.map((project) => ({ id: project.id, teamId: project.teamId, name: context.organization.projects.find((entry) => entry.id === project.id)?.name ?? '', version: context.organization.projects.find((entry) => entry.id === project.id)?.version ?? 0, members: project.members, canManage: canManageProject(context.actor, project), canCreate: canCreateProjectTask(context.actor, project, context.actor.id) || canManageProject(context.actor, project), canConfirmMilestone: project.members.some((member) => member.accountId === context.actor.id && member.roles.includes('project_lead')) })),
         periods: context.teamId ? await planning.periods(context.teamId) : [], tasks: visible, arrangements: await tasks.arrangements(visible.map((task) => task.id)), milestones: await projects.milestones(projectIds), backlog: await projects.backlog(projectIds),
