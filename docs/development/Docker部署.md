@@ -121,7 +121,7 @@ V1 生产升级必须使用经过审核的私有转换材料，否则脚本在�
 
 - 网页入口与未带哈希的静态文件使用 `Cache-Control: no-store`，关闭 ETag 与修改时间条件判断；`/assets/` 下带内容哈希的 JS/CSS 保留一年缓存及 `immutable`。归档为复用依赖固定了文件时间，同长度首页可能跨版本产生相同 ETag，仅使用 `no-cache` 会误返回 304，因此已有缓存的条件请求也必须返回完整新首页。[Nginx 条件请求配置](https://nginx.org/en/docs/http/ngx_http_core_module.html#if_modified_since)
 - `Validate` 会在隔离网关覆盖首页、`/index.html`、`/reports`、`/weekly-plans` 和 `/account`，分别携带旧 ETag、旧修改时间及两者组合，检查 200、完整 HTML 和禁止存储；同时验证哈希资源仍可返回 304、缺失资源返回 404。修复发布后浏览器或桌面客户端需刷新一次；已打开的页面不会自动替换，桌面窗口关闭只隐藏到托盘。
-- 2026-10-19 缓存修复的 5 项部署安全测试、API/网页及共享包构建通过；服务器隔离容器中的 15 组旧缓存请求、哈希资源 304/immutable、缺失资源 404、API 转发、数据库只读连接和 readiness 200 均通过。此记录为 `Validate` 证据，不代表该配置已切换到生产，也未实测已安装的 Electron 客户端。
+- 2026-10-19 缓存修复的 5 项部署安全测试、API/网页及共享包构建通过；服务器隔离容器中的 15 组旧缓存请求、哈希资源 304/immutable、缺失资源 404、API 转发、数据库只读连接和 readiness 200 均通过。同日按授权部署源码 `6f360ac`（工作区干净），生产版本 `20261019-092433-750fd5`；备份 gzip/SHA256 校验通过，新增迁移 0 项，API/Nginx 均 healthy。从生产 EIP 复测 15 组旧缓存请求、JS/CSS 缓存及 readiness 均通过，真实 Chrome 从旧 `/reports` 进入新版周报并加载任务数据。临时容器、网络、打包目录和验收标签页已清理；已安装的 Electron 客户端未实测。
 
 - 浏览器在内网 HTTP 页面上可能不提供 `crypto.randomUUID()`。前端统一通过 `createOperationId` 生成 UUID v4：优先使用原生方法，否则使用 HTTP 上可用的 `crypto.getRandomValues`，保持后端幂等键格式与随机性。2026-10-16 已覆盖周计划新建任务、分工、里程碑、个人事项与生命周期等 28 处调用；15 项前端测试、类型检查、构建与 ESLint 通过，并在生产 HTTP 来源的 Chromium 中验证原生方法缺失时兼容生成成功。该浏览器验证未写入生产业务数据。[浏览器接口说明](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)
 
