@@ -16,7 +16,7 @@ export class OrganizationRepository {
     // 账号与成员目录统一按创建时间倒序；同一毫秒创建时用ID稳定排序。
     const accounts: unknown = await this.manager.query('SELECT id, login_name AS loginName, display_name AS displayName, team_id AS teamId, disabled, version FROM accounts WHERE is_super_admin = 0 ORDER BY created_at DESC, id ASC FOR UPDATE');
     const teams: unknown = await this.manager.query('SELECT id, name, leader_id AS leaderId, version FROM teams');
-    const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version FROM projects');
+    const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version FROM projects ORDER BY created_at DESC,id ASC');
     const projectMemberships: unknown = await this.manager.query('SELECT project_id AS projectId, account_id AS accountId, roles_json FROM project_members');
     const pm = z.array(z.object({ projectId: z.string(), accountId: z.string(), roles_json: z.unknown() })).parse(projectMemberships);
     const projectRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), version: z.number() })).parse(projects);
@@ -51,7 +51,7 @@ export class OrganizationRepository {
   /** 新版项目服务在校验整份成员配置后创建项目基础记录。 */
   async createProject(team: string, name: string): Promise<string> {
     const id = randomUUID();
-    await this.manager.query('INSERT INTO projects (id, team_id, name) VALUES (?, ?, ?)', [id, team, name]);
+    await this.manager.query('INSERT INTO projects (id, team_id, name, created_at) VALUES (?, ?, ?, UTC_TIMESTAMP(3))', [id, team, name]);
     return id;
   }
 

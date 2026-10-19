@@ -14,7 +14,7 @@ export async function mutateProject(manager: EntityManager, context: V2Context, 
   const repository = new V2ProjectRepository(manager);
   if (command.action === 'create_backlog') {
     const id = randomUUID();
-    await repository.createBacklog({ id, projectId: command.projectId, creatorId: context.actor.id, title: command.title, priority: command.priority, version: 0, convertedTaskId: null, deletedAt: null }); return [id];
+    await repository.createBacklog({ id, createdAt: new Date().toISOString(), projectId: command.projectId, creatorId: context.actor.id, title: command.title, priority: command.priority, version: 0, convertedTaskId: null, deletedAt: null }); return [id];
   }
   if ('backlogId' in command) {
     const row = await repository.backlogItem(command.backlogId);

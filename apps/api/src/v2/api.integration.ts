@@ -1,3 +1,4 @@
+import { verifySorting } from './sorting.integration.js';
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -165,6 +166,8 @@ async function smoke(): Promise<void> {
     await call('tasks', lead, { action: 'set_status', operationId: randomUUID(), taskId, version: latest.version, status: 'completed' });
     const stale = v2WeeklyStateSchema.parse(await call(weeklyPath, leader)); assert.equal(stale.text.stale, true); assert.equal(stale.text.body, save.body);
     await call('report', leader, { ...save, action: 'regenerate', operationId: randomUUID(), version: 1 }, 409);
+    stage = 'sorting defaults, manual and reset';
+    await verifySorting({ source, leader, lead, manager, developer, projectId, hiddenProjectId, teamId, periodId: period.id, nextId: next.id, call, state });
     stage = 'revocation before idempotence';
     await source.query('DELETE FROM project_members WHERE project_id=? AND account_id=?', [projectId, lead.id]);
     await call('tasks', lead, command, 403);

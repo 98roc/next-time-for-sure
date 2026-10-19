@@ -31,9 +31,18 @@ export class V2PersonalRepository {
   async version(ownerId: string): Promise<number> { return z.array(z.object({ version: z.number() })).parse(await this.manager.query('SELECT version FROM v2_personal_views WHERE owner_id=?', [ownerId]))[0]?.version ?? 0; }
 
   /** 私人顺序只读本人，项目权限撤销后的任务不向页面返回位置。 */
-  async placements(ownerId: string) { return z.array(v2PlacementSchema).parse(await this.manager.query('SELECT task_id AS taskId,category_id AS categoryId,position FROM v2_placements WHERE owner_id=? ORDER BY position,task_id', [ownerId])); }
+  async placements(ownerId: string) {
+    const rows = z.array(v2PlacementSchema).parse(await this.manager.query(`SELECT p.task_id AS taskId,p.category_id AS categoryId,p.position FROM v2_placements p JOIN v2_categories c ON c.id=p.category_id JOIN v2_tasks t ON t.id=p.task_id WHERE p.owner_id=? ORDER BY c.position,c.id,CASE WHEN c.manual_order=1 THEN p.position ELSE t.priority END,CASE WHEN c.manual_order=0 THEN t.created_at END,p.task_id`, [ownerId]));
+    return rows.map((row, position) => ({ ...row, position }));
+  }
 
-  /** 状态改变或转执行人后进入目标默认列顶部；普通字段更新保持既有位置。 */
+  /** 恢复后优先级和新增任务动态参与默认排序，分类和任务状态均不改变。 */
+  async resetOrder(ownerId: string): Promise<void> {
+    await this.manager.query('UPDATE v2_categories SET manual_order=0 WHERE owner_id=?', [ownerId]);
+    await this.bump(ownerId);
+  }
+
+  /** 状态改变或转执行人后进入默认分类；默认分类按规则展示，手动分类置顶。 */
   async place(task: V2Task, previous?: V2Task, selected?: string, beforeTaskId?: string | null): Promise<void> {
     const ownerId = task.executorId;
     await this.ensure(ownerId);
@@ -51,6 +60,7 @@ export class V2PersonalRepository {
     if (index < 0) throw new ConflictException('目标位置已变化，请刷新');
     targets.splice(index, 0, { taskId: task.id, categoryId, position: index });
     for (const [position, row] of targets.entries()) await this.manager.query('INSERT INTO v2_placements(task_id,owner_id,category_id,position) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE owner_id=VALUES(owner_id),category_id=VALUES(category_id),position=VALUES(position)', [row.taskId, ownerId, categoryId, position]);
+    if (beforeTaskId !== undefined) await this.manager.query('UPDATE v2_categories SET manual_order=1 WHERE id=? AND owner_id=?', [categoryId, ownerId]);
     await this.bump(ownerId);
   }
 
@@ -67,12 +77,6 @@ export class V2PersonalRepository {
     const combined = [...rows.filter((row) => row.categoryId === receiverId), ...rows.filter((row) => row.categoryId === sourceId)];
     for (const [position, row] of combined.entries()) await this.manager.query('UPDATE v2_placements SET category_id=?,position=? WHERE task_id=? AND owner_id=?', [receiverId, position, row.taskId, ownerId]);
     await this.manager.query('DELETE FROM v2_categories WHERE id=? AND owner_id=?', [sourceId, ownerId]);
-  }
-
-  /** 写入已验证的全量个人顺序，不修改共享顺序或任务优先级。 */
-  async savePositions(ownerId: string, rows: { taskId: string; position: number }[]): Promise<void> {
-    for (const row of rows) await this.manager.query('UPDATE v2_placements SET position=? WHERE task_id=? AND owner_id=?', [row.position, row.taskId, ownerId]);
-    await this.bump(ownerId);
   }
 
   /** 删除业务任务解除当前位置但不删除历史，旧执行人的看板版本也要变化。 */

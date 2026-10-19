@@ -6,7 +6,7 @@ import { naturalWeek, periodWindow, shanghaiDate, validatePeriodChanges } from '
 import { canChangeTaskStatus, canConfirmMilestone, canCreateProjectTask, canDeleteTask, canManageProject, canViewTask, type V2Actor, type V2ProjectAccess } from './permissions.js';
 import { summarizePeriod } from './history.js';
 import { milestoneAfterTaskChange, rearrangeTask, transitionTask, validateMilestoneCompletion, validateMilestoneLink } from './task-rules.js';
-import { destinationCategory, removeCategory, reorderByPriority, validateCategories } from './personal-view.js';
+import { destinationCategory, removeCategory, validateCategories } from './personal-view.js';
 
 const team = randomUUID(), projectId = randomUUID(), executor = randomUUID(), manager = randomUUID(), lead = randomUUID(), leader = randomUUID(), creator = randomUUID();
 const project: V2ProjectAccess = { id: projectId, teamId: team, teamLeaderId: leader, members: [{ accountId: executor, roles: ['developer'] }, { accountId: creator, roles: ['developer'] }, { accountId: manager, roles: ['project_manager'] }, { accountId: lead, roles: ['project_lead'] }] };
@@ -167,10 +167,4 @@ test('默认分类唯一、手动分类优先、同状态字段编辑保持位�
   assert.throws(() => validateCategories([...categories, { ...custom, isDefault: true }], executor), /唯一|仅有一个/);
   assert.equal(removeCategory(all, ongoing.id, custom.id).find((category) => category.id === custom.id)?.isDefault, true);
   assert.throws(() => removeCategory(categories, ongoing.id, ongoing.id), /最后一个/);
-});
-
-test('一次性优先级重排保持同优先级顺序和隐藏任务，且不修改输入', () => {
-  const rows = [{ taskId: 'hidden', categoryId: 'column', position: 0, priority: 3 }, { taskId: 'visible', categoryId: 'column', position: 1, priority: 3 }, { taskId: 'urgent', categoryId: 'column', position: 2, priority: 1 }];
-  assert.deepEqual(reorderByPriority(rows).map((row) => row.taskId), ['urgent', 'hidden', 'visible']);
-  assert.equal(rows[0]?.taskId, 'hidden');
 });

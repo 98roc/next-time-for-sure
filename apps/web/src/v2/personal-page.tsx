@@ -9,7 +9,7 @@ import { TaskEditor } from './task-editor';
 import { CategoryForm, DeleteCategory } from './category-dialogs';
 import { usePointerSort } from './drag';
 
-const defaultDescription = '新分配任务和其他入口的状态变化，进入对应状态默认分类顶部。手动选择优先；更换默认分类不搬动已有任务。';
+const defaultDescription = '新分配任务和其他入口的状态变化，进入对应状态的默认分类，按默认排序排列；已手动排序的分类中新任务置顶。手动选择优先；更换默认分类不搬动已有任务。';
 
 /** 私人和本人执行的项目任务共用看板，完成区间不影响未完成任务。 */
 export function PersonalPageV2() {
@@ -35,7 +35,7 @@ export function PersonalPageV2() {
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
   return <>
     <header className="mw-heading"><div><h1>{greeting}，{user.displayName}</h1>{data.teamMessage.trim() && <p id="mw-team-phrase">{data.teamMessage}</p>}</div><div className="mw-actions"><button className="mw-quiet" onClick={() => modal.open(<CategoryForm />)}>＋ 新增分类</button><button className="mw-primary" onClick={() => modal.open(<TaskCreate personal />)}>＋ 新建任务</button></div></header>
-    <div className="mw-toolbar"><label className="mw-search">⌕<input aria-label="搜索任务" placeholder="搜索任务名称" value={search} onChange={(event) => setSearch(event.target.value)} /></label><select aria-label="筛选任务来源" value={source} onChange={(event) => setSource(event.target.value)}><option value="all">全部项目与个人任务</option><option value="private">仅个人任务</option>{data.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><button disabled={action.busy} onClick={() => { void action.act(() => run('personal', { action: 'reorder_priority', operationId: createOperationId(), version: data.personalVersion })); }}>⇣ 按优先级重排</button></div>
+    <div className="mw-toolbar"><label className="mw-search">⌕<input aria-label="搜索任务" placeholder="搜索任务名称" value={search} onChange={(event) => setSearch(event.target.value)} /></label><select aria-label="筛选任务来源" value={source} onChange={(event) => setSource(event.target.value)}><option value="all">全部项目与个人任务</option><option value="private">仅个人任务</option>{data.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><button disabled={action.busy} onClick={() => { void action.act(() => run('personal', { action: 'reset_order', operationId: createOperationId(), version: data.personalVersion })); }}>恢复默认排序</button></div>
     <Feedback error={action.error} /><div className="mw-board-meta"><span>{visible.length} 项任务</span></div>
     <div className="mw-board" ref={board} aria-label="任务分类看板">{data.categories.map((category) => {
       const ids = data.placements.filter((row) => row.categoryId === category.id).sort((a, b) => a.position - b.position).map((row) => row.taskId);

@@ -1,3 +1,4 @@
+import { resolveOrder } from './sorting.js';
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
@@ -45,15 +46,22 @@ export class V2PlanningRepository {
     if (!taskIds.length) return [];
     return z.array(z.object({ plannedDays: z.coerce.number().nullable() }).passthrough().pipe(v2ArrangementHistorySchema)).parse(await this.manager.query(`SELECT id,task_id AS taskId,period_id AS periodId,provenance,planned_days AS plannedDays,${instantColumn('valid_from','validFrom')},${instantColumn('valid_until','validUntil')} FROM v2_arrangement_history WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY valid_from,id`, taskIds));
   }
-  /** 共享排序无记录时返回确定的初始顺序，增加新对象时附在末尾。 */
-  async order(teamId: string, scope: string, ids: string[]) {
-    const rows = z.array(z.object({ ordered_ids: z.unknown(), version: z.number() })).parse(await this.manager.query('SELECT ordered_ids,version FROM v2_shared_orders WHERE team_id=? AND scope_key=?', [teamId, scope]));
-    const row = rows[0];
-    const stored = row ? z.array(z.string()).parse(decodeJson(row.ordered_ids)) : [];
-    return { ids: [...stored.filter((id) => ids.includes(id)), ...ids.filter((id) => !stored.includes(id))], version: row?.version ?? 0 };
+  /** 完整作用域在组织锁内合并新增项并保存，避免下一次新增挤乱已置顶对象。 */
+  async order(teamId: string, scope: string, ids: string[], newestIds = ids) {
+    const rows = z.array(z.object({ ordered_ids: z.unknown(), version: z.number(), manual_order: z.coerce.boolean() })).parse(await this.manager.query('SELECT ordered_ids,version,manual_order FROM v2_shared_orders WHERE team_id=? AND scope_key=?', [teamId, scope]));
+    const row = rows[0], stored = row ? z.array(z.string()).parse(decodeJson(row.ordered_ids)) : [];
+    const manual = row?.manual_order ?? false, resolved = resolveOrder(ids, manual ? stored : null, newestIds);
+    let version = row?.version ?? 0;
+    if (manual && JSON.stringify(resolved) !== JSON.stringify(stored)) {
+      await this.saveOrder(teamId, scope, resolved); version++;
+    }
+    return { ids: resolved, version, manual };
   }
-  /** 作用域由服务固定构造，客户端不能任意写其他团队的键。 */
-  async saveOrder(teamId: string, scope: string, ids: string[]): Promise<void> { await this.manager.query('INSERT INTO v2_shared_orders(team_id,scope_key,ordered_ids,version) VALUES (?,?,?,1) ON DUPLICATE KEY UPDATE ordered_ids=VALUES(ordered_ids),version=version+1', [teamId, scope, JSON.stringify(ids)]); }
+
+  /** 恢复默认也递增版本，不删除版本行，防止旧的拖动请求再次覆盖。 */
+  async saveOrder(teamId: string, scope: string, ids: string[], manual = true): Promise<void> {
+    await this.manager.query('INSERT INTO v2_shared_orders(team_id,scope_key,ordered_ids,version,manual_order) VALUES (?,?,?,1,?) ON DUPLICATE KEY UPDATE ordered_ids=VALUES(ordered_ids),manual_order=VALUES(manual_order),version=version+1', [teamId, scope, JSON.stringify(ids), Number(manual)]);
+  }
   /** 整稿仅供团队负责人，受限成员不调用本查询。 */
   async report(teamId: string, summaryId: string, planId: string): Promise<V2ReportText | null> { return z.array(textSchema).parse(await this.manager.query('SELECT body,manual,source_hash AS sourceHash,version FROM v2_report_texts WHERE team_id=? AND summary_period_id=? AND plan_period_id=?', [teamId, summaryId, planId]))[0] ?? null; }
   /** 保存保留来源摘要，禁止静默将手工文字标记同步。 */

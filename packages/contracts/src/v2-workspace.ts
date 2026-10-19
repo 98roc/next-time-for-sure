@@ -6,16 +6,17 @@ const operation = { operationId: id };
 const confirmation = z.string().regex(/^[a-f0-9]{64}$/u);
 const name = z.string().trim().min(1).max(100);
 export const v2ProjectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })), canManage: z.boolean(), canCreate: z.boolean(), canConfirmMilestone: z.boolean() });
-export const v2BacklogSchema = z.object({ id, projectId: id, creatorId: id, title: z.string(), priority: v2PrioritySchema, version, convertedTaskId: id.nullable(), deletedAt: v2InstantSchema.nullable() });
+export const v2BacklogSchema = z.object({ id, createdAt: v2InstantSchema, projectId: id, creatorId: id, title: z.string(), priority: v2PrioritySchema, version, convertedTaskId: id.nullable(), deletedAt: v2InstantSchema.nullable() });
 export type V2Backlog = z.infer<typeof v2BacklogSchema>;
 export const v2ArrangementSchema = z.object({ taskId: id, periodId: id, plannedDays: z.number().nullable(), position: z.number().int(), version });
 export type V2Arrangement = z.infer<typeof v2ArrangementSchema>;
 export const v2PlacementSchema = z.object({ taskId: id, categoryId: id, position: z.number().int() });
+export const v2OrderSchema = z.object({ ids: z.array(id), version, manual: z.boolean().default(false) });
 export const v2WorkspaceSchema = z.object({
   team: teamSchema.nullable(), teamMessage: z.string(), teamVersion: version, teamLeader: z.boolean(), today: v2DateSchema, naturalWeekStart: v2DateSchema,
   accounts: z.array(directoryAccountSchema), projects: z.array(v2ProjectSchema), periods: z.array(v2PeriodSchema),
   tasks: z.array(v2TaskSchema), arrangements: z.array(v2ArrangementSchema), milestones: z.array(v2MilestoneSchema), backlog: z.array(v2BacklogSchema),
-  categories: z.array(v2CategorySchema), placements: z.array(v2PlacementSchema), personalVersion: version,
+  categories: z.array(v2CategorySchema), placements: z.array(v2PlacementSchema), personalVersion: version, orders: z.array(v2OrderSchema.extend({ scope: z.string() })),
 });
 export type V2Workspace = z.infer<typeof v2WorkspaceSchema>;
 
@@ -27,6 +28,7 @@ export const v2PersonalCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('delete_category'), version, categoryId: id, receiverId: id, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('move_task'), version, taskId: id, taskVersion: version, categoryId: id, beforeTaskId: id.nullable() }).strict(),
   z.object({ ...operation, action: z.literal('reorder_priority'), version }).strict(),
+  z.object({ ...operation, action: z.literal('reset_order'), version }).strict(),
 ]);
 export type V2PersonalCommand = z.infer<typeof v2PersonalCommandSchema>;
 
@@ -47,10 +49,11 @@ export const v2PeriodChangeSchema = z.object({ periodId: id, version, startOn: v
 export const v2PlanningCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('extend_periods'), direction: z.enum(['before', 'after']), version }).strict(),
   z.object({ ...operation, action: z.literal('change_periods'), version, periods: z.array(v2PeriodChangeSchema).min(1).max(500), confirmation }).strict(),
-  z.object({ ...operation, action: z.literal('reorder_projects'), version, projectIds: z.array(id).max(500) }).strict(),
-  z.object({ ...operation, action: z.literal('reorder_tasks'), projectId: id, periodId: id, view: z.enum(['summary', 'plan']), executorId: id.optional(), version, taskIds: z.array(id).max(500) }).strict(),
+  z.object({ ...operation, action: z.literal('reorder_projects'), periodId: id.optional(), page: z.enum(['projects', 'weekly']).default('weekly'), reset: z.boolean().default(false), version, projectIds: z.array(id).max(500) }).strict(),
+  z.object({ ...operation, action: z.literal('reorder_project_items'), projectId: id, target: z.enum(['tasks', 'backlog']), reset: z.boolean().default(false), version, ids: z.array(id).max(500) }).strict(),
+  z.object({ ...operation, action: z.literal('reorder_tasks'), projectId: id, periodId: id, view: z.enum(['summary', 'plan']), executorId: id.optional(), reset: z.boolean().default(false), version, taskIds: z.array(id).max(500) }).strict(),
 ]);
-export type V2PlanningCommand = z.infer<typeof v2PlanningCommandSchema>;
+export type V2PlanningCommand = z.input<typeof v2PlanningCommandSchema>;
 export const v2ReportCommandSchema = z.object({ ...operation, action: z.enum(['save', 'verify', 'regenerate']), summaryPeriodId: id, planPeriodId: id, version, sourceHash: confirmation, body: z.string().max(200_000) }).strict();
 export type V2ReportCommand = z.infer<typeof v2ReportCommandSchema>;
 
@@ -71,11 +74,11 @@ export const v2ImpactSchema = z.object({ confirmation, title: z.string(), detail
 export type V2Impact = z.infer<typeof v2ImpactSchema>;
 export const v2TaskHistorySchema = z.array(v2TaskEventSchema);
 
-export const v2SummaryRowSchema = z.object({ taskId: id, title: z.string().nullable(), executorId: id.nullable(), executorName: z.string().nullable(), projectId: id.nullable(), status: v2StatusSchema.nullable(), priority: v2PrioritySchema.nullable(), arranged: z.boolean(), executed: z.boolean(), planning: z.enum(['planned', 'unplanned', 'unknown']), historyIncomplete: z.boolean() });
+export const v2SummaryRowSchema = z.object({ taskId: id, createdAt: v2InstantSchema.nullable().default(null), title: z.string().nullable(), executorId: id.nullable(), executorName: z.string().nullable(), projectId: id.nullable(), status: v2StatusSchema.nullable(), priority: v2PrioritySchema.nullable(), arranged: z.boolean(), executed: z.boolean(), planning: z.enum(['planned', 'unplanned', 'unknown']), historyIncomplete: z.boolean() });
 export type V2SummaryRow = z.infer<typeof v2SummaryRowSchema>;
 export const v2WeeklyStateSchema = z.object({
   summaryPeriod: v2PeriodSchema, planPeriod: v2PeriodSchema, summary: z.array(v2SummaryRowSchema),
-  projectOrder: z.object({ ids: z.array(id), version }), taskOrders: z.array(z.object({ projectId: id, periodId: id, ids: z.array(id), version })),
+  projectOrder: v2OrderSchema, taskOrders: z.array(v2OrderSchema.extend({ projectId: id, periodId: id })),
   text: z.object({ body: z.string(), manual: z.boolean(), sourceHash: z.string(), version, stale: z.boolean() }),
   generatedText: z.string(), currentSourceHash: z.string(), canEditText: z.boolean(),
 });

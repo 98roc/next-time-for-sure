@@ -5,7 +5,7 @@ import type { V2PersonalCommand } from '@ntfs/contracts';
 import { requireVersion, checkRule, type V2Context } from './context.js';
 import { V2PersonalRepository } from './personal.repository.js';
 import { V2TaskRepository } from './task.repository.js';
-import { removeCategory, reorderByPriority, validateCategories } from './personal-view.js';
+import { removeCategory, validateCategories } from './personal-view.js';
 import { requireConfirmation } from './impact.js';
 import { requireTask } from './authorization.js';
 import { mutateTask } from './task-mutations.js';
@@ -15,11 +15,7 @@ export async function mutatePersonal(manager: EntityManager, context: V2Context,
   const repository = new V2PersonalRepository(manager), ownerId = context.actor.id;
   await repository.ensure(ownerId); requireVersion(await repository.version(ownerId), command.version);
   const categories = await repository.categories(ownerId);
-  if (command.action === 'reorder_priority') {
-    const tasks = await new V2TaskRepository(manager).visible(ownerId, context.projects.map((project) => project.id));
-    const placements = (await repository.placements(ownerId)).map((row) => ({ ...row, priority: tasks.find((task) => task.id === row.taskId)?.priority ?? 3 }));
-    await repository.savePositions(ownerId, reorderByPriority(placements)); return [ownerId];
-  }
+  if (command.action === 'reorder_priority' || command.action === 'reset_order') { await repository.resetOrder(ownerId); return [ownerId]; }
   if (command.action === 'move_task') {
     const task = requireTask(context, await new V2TaskRepository(manager).get(command.taskId));
     if (task.executorId !== ownerId || task.deletedAt) throw new ForbiddenException('只能整理本人当前工作。');

@@ -28,10 +28,3 @@ export function removeCategory(categories: V2Category[], sourceId: string, recei
   validateCategories(result, source.ownerId);
   return result;
 }
-
-/** 一次性稳定重排全部任务，同优先级保持既有顺序；不能只传筛选后的可见子集。 */
-export function reorderByPriority(placements: V2Placement[]): V2Placement[] {
-  const groups = new Map<string, V2Placement[]>();
-  for (const placement of placements) { const rows = groups.get(placement.categoryId) ?? []; rows.push(placement); groups.set(placement.categoryId, rows); }
-  return [...groups.values()].flatMap((rows) => [...rows].sort((a, b) => a.position - b.position).sort((a, b) => a.priority - b.priority).map((row, position) => ({ ...row, position })));
-}

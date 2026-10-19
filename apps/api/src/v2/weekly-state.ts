@@ -1,3 +1,4 @@
+import { periodOrderSource } from './period-order.js';
 import { ConflictException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import type { V2WeeklyState } from '@ntfs/contracts';
@@ -23,12 +24,14 @@ export async function buildWeeklyState(manager: EntityManager, context: V2Contex
 
   // 读取全团队项目顺序后仅投影有权项目；受限查询不回写或删除隐藏项目。
   const allProjectIds = context.organization.projects.filter((project) => project.teamId === context.teamId).map((project) => project.id);
-  const fullOrder = await planning.order(context.teamId, 'projects', allProjectIds);
-  const projectOrder = { ids: fullOrder.ids.filter((id) => context.projects.some((project) => project.id === id)), version: fullOrder.version };
+  const fullOrder = await planning.order(context.teamId, `projects:${summaryPeriod.id}`, allProjectIds);
+  const projectOrder = { ids: fullOrder.ids.filter((id) => context.projects.some((project) => project.id === id)), version: fullOrder.version, manual: fullOrder.manual };
   const taskOrders: V2WeeklyState['taskOrders'] = [];
   for (const project of context.projects) for (const period of [summaryPeriod, planPeriod]) {
-    const taskIds = period.id === summaryPeriod.id ? summary.filter((row) => row.projectId === project.id).map((row) => row.taskId) : current.filter((task) => task.projectId === project.id && arrangements.some((row) => row.taskId === task.id && row.periodId === period.id)).map((task) => task.id);
-    taskOrders.push({ projectId: project.id, periodId: period.id, ...await planning.order(context.teamId, `tasks:${project.id}:${period.id}`, taskIds) });
+    const source = await periodOrderSource(manager, project.id, period);
+    const full = await planning.order(context.teamId, `tasks:${project.id}:${period.id}`, source.ids, source.newestIds);
+    const visibleIds = new Set(period.id === summaryPeriod.id ? source.summary.map((row) => row.taskId) : source.plan.map((row) => row.id));
+    taskOrders.push({ projectId: project.id, periodId: period.id, ...full, ids: full.ids.filter((id) => visibleIds.has(id)) });
   }
   const person = (id: string | null) => context.organization.accounts.find((account) => account.id === id)?.displayName ?? '历史成员';
   const groups = (side: 'summary' | 'plan'): V2ReportGroup[] => projectOrder.ids.map((projectId) => {

@@ -27,4 +27,8 @@
 .v2-avatar { display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--selected);color:var(--accent);flex-shrink:0; }
 .v2-scope .v2-drag-ghost { position:fixed!important;left:0!important;top:0!important;margin:0!important;z-index:1500;pointer-events:none;opacity:.94;box-shadow:0 12px 30px #0003;will-change:transform; }
 .v2-scope .v2-drag-source { display:none!important; }
+.v2-scope button.v2-sort-handle { touch-action:none;user-select:none;cursor:grab;display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;margin-right:8px;padding:3px;border:0;background:transparent;color:var(--v2-muted);vertical-align:middle; }
+.v2-scope button.v2-sort-handle:active { cursor:grabbing; }
+.v2-scope button.v2-sort-handle:disabled { cursor:default;opacity:.35; }
+.v2-scope tr.v2-drag-ghost { display:table;background:var(--surface);border-collapse:collapse; }
 @media(max-width:600px) { .v2-scope .v2-fields { grid-template-columns:minmax(0,1fr); }.v2-scope .v2-field input,.v2-scope .v2-field select { font-size:16px; } }

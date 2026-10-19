@@ -56,6 +56,12 @@ export class V2TaskRepository {
     return z.array(z.object({ id: z.string() })).parse(await this.manager.query(`SELECT id FROM v2_tasks WHERE kind='project' AND project_id IN (${projectIds.map(() => '?').join(',')})`, projectIds)).map((row) => row.id);
   }
 
+  /** 项目排序保留历史任务位置，不向该项目权限之外暴露任何对象。 */
+  async projectOrderTasks(projectIds: string[]): Promise<V2Task[]> {
+    if (!projectIds.length) return [];
+    return z.array(v2TaskSchema).parse(await this.manager.query(`${taskSelect} WHERE kind='project' AND project_id IN (${projectIds.map(() => '?').join(',')}) ORDER BY priority,created_at,id`, projectIds));
+  }
+
   /** 当前安排供编辑使用，历史总结不能用此查询替代有效时间片。 */
   async arrangements(taskIds: string[]) {
     if (!taskIds.length) return [];

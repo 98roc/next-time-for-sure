@@ -1,3 +1,4 @@
+import { readProjectOrders } from './project-orders.js';
 import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2Task, V2TaskCommand, V2TaskEdit, V2TeamCommand, V2Workspace } from '@ntfs/contracts';
 import { DatabaseService } from '../database/database.service.js';
@@ -36,6 +37,7 @@ export class V2WorkspaceService {
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { message: '', version: 0 };
       return {
+        orders: await readProjectOrders(manager, context),
         team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessage: settings.message, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,
         accounts: context.organization.accounts.filter((account) => account.teamId === context.teamId && context.teamId !== null),
         projects: context.projects.map((project) => ({ id: project.id, teamId: project.teamId, name: context.organization.projects.find((entry) => entry.id === project.id)?.name ?? '', version: context.organization.projects.find((entry) => entry.id === project.id)?.version ?? 0, members: project.members, canManage: canManageProject(context.actor, project), canCreate: canCreateProjectTask(context.actor, project, context.actor.id) || canManageProject(context.actor, project), canConfirmMilestone: project.members.some((member) => member.accountId === context.actor.id && member.roles.includes('project_lead')) })),

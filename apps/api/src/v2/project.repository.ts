@@ -5,7 +5,7 @@ import { v2BacklogSchema, v2MilestoneSchema, type V2Backlog, type V2Milestone } 
 import { instantColumn } from './repository-utils.js';
 
 const milestoneSelect = "SELECT id,project_id AS projectId,owner_id AS ownerId,title,DATE_FORMAT(expected_on,'%Y-%m-%d') AS expectedOn,status,needs_review AS needsReview,version FROM v2_milestones";
-const backlogSelect = `SELECT id,project_id AS projectId,creator_id AS creatorId,title,priority,version,converted_task_id AS convertedTaskId,${instantColumn('deleted_at', 'deletedAt')} FROM v2_backlog`;
+const backlogSelect = `SELECT id,project_id AS projectId,creator_id AS creatorId,title,priority,version,converted_task_id AS convertedTaskId,${instantColumn('deleted_at', 'deletedAt')},${instantColumn('created_at', 'createdAt')} FROM v2_backlog`;
 const milestones = z.array(v2MilestoneSchema.extend({ needsReview: z.union([z.boolean(), z.number()]).transform(Boolean) }));
 
 /** 待建和里程碑的持久化层，不复制任务或跨入口状态。 */
