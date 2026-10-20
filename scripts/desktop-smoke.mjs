@@ -30,7 +30,7 @@ await withFixture(async (fixture) => {
     const address = server.httpServer.address(); assert.ok(address && typeof address !== 'string');
     const url = `http://127.0.0.1:${address.port}`;
     const environment = { ...process.env }; delete environment.ELECTRON_RUN_AS_NODE;
-    environment.NTFS_RUNTIME_FIXTURE = JSON.stringify({ directory, url, token: fixture.developer.cookie.split('=')[1], csrf: fixture.developer.csrf });
+    environment.NTFS_RUNTIME_FIXTURE = JSON.stringify({ directory, url, token: fixture.developer.cookie.split('=')[1], csrf: fixture.developer.csrf, leaderCookie: fixture.leader.cookie, leaderCsrf: fixture.leader.csrf, projectId: fixture.projectId, executorId: fixture.developer.id, periodId: initial.periods.find(row => row.startOn <= initial.today && row.endOn >= initial.today).id });
     child = spawn(join(root, 'apps/desktop/node_modules/electron/dist/electron.exe'), [join(root, 'apps/desktop/scripts/runtime-smoke.mjs')], { env: environment, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     let passed = false;
     child.stdout.on('data', chunk => { passed ||= chunk.toString().includes('ELECTRON_RUNTIME_PASS'); });
@@ -40,7 +40,7 @@ await withFixture(async (fixture) => {
     try { const [code] = await once(child, 'exit'); assert.equal(code, 0); assert.equal(passed, true); } finally { clearTimeout(timer); }
     const updated = await (await fixture.call('v2/workspace', fixture.leader)).json();
     assert.equal(updated.tasks.find(row => row.title === 'Electron 隔离验收')?.status, 'in_progress');
-    console.log('PASS: real Electron renderer, authenticated V2 write/API readback, sandbox, site cookies and close-to-tray lifecycle.');
+    console.log('PASS: real Electron renderer, authenticated V2 write/API readback, sandbox, site cookies, close-to-tray, native notification show/click and offline no-replay.');
   } finally {
     if (child) await stopChild(child);
     await server.close();

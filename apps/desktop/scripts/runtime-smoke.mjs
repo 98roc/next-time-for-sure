@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, Notification, session } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { siteStorage } from '../dist/config.js';
 
@@ -15,6 +16,9 @@ async function main() {
   stage = 'cookies';
   const business = session.fromPartition(siteStorage(fixture.url).partition);
   await business.cookies.set({ url: fixture.url, name: 'ntfs_session', value: fixture.token, httpOnly: true, sameSite: 'lax' });
+  const shown = [];
+  const originalShow = Notification.prototype.show;
+  Notification.prototype.show = function () { shown.push(this); return originalShow.call(this); };
   app.on('browser-window-created', (_event, window) => window.hide());
   await import('../dist/main.js');
   stage = 'main-window';
@@ -49,11 +53,35 @@ async function main() {
     return { status: updated.tasks.find(row => row.id === task.id).status, taskId: task.id };
   })()`);
   assert.equal(result.status, 'in_progress');
+  stage = 'notifications';
+  await delay(6000);
+  assert.equal(shown.length, 0, 'Startup must not replay the preexisting assignment');
+  const create = async (title) => {
+    const response = await fetch(fixture.url + '/api/v1/v2/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: fixture.url, Cookie: fixture.leaderCookie, 'X-CSRF-Token': fixture.leaderCsrf }, body: JSON.stringify({ action: 'create_project', operationId: randomUUID(), task: { projectId: fixture.projectId, executorId: fixture.executorId, periodId: fixture.periodId, title, priority: 3, milestoneId: null, plannedDays: null } }) });
+    assert.equal(response.status, 200);
+  };
+  await create('Electron 在线系统消息验收');
+  for (let attempt = 0; attempt < 60 && shown.length === 0; attempt++) await delay(200);
+  assert.equal(shown.length, 1);
+  shown[0].emit('click');
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (!window.webContents.isLoading() && await window.webContents.executeJavaScript('document.body.innerText.includes("Electron 在线系统消息验收") && !!document.querySelector("dialog[open]")')) break;
+    await delay(200);
+  }
+  assert.equal(await window.webContents.executeJavaScript('!!document.querySelector("dialog[open]")'), true);
+  await business.cookies.remove(fixture.url, 'ntfs_session');
+  await delay(5500);
+  await create('Electron 离线保留列表验收');
+  await business.cookies.set({ url: fixture.url, name: 'ntfs_session', value: fixture.token, httpOnly: true, sameSite: 'lax' });
+  await delay(6500);
+  assert.equal(shown.length, 1, 'Reconnect must not replay offline messages');
+  for (const notification of shown) notification.close();
+  Notification.prototype.show = originalShow;
   stage = 'lifecycle';
   const isolated = session.fromPartition(`persist:other-${Date.now()}`);
   assert.equal((await isolated.cookies.get({ name: 'ntfs_session' })).length, 0);
   window.close(); await delay(100); assert.equal(window.isDestroyed(), false); assert.equal(window.isVisible(), false);
-  console.log('ELECTRON_RUNTIME_PASS');
+  console.log('ELECTRON_RUNTIME_PASS notifications-native-call-click-and-offline-baseline');
   app.quit();
 }
 

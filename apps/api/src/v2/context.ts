@@ -5,7 +5,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { OrganizationRepository } from '../organization/organization.repository.js';
 import { canViewProject, type V2Actor, type V2ProjectAccess } from './permissions.js';
 
-export type V2Context = { actor: V2Actor; organization: OrganizationSnapshot; projects: V2ProjectAccess[]; teamId: string | null; teamLeader: boolean };
+export type V2Context = { operationId?: string; actor: V2Actor; organization: OrganizationSnapshot; projects: V2ProjectAccess[]; teamId: string | null; teamLeader: boolean };
 
 /** 组织锁先于账号锁，与账号停用及项目成员修改遵循相同锁顺序。 */
 export async function loadV2Context(manager: EntityManager, identity: IdentityService, token: string, csrf?: string): Promise<V2Context> {

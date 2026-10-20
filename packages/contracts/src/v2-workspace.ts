@@ -114,3 +114,9 @@ export const v2TaskEditSchema = z.object({
 export type V2TaskEdit = z.infer<typeof v2TaskEditSchema>;
 export const v2AddExistingSchema = z.object({ ...operation, action: z.literal('add_existing'), periodId: id, tasks: z.array(z.object({ taskId: id, version }).strict()).min(1).max(100) }).strict();
 export type V2AddExisting = z.infer<typeof v2AddExistingSchema>;
+
+/** 消息内容按任务合并，不设已读状态；游标字符串避免数据库大整数精度丢失。 */
+export const v2MessageItemSchema = z.object({ taskId: id, projectId: id, projectName: z.string(), title: z.string(), reasons: z.array(z.string()) });
+export type V2MessageItem = z.infer<typeof v2MessageItemSchema>;
+export const v2MessagesSchema = z.object({ accountId: id, cursor: z.string().regex(/^\d+$/u), page: z.number().int().positive(), total: z.number().int().nonnegative(), messages: z.array(z.object({ id: z.string(), createdAt: v2InstantSchema, items: z.array(v2MessageItemSchema) })) });
+export type V2Messages = z.infer<typeof v2MessagesSchema>;

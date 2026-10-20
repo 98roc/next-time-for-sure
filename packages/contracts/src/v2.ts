@@ -51,6 +51,7 @@ export const v2TaskEventSchema = z.object({
   id: v2IdSchema, taskId: v2IdSchema, sequence: v2VersionSchema, actorId: v2IdSchema,
   occurredAt: v2InstantSchema, action: z.enum(['created', 'updated', 'status_changed', 'deleted', 'migrated']),
   beforeStatus: v2StatusSchema.nullable(), snapshot: v2TaskSchema,
+  fromBacklog: z.boolean().optional(),
   executorName: z.string().nullable().default(null), actorName: z.string().nullable().default(null),
 }).strict().refine((event) => event.taskId === event.snapshot.id && event.sequence === event.snapshot.version, '事件必须对应任务及版本');
 export type V2TaskEvent = z.infer<typeof v2TaskEventSchema>;

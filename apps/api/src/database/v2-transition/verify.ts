@@ -49,7 +49,7 @@ export async function verifyConverted(source: DataSource, legacyInput?: LegacySo
         const weekly = v2WeeklyStateSchema.parse(await get(`v2/weekly?summaryPeriodId=${summary.id}&planPeriodId=${plan.id}`));
         assert.equal(weekly.canEditText, true);
         const supplements = z.array(z.object({ task_id: z.string() })).parse(await source.query("SELECT task_id FROM v2_arrangement_history WHERE period_id=? AND provenance='migration_supplement'", [summary.id]));
-        for (const row of supplements) { const item = weekly.summary.find((entry) => entry.taskId === row.task_id); assert.ok(item); assert.equal(item.planning, 'unplanned'); }
+        for (const row of supplements) { const item = weekly.summary.find((entry) => entry.taskId === row.task_id); assert.ok(item); assert.equal(item.planning, 'unknown'); }
       }
     }
   } finally {

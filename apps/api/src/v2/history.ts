@@ -1,3 +1,4 @@
+import { classifyPlanning } from './planning-classification.js';
 import type { V2ArrangementHistory, V2Period, V2TaskEvent, V2Status } from '@ntfs/contracts';
 import { periodWindow } from './calendar.js';
 
@@ -58,13 +59,9 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const executed = end > window.start && executedDuring(known, window.start, end);
     if (!arranged && !executed) continue;
 
-    // “计划内”要求区间开始前已经生效且开始时未撤销的真实安排。
-    const planned = relevant.some((arrangement) => arrangement.provenance === 'scheduled' && arrangement.validFrom < window.start && (arrangement.validUntil === null || arrangement.validUntil > window.start));
     const first = history[0];
     const historyIncomplete = known.length === 0 || (first?.action === 'migrated' && first.occurredAt > window.start);
-    const unknownPlanning = relevant.some((arrangement) => arrangement.provenance === 'migration_unknown');
-    const supplemented = relevant.some((arrangement) => arrangement.provenance === 'migration_supplement');
-    rows.push({ taskId, createdAt: snapshot?.createdAt ?? first?.snapshot.createdAt ?? null, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: planned ? 'planned' : unknownPlanning ? 'unknown' : supplemented || !historyIncomplete ? 'unplanned' : 'unknown', historyIncomplete });
+    rows.push({ taskId, createdAt: snapshot?.createdAt ?? first?.snapshot.createdAt ?? null, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: classifyPlanning(period, history, arrangements), historyIncomplete });
   }
   return rows;
 }

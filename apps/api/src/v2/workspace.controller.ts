@@ -9,6 +9,12 @@ import { V2WorkspaceService } from './workspace.service.js';
 @Controller('v2')
 export class V2WorkspaceController {
   constructor(private readonly service: V2WorkspaceService) {}
+  /** 分页消息及桌面增量游标共用身份和权限边界。 */
+  @Get('notifications') @Header('Cache-Control', 'no-store')
+  notifications(@Req() request: IncomingMessage, @Query() query: unknown) {
+    const input = parseBody(z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), after: z.union([z.literal('start'), z.string().regex(/^\d{1,20}$/u)]).optional() }).strict(), query);
+    return this.service.messages(businessToken(request), input.page, input.after);
+  }
   /** 读取当前可见的工作区。 */
   @Get('workspace') @Header('Cache-Control', 'no-store')
   workspace(@Req() request: IncomingMessage) { return this.service.snapshot(businessToken(request)); }

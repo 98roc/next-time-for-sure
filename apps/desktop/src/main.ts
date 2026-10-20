@@ -1,3 +1,4 @@
+import { startNotifications } from './notifications';
 import { app, BrowserWindow, dialog, Menu, nativeImage, nativeTheme, session, Tray, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
 import { DEFAULT_UPDATE_URL, DEFAULT_WEB_URL, loadConfig, siteStorage, type DesktopConfig } from './config.js';
@@ -13,6 +14,7 @@ app.setPath('userData', existingUserData);
 let window: BrowserWindow | undefined;
 let tray: Tray | undefined;
 let quitting = false;
+let stopNotifications: (() => void) | undefined;
 let configured = new URL(DEFAULT_WEB_URL);
 let updater: UpdateController | undefined;
 let openSettings: (() => void) | undefined;
@@ -94,6 +96,7 @@ async function start(): Promise<void> {
   updater = createUpdater(config, window, (label) => { updateLabel = label; refreshMenus(); });
   refreshMenus();
   if (configError) { openSettings(); return; }
+  stopNotifications = startNotifications(businessSession, configured, show);
 
   void window.loadURL(configured.href).catch(async () => {
     if (quitting) return;
@@ -107,6 +110,6 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => show());
   app.on('activate', () => show());
-  app.on('before-quit', () => { quitting = true; clearTimeout(startupTimer); nativeTheme.removeListener('updated', syncWindowTheme); tray?.destroy(); });
+  app.on('before-quit', () => { quitting = true; stopNotifications?.(); clearTimeout(startupTimer); nativeTheme.removeListener('updated', syncWindowTheme); tray?.destroy(); });
   void app.whenReady().then(start).catch(() => { console.error('桌面启动失败，请检查服务与客户端配置。'); app.quit(); });
 }

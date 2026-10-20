@@ -1,3 +1,4 @@
+import { MessagesButton } from './messages';
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { Identity } from '@ntfs/contracts';
@@ -59,7 +60,7 @@ function Frame() {
           <button type="button" className="v2-sidebar-toggle" aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'} title={collapsed ? '展开侧边栏' : '收起侧边栏'} aria-expanded={!collapsed} aria-controls="v2-sidebar" onClick={toggle}>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /><path d={collapsed ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'} /></svg>
           </button>
-          <span>工作空间 / {pageLabel}</span>
+          <span>工作空间 / {pageLabel}</span><MessagesButton />
         </div>
         <main key={path} className="v2-main" aria-label={pageLabel}>
           <div className={`v2-page ${pageClass}`}><Outlet /></div>

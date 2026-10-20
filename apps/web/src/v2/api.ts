@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiErrorSchema, v2ImpactSchema, v2MemberImpactSchema, v2SummaryRowSchema, v2TaskHistorySchema, v2WeeklyStateSchema, v2WorkspaceSchema } from '@ntfs/contracts';
+import { v2MessagesSchema, apiErrorSchema, v2ImpactSchema, v2MemberImpactSchema, v2SummaryRowSchema, v2TaskHistorySchema, v2WeeklyStateSchema, v2WorkspaceSchema } from '@ntfs/contracts';
 import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2TaskCommand, V2TaskEdit, V2TeamCommand } from '@ntfs/contracts';
 import { IdentityApiError } from '../identity/api';
 
@@ -32,3 +32,6 @@ export const readImpact = (intent: V2ImpactIntent) => request('impact', v2Impact
 export const readMemberImpact = (input: V2MemberImpactInput) => request('members-impact', v2MemberImpactSchema, input);
 /** 命令和地址一一对应，防止不同入口生成不同语义。 */
 export const sendCommand = <K extends keyof Commands>(path: K, body: Commands[K], csrf: string) => request(path, resultSchema, body, csrf);
+
+/** 最近七天的本人消息，后台刷新不续期登录。 */
+export const readMessages = (page: number) => request(`notifications?page=${page}`, v2MessagesSchema, undefined, undefined, true);

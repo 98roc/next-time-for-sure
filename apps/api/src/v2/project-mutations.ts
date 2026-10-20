@@ -25,7 +25,7 @@ export async function mutateProject(manager: EntityManager, context: V2Context, 
       await requireConfirmation(manager, context, { action: command.action, backlogId: row.id, version: command.version }, command.confirmation, today);
       await repository.deleteBacklog(row.id);
     } else {
-      const task = await createProjectTask(manager, context, command.task, row.creatorId);
+      const task = await createProjectTask(manager, context, command.task, row.creatorId, undefined, true);
       await repository.convertBacklog(row.id, task.id, context.actor.id); return [task.id];
     }
     return [row.id];

@@ -117,7 +117,7 @@ test('历史总结涵盖跨区间持续进行，之后完成与重开不回写�
   const first = summarizePeriod(period, history, arrangements, now)[0];
   assert.equal(first?.status, 'in_progress'); assert.equal(first?.planning, 'planned');
   const ongoing = summarizePeriod(second, history, arrangements, now)[0];
-  assert.equal(ongoing?.status, 'in_progress'); assert.equal(ongoing?.executed, true); assert.equal(ongoing?.arranged, false); assert.equal(ongoing?.planning, 'unplanned');
+  assert.equal(ongoing?.status, 'in_progress'); assert.equal(ongoing?.executed, true); assert.equal(ongoing?.arranged, false); assert.equal(ongoing?.planning, 'planned');
   assert.equal(summarizePeriod(third, history, arrangements, now)[0]?.status, 'completed');
   assert.equal(history[1]?.actorId, lead);
 });
@@ -135,7 +135,7 @@ test('撤销安排不伪造计划内，迁移补录不补造历史状态，私�
   const history = [event(migrated, migrated.updatedAt, 'migrated', null)];
   const supplement: V2ArrangementHistory = { ...arrangement(migrated, period, migrated.updatedAt), provenance: 'migration_supplement' };
   const row = summarizePeriod(period, history, [supplement], '2026-10-17T00:00:00.000Z')[0];
-  assert.equal(row?.historyIncomplete, true); assert.equal(row?.planning, 'unplanned');
+  assert.equal(row?.historyIncomplete, true); assert.equal(row?.planning, 'unknown');
   assert.equal(summarizePeriod(period, history, [{ ...supplement, validFrom: '2026-10-10T00:00:00.000Z' }], '2026-10-15T00:00:00.000Z')[0]?.status, null);
   const cancelled = { ...arrangement(initial, period), validUntil: '2026-10-11T00:00:00.000Z' };
   assert.equal(summarizePeriod(period, [event(initial, initial.createdAt, 'created', null)], [cancelled], '2026-10-20T00:00:00.000Z').length, 0);
@@ -149,7 +149,7 @@ test('区间结束后迁移仍承接该区间安排，补录不补造历史状�
   const history = [event(migrated, at, 'migrated', null)];
   const supplement: V2ArrangementHistory = { ...arrangement(migrated, period, at), provenance: 'migration_supplement' };
   const row = summarizePeriod(period, history, [supplement], '2026-10-21T00:00:00.000Z')[0];
-  assert.equal(row?.arranged, true); assert.equal(row?.status, null); assert.equal(row?.historyIncomplete, true); assert.equal(row?.planning, 'unplanned');
+  assert.equal(row?.arranged, true); assert.equal(row?.status, null); assert.equal(row?.historyIncomplete, true); assert.equal(row?.planning, 'unknown');
   assert.equal(summarizePeriod(period, history, [{ ...supplement, provenance: 'migration_unknown' }], '2026-10-21T00:00:00.000Z')[0]?.planning, 'unknown');
   assert.equal(summarizePeriod(period, history, [supplement], '2026-10-19T00:00:00.000Z').length, 0);
   assert.equal(summarizePeriod(period, history, [{ ...supplement, provenance: 'scheduled' }], '2026-10-21T00:00:00.000Z').length, 0);
@@ -167,4 +167,20 @@ test('默认分类唯一、手动分类优先、同状态字段编辑保持位�
   assert.throws(() => validateCategories([...categories, { ...custom, isDefault: true }], executor), /唯一|仅有一个/);
   assert.equal(removeCategory(all, ongoing.id, custom.id).find((category) => category.id === custom.id)?.isDefault, true);
   assert.throws(() => removeCategory(categories, ongoing.id, ongoing.id), /最后一个/);
+});
+
+
+test('突发新任务仅首次当前区间计划外，已有执行偏移、延续和待建转换不算', () => {
+  const createdAt = '2026-10-12T01:00:00.000Z';
+  const task = { ...initial, createdAt, updatedAt: createdAt };
+  const created = event(task, createdAt, 'created', null);
+  const rows = [arrangement(task, period, createdAt)];
+  assert.equal(summarizePeriod(period, [created], rows, '2026-10-13T00:00:00.000Z')[0]?.planning, 'unplanned');
+  assert.equal(summarizePeriod(period, [{ ...created, fromBacklog: true }], rows, '2026-10-13T00:00:00.000Z')[0]?.planning, 'planned');
+  const started = transitionTask(task, 'in_progress', '2026-10-13T01:00:00.000Z');
+  const history = [created, event(started, started.updatedAt, 'status_changed', 'not_started')];
+  assert.equal(summarizePeriod(second, history, rows, '2026-10-21T00:00:00.000Z')[0]?.planning, 'planned');
+  const futureRows = [arrangement(task, second, createdAt)];
+  assert.equal(summarizePeriod(period, history, futureRows, '2026-10-14T00:00:00.000Z')[0]?.planning, 'planned');
+  assert.equal(summarizePeriod(period, [created], [...rows.map((row) => ({ ...row, validUntil: '2026-10-14T00:00:00.000Z' })), arrangement(task, second, '2026-10-14T00:00:00.000Z')], '2026-10-21T00:00:00.000Z')[0]?.planning, 'unplanned');
 });

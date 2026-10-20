@@ -1,3 +1,4 @@
+import { notifyTask } from './notifications.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
@@ -11,7 +12,7 @@ import { V2ProjectRepository } from './project.repository.js';
 import { milestoneAfterTaskChange, rearrangeTask, transitionTask, validateMilestoneLink } from './task-rules.js';
 
 /** 共用任务创建服务，供项目、我的工作、周计划批量和待建转换调用。 */
-export async function createProjectTask(manager: EntityManager, context: V2Context, input: V2ProjectTaskInput, creatorId = context.actor.id, categoryId?: string): Promise<V2Task> {
+export async function createProjectTask(manager: EntityManager, context: V2Context, input: V2ProjectTaskInput, creatorId = context.actor.id, categoryId?: string, fromBacklog = false): Promise<V2Task> {
   const project = requireProject(context, input.projectId);
   if (!canCreateProjectTask(context.actor, project, input.executorId)) throw new ForbiddenException('没有安排该执行人的权限。');
   requireProjectMember(context, project, input.executorId);
@@ -36,6 +37,8 @@ export async function createProjectTask(manager: EntityManager, context: V2Conte
   await tasks.insert(task, context.actor.id);
   await tasks.addArrangement(task, input.periodId, input.plannedDays, context.actor.id, now);
   await personal.place(task, undefined, categoryId);
+  await notifyTask(manager, context, task, 'created', fromBacklog);
+  if (task.status === 'completed') await notifyTask(manager, context, task, 'completed');
   return task;
 }
 
@@ -110,5 +113,6 @@ export async function mutateTask(manager: EntityManager, context: V2Context, com
     }
   }
   await tasks.update(task, next, context.actor.id, command.action === 'set_status' && task.status !== next.status ? 'status_changed' : command.action === 'delete' ? 'deleted' : 'updated');
+  if (task.status !== 'completed' && next.status === 'completed') await notifyTask(manager, context, next, 'completed');
   return [task.id];
 }

@@ -49,7 +49,7 @@ export async function withFixture(verify: (fixture: Fixture) => Promise<void>): 
         for (const task of tasks) { for (const table of ['v2_task_events', 'v2_arrangement_history', 'v2_arrangements', 'v2_placements']) await db.query(`DELETE FROM ${table} WHERE task_id=?`, [task.id]); await db.query('DELETE FROM v2_tasks WHERE id=?', [task.id]); }
         for (const table of ['v2_operations', 'audit_events']) await db.query(`DELETE FROM ${table} WHERE actor_id=?`, [id]);
         for (const table of ['v2_categories', 'v2_personal_views']) await db.query(`DELETE FROM ${table} WHERE owner_id=?`, [id]);
-        for (const table of ['login_sessions', 'personal_tokens']) await db.query(`DELETE FROM ${table} WHERE account_id=?`, [id]);
+        for (const table of ['v2_notifications', 'login_sessions', 'personal_tokens']) await db.query(`DELETE FROM ${table} WHERE account_id=?`, [id]);
       }
       for (const { id } of teams) {
         for (const table of ['v2_backlog', 'v2_milestones', 'project_members']) await db.query(`DELETE t FROM ${table} t JOIN projects p ON p.id=t.project_id WHERE p.team_id=?`, [id]);

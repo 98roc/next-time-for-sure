@@ -1,0 +1,7 @@
+.v2-topbar .v2-messages-button{margin-left:auto;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.v2-messages-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.v2-messages-list>li{padding:10px 0;border-bottom:1px solid var(--line,#dfe4eb)}
+.v2-messages-list time{display:block;margin-top:6px;font-size:12px;opacity:.65}
+.v2-message-item{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-bottom:6px;overflow-wrap:anywhere}
+.v2-message-item .nt-muted{font-size:12px}
+.v2-message-pagination{display:flex;align-items:center;gap:10px;margin-left:auto;white-space:nowrap}

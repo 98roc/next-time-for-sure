@@ -44,13 +44,10 @@
 #ntfs-weekly-demo .w-person-totals{margin:4px 0 12px;text-align:left!important;font-size:12px;color:var(--w-muted)}
 #ntfs-weekly-demo .w-column-head{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:9px}
 #ntfs-weekly-demo .w-facts{font-size:12px;color:var(--w-muted);margin-bottom:8px!important}
-#ntfs-weekly-demo .w-task-title{border:0;background:transparent;text-align:left;padding:0;color:var(--w-text)!important;font-size:13px!important;overflow-wrap:anywhere}
-#ntfs-weekly-demo .w-task-title:hover{color:var(--w-accent)!important}
 #ntfs-weekly-demo .w-task-meta{font-size:11px;color:var(--w-muted);display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:5px}
 #ntfs-weekly-demo .w-tag{display:inline-flex;align-items:center;gap:4px;background:var(--w-canvas);color:var(--w-muted);padding:2px 6px;border-radius:4px;font-size:11px;white-space:nowrap}
 #ntfs-weekly-demo .w-tag.done{background:var(--w-green-bg);color:var(--w-green)}
 #ntfs-weekly-demo .w-tag.doing{background:var(--w-selected);color:var(--w-accent)}
-#ntfs-weekly-demo .w-tag.outside{background:var(--w-amber-bg);color:var(--w-amber)}
 #ntfs-weekly-demo .w-plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0}
 #ntfs-weekly-demo .w-empty{padding:24px 10px;text-align:center;font-size:12px;color:var(--w-muted);background:var(--w-canvas);border-radius:6px;margin-top:10px}
 #ntfs-weekly-demo .w-person-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:18px 0 12px}

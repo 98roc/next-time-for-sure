@@ -13,6 +13,8 @@ export function PeriodSelect({ periods, value, onChange, label, disabled = false
 }
 /** 状态始终保留文字，不只通过色彩表达。 */
 export function StatusBadge({ status }: { status: V2Status | null }) { return <span className={`w-tag nt-badge ${status === 'completed' ? 'done nt-done' : status === 'in_progress' ? 'doing' : ''}`}>{status ? v2StatusLabels[status] : '历史状态不可还原'}</span>; }
+/** 项目汇总与周报共用计划性标签，判断规则由调用方提供。 */
+export function PlanningBadge({ children }: { children: ReactNode }) { return <span className="v2-planning-badge">{children}</span>; }
 /** 异步操作在本地保留错误和草稿，避免未处理的 Promise 或重复点击。 */
 export function useAction() {
   const [busy, setBusy] = useState(false), [error, setError] = useState('');

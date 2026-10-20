@@ -1,3 +1,4 @@
+import { readMessages } from './notifications.js';
 import { readProjectOrders } from './project-orders.js';
 import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2Task, V2TaskCommand, V2TaskEdit, V2TeamCommand, V2Workspace } from '@ntfs/contracts';
@@ -26,6 +27,11 @@ import { summarizePeriod } from './history.js';
 @Injectable()
 export class V2WorkspaceService {
   constructor(private readonly database: DatabaseService, private readonly identity: IdentityService) {}
+
+  /** 消息不续期会话，每次按当前项目权限裁剪。 */
+  async messages(token: string, page: number, after?: string) {
+    return this.database.transaction(async (manager) => readMessages(manager, await loadV2Context(manager, this.identity, token), page, after));
+  }
 
   /** 单次快照保证项目、个人与计划引用相同任务；其他人的私人分类不会返回。 */
   async snapshot(token: string): Promise<V2Workspace> {
@@ -58,6 +64,7 @@ export class V2WorkspaceService {
     return this.database.transaction(async (manager) => {
       const context = await loadV2Context(manager, this.identity, token, csrf), repository = new V2TaskRepository(manager);
       const task = 'taskId' in command ? await repository.get(command.taskId) : undefined;
+      context.operationId = command.operationId;
       authorizeTaskCommand(context, command, task);
       return executeOnce(manager, context.actor.id, command, async () => {
         if (task && 'version' in command) requireVersion(task.version, command.version);
@@ -73,13 +80,14 @@ export class V2WorkspaceService {
 
   /** 待建和里程碑共用项目权限，转换复用任务创建事务。 */
   async project(token: string, csrf: string, command: V2ProjectCommand) {
-    return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf); await authorizeProjectCommand(manager, context, command); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutateProject(manager, context, command, shanghaiDate(new Date().toISOString())) })); });
+    return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf); context.operationId = command.operationId; await authorizeProjectCommand(manager, context, command); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutateProject(manager, context, command, shanghaiDate(new Date().toISOString())) })); });
   }
 
   /** 个人视图只处理当前用户，不接受客户端 ownerId。 */
   async personal(token: string, csrf: string, command: V2PersonalCommand) {
     return this.database.transaction(async (manager) => {
       const context = await loadV2Context(manager, this.identity, token, csrf);
+      context.operationId = command.operationId;
       if ('taskId' in command && requireTask(context, await new V2TaskRepository(manager).get(command.taskId)).executorId !== context.actor.id) throw new ForbiddenException('只能调整本人执行任务的个人视图。');
       return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutatePersonal(manager, context, command, shanghaiDate(new Date().toISOString())) }));
     });
@@ -115,6 +123,7 @@ export class V2WorkspaceService {
   async edit(token: string, csrf: string, command: V2TaskEdit) {
     return this.database.transaction(async (manager) => {
       const context = await loadV2Context(manager, this.identity, token, csrf), task = requireTask(context, await new V2TaskRepository(manager).get(command.taskId));
+      context.operationId = command.operationId;
       authorizeEdit(context, task, command);
       return executeOnce(manager, context.actor.id, command, async () => {
         requireVersion(task.version, command.version);

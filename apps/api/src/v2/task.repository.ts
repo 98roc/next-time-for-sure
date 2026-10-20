@@ -42,11 +42,12 @@ export class V2TaskRepository {
   async history(taskIds: string[]): Promise<V2TaskEvent[]> {
     if (!taskIds.length) return [];
     const rows = z.array(z.object({ snapshot_json: z.unknown(), id: z.string(), taskId: z.string(), sequence: z.number(), actorId: z.string(), action: z.string(), beforeStatus: z.string().nullable(), occurredAt: z.string() })).parse(await this.manager.query(`SELECT id,task_id AS taskId,sequence,actor_id AS actorId,action,before_status AS beforeStatus,snapshot_json,${instantColumn('occurred_at','occurredAt')} FROM v2_task_events WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY occurred_at,sequence`, taskIds));
+    const converted = z.array(z.object({ taskId: z.string() })).parse(await this.manager.query(`SELECT converted_task_id AS taskId FROM v2_backlog WHERE converted_task_id IN (${taskIds.map(() => '?').join(',')})`, taskIds));
     return rows.map(({ snapshot_json, ...row }) => {
       const decoded = decodeJson(snapshot_json);
       const envelope = z.object({ task: v2TaskSchema, executorName: z.string().nullable(), actorName: z.string().nullable() }).safeParse(decoded);
       // 早期或迁移缺证据的快照明确保留空姓名，不拿现有账号姓名伪造历史。
-      return v2TaskEventSchema.parse({ ...row, snapshot: envelope.success ? envelope.data.task : decoded, executorName: envelope.success ? envelope.data.executorName : null, actorName: envelope.success ? envelope.data.actorName : null });
+      return v2TaskEventSchema.parse({ ...row, fromBacklog: converted.some((item) => item.taskId === row.taskId), snapshot: envelope.success ? envelope.data.task : decoded, executorName: envelope.success ? envelope.data.executorName : null, actorName: envelope.success ? envelope.data.actorName : null });
     });
   }
 

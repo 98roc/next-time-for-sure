@@ -12,5 +12,17 @@
 .v2-scope .v2-page-heading { margin-top:12px; }
 .v2-scope .v2-option-note { display:block;color:var(--muted);font-size:12px; }
 .v2-scope .v2-outside { display:block;color:var(--muted);font-size:11px; }
+/* 内容链接共用正文色与悬停反馈，避免项目和周计划呈现两套样式。 */
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.nt-link,.w-task-title) {
+  border:0;background:transparent;color:var(--v2-text);padding:0;text-align:left;overflow-wrap:anywhere;
+}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.nt-link,.w-task-title):hover {
+  background:transparent;color:var(--v2-accent);
+}
+.v2-scope .v2-planning-badge {
+  display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:11px;line-height:1.6;
+  white-space:nowrap;vertical-align:middle;color:light-dark(#855a18,#e3bb7d);background:light-dark(#fff3df,#392f22);
+}
+#nt-project .nt-table .v2-planning-badge { margin-left:10px; }
 .v2-navigation-warning{position:fixed;z-index:10000;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:var(--surface,#fff);color:var(--text,#222);border:1px solid var(--line,#ddd);border-radius:12px;padding:18px;box-shadow:0 12px 40px #0003;max-width:95vw}
 #ntfs-my-work .mw-card-list>div:has(>.mw-task),#ntfs-weekly-demo .w-task-list>div:has(>.w-task-row){display:contents}
