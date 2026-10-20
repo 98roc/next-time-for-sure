@@ -7,6 +7,19 @@ import { useWorkspace } from './workspace';
 import { TaskEditor } from './task-editor';
 import './messages.css';
 
+/** 兼容已保存的消息说明，提取事件标签；未知说明保留，避免隐藏后端新增事件。 */
+function messagePresentation(reasons: string[]) {
+  const labels = new Set<string>(), details: string[] = [];
+  for (const reason of reasons) {
+    if (reason.endsWith('为你安排了任务')) labels.add('分配给我');
+    else if (reason.endsWith('新增了计划外任务')) labels.add('计划外');
+    else if (reason.endsWith('完成了任务')) {
+      labels.add('已完成');
+    } else details.push(reason);
+  }
+  return { labels: [...labels], details };
+}
+
 /** 右上角消息入口无红点；系统通知深链只接受任务标识，访问时重新读取权限。 */
 export function MessagesButton() {
   const modal = useModal();
@@ -24,7 +37,6 @@ export function MessagesButton() {
   }, [target, list, modal, params, setParams]);
   return <button className="v2-messages-button" aria-label="消息" title="消息" onClick={() => modal.open(<MessagesDialog />)}>
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
-    消息
   </button>;
 }
 
@@ -39,16 +51,21 @@ function MessagesDialog() {
     <span>{data.page} / {Math.ceil(data.total / 10)}</span>
     <button aria-label="下一页消息" disabled={data.page * 10 >= data.total} onClick={() => setPage(data.page + 1)}>下一页</button>
   </div> : undefined;
-  return <ModalPage title="消息" actions={pagination}>
-    <p className="nt-muted">最近 7 天</p>
+  return <ModalPage title="消息" subtitle="最近7天" compact hideCloseAction actions={pagination}>
     {query.isError ? <div role="alert">消息加载失败：{query.error.message}<button onClick={() => { void query.refetch(); }}>重试</button></div> : !data ? <p role="status">正在加载消息…</p> : <>
-      {!data.messages.length && <div className="nt-empty">最近 7 天暂无消息</div>}
+      {!data.messages.length && <div className="v2-message-empty">暂无消息</div>}
       <ul className="v2-messages-list">{data.messages.map((message) => <li key={message.id}>
-        {message.items.map((item) => <div className="v2-message-item" key={item.taskId}>
-          <button className="nt-link" onClick={() => modal.push(<MessageTask taskId={item.taskId} />)}>{item.title}</button>
-          <span className="nt-muted">{item.projectName} · {item.reasons.join('；')}</span>
-        </div>)}
-        <time>{new Date(message.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</time>
+        {message.items.map((item) => {
+          const presentation = messagePresentation(item.reasons);
+          return <div className="v2-message-item" key={item.taskId}>
+            <div className="v2-message-heading">
+              <button className="nt-link" onClick={() => modal.push(<MessageTask taskId={item.taskId} />)}>{item.title}</button>
+              <span className="v2-message-tags">{presentation.labels.map((label) => <span className="v2-message-tag" key={label}>{label}</span>)}</span>
+            </div>
+            <div className="v2-message-meta"><span>{item.projectName}</span><span aria-hidden="true">·</span><time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</time></div>
+            {presentation.details.length > 0 && <span className="v2-message-detail">{presentation.details.join('；')}</span>}
+          </div>;
+        })}
       </li>)}</ul>
     </>}
   </ModalPage>;
