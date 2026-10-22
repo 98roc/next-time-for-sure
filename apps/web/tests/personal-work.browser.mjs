@@ -24,7 +24,7 @@ try {
   let subtasks = { taskId: task.id, version: 0, items: [] }, savedReport = null;
   function report(on) {
     const projects = w.personalPreferences.projectOrder?.map(id => w.projects.find(p => p.id === id)) ?? w.projects;
-    const generatedText = `${on} 日报\n\n山东\n1.${task.title}\n${subtasks.items.filter(i => i.completed).map((i, index) => `  （${index + 1}）${i.title}`).join('\n')}\n2.当日完成任务（当日完成）`;
+    const generatedText = `山东\n1.${task.title}\n${subtasks.items.filter(i => i.completed).map((i, index) => `  （${index + 1}）${i.title}`).join('\n')}\n2.当日完成任务`;
     const currentSourceHash = String(subtasks.version % 10).repeat(64);
     return { on, preferences: w.personalPreferences, projects, generatedText, currentSourceHash, text: savedReport ? { ...savedReport, stale: savedReport.sourceHash !== currentSourceHash } : { body: generatedText, manual: false, sourceHash: currentSourceHash, version: 0, stale: false } };
   }
@@ -87,7 +87,8 @@ try {
   await active.getByRole('button', { name: '保存', exact: true }).click(); await page.locator('dialog').waitFor({ state: 'hidden' });
   assert.equal(commands.at(-1).removedIds.length, 1);
   await dailyButton.click(); await active.locator('pre').waitFor();
-  assert.match(await active.locator('pre').textContent(), /（1）修复部门与角色联动/u); assert.doesNotMatch(await active.locator('pre').textContent(), /未开始|进行中/u);
+  assert.match(await active.locator('pre').textContent(), /^山东\n/u);
+  assert.match(await active.locator('pre').textContent(), /（1）修复部门与角色联动/u); assert.doesNotMatch(await active.locator('pre').textContent(), /未开始|进行中|（当日完成）|\d{4}-\d{2}-\d{2} 日报/u);
   await page.screenshot({ path: evidence + '/daily-light.png', fullPage: true });
   await active.getByRole('button', { name: '编辑', exact: true }).click(); await active.getByRole('textbox', { name: '编辑文字', exact: true }).fill('我的手工日报');
   assert.equal(await active.getByLabel('日报日期', { exact: true }).isDisabled(), true);

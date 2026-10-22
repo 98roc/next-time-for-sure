@@ -62,7 +62,8 @@ export async function verifyPersonalWork(h: Harness): Promise<void> {
   const privateId = v2ResultSchema.parse(await call('tasks', developer, { action: 'create_private', operationId: randomUUID(), task: { title: '个人日报任务' } })).objectIds[0]; assert.ok(privateId);
   await call('subtasks', developer, { ...command, operationId: randomUUID(), taskId: privateId, items: [a] });
   await call('tasks', developer, { action: 'set_status', operationId: randomUUID(), taskId: privateId, version: 0, status: 'completed' });
-  assert.match((await daily()).generatedText, /\d+\.个人日报任务（当日完成）\n\x20{2}（1）私人步骤甲/u);
+  assert.match((await daily()).generatedText, /\d+\.个人日报任务\n\x20{2}（1）私人步骤甲/u);
+  assert.doesNotMatch((await daily()).text.body, /^\d{4}-\d{2}-\d{2} 日报|（当日完成）/u);
   await call(`subtasks?taskId=${privateId}`, manager, undefined, 404);
 
   // 账号偏好跨请求持久化，其他账号不受影响；项目共享顺序和个人覆盖分开。

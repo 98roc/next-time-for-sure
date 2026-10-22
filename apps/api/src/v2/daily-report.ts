@@ -28,15 +28,15 @@ export function dailyRows(events: V2TaskEvent[], snapshots: SubtaskSnapshot[], s
   return [...rows.values()].sort((a, b) => a.taskId.localeCompare(b.taskId));
 }
 
-/** 主任务保留一级编号，子任务按（1）（2）编号；不输出未开始或进行中标签。 */
-export function generateDailyText(on: string, projects: { id: string; name: string }[], rows: DailyRow[]): string {
-  const lines = [`${on} 日报`, ''];
+/** 正文直接从项目开始，主子任务保留分级编号，不输出日期标题或状态标签。 */
+export function generateDailyText(projects: { id: string; name: string }[], rows: DailyRow[]): string {
+  const lines: string[] = [];
   for (const group of [...projects, { id: null, name: '个人任务' }]) {
     const items = rows.filter((row) => row.projectId === group.id);
     if (!items.length) continue;
     lines.push(group.name);
     for (const [index, item] of items.entries()) {
-      lines.push(`${index + 1}.${item.title}${item.completed ? '（当日完成）' : ''}`);
+      lines.push(`${index + 1}.${item.title}`);
       item.children.forEach((title, childIndex) => lines.push(`  （${childIndex + 1}）${title}`));
     }
     lines.push('');
@@ -66,7 +66,7 @@ export async function buildDailyReport(manager: EntityManager, context: V2Contex
   for (const row of historic) if (row.projectId && !groups.some((group) => group.id === row.projectId)) groups.push({ id: row.projectId, name: row.projectName || '历史项目' });
   // 项目名称也使用当时的本人事实，后续项目改名不能改写历史日报。
   const reportGroups = groups.map((group) => ({ ...group, name: rows.find((row) => row.projectId === group.id && row.projectName)?.projectName || group.name })).filter((group) => rows.some((row) => row.projectId === group.id));
-  const generatedText = generateDailyText(on, reportGroups, rows), currentSourceHash = hashValue({ on, rows, groups: reportGroups });
+  const generatedText = generateDailyText(reportGroups, rows), currentSourceHash = hashValue({ on, rows, groups: reportGroups });
   const saved = await repository.report(ownerId, on);
   const text = saved?.manual ? { ...saved, stale: saved.sourceHash !== currentSourceHash } : { body: generatedText, manual: false, sourceHash: currentSourceHash, version: saved?.version ?? 0, stale: false };
   return { on, preferences: { ...preferences, projectOrder: preferences.projectOrder === null ? null : ids }, projects, text, generatedText, currentSourceHash };
