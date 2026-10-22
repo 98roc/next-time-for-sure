@@ -59,6 +59,11 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const executed = end > window.start && executedDuring(known, window.start, end);
     if (!arranged && !executed) continue;
 
+    // 未开始且已移出该区间时，不因曾进行中或曾有安排继续占据总结。
+    // 以回看截止时刻判断，区间结束后的改期、回退不能改写历史；午夜取消归下一区间。
+    const arrangedAtEnd = relevant.some((row) => row.validUntil === null || row.validUntil >= end);
+    if (snapshot?.status === 'not_started' && !arrangedAtEnd) continue;
+
     const first = history[0];
     const historyIncomplete = known.length === 0 || (first?.action === 'migrated' && first.occurredAt > window.start);
     rows.push({ taskId, createdAt: snapshot?.createdAt ?? first?.snapshot.createdAt ?? null, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: classifyPlanning(period, history, arrangements), historyIncomplete });

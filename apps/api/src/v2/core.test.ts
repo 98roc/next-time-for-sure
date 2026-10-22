@@ -182,5 +182,47 @@ test('突发新任务仅首次当前区间计划外，已有执行偏移、延�
   assert.equal(summarizePeriod(second, history, rows, '2026-10-21T00:00:00.000Z')[0]?.planning, 'planned');
   const futureRows = [arrangement(task, second, createdAt)];
   assert.equal(summarizePeriod(period, history, futureRows, '2026-10-14T00:00:00.000Z')[0]?.planning, 'planned');
-  assert.equal(summarizePeriod(period, [created], [...rows.map((row) => ({ ...row, validUntil: '2026-10-14T00:00:00.000Z' })), arrangement(task, second, '2026-10-14T00:00:00.000Z')], '2026-10-21T00:00:00.000Z')[0]?.planning, 'unplanned');
+  assert.equal(summarizePeriod(period, history, [...rows.map((row) => ({ ...row, validUntil: '2026-10-14T00:00:00.000Z' })), arrangement(task, second, '2026-10-14T00:00:00.000Z')], '2026-10-21T00:00:00.000Z')[0]?.planning, 'unplanned');
+});
+
+test('未开始移出周期立即移除总结，曾进行中再退回也不保留，周期结束不重新出现', () => {
+  const started = transitionTask(initial, 'in_progress', '2026-10-13T01:00:00.000Z');
+  const reset = transitionTask(started, 'not_started', '2026-10-14T01:00:00.000Z');
+  const created = event(initial, initial.createdAt, 'created', null);
+  const histories = [[created], [created, event(started, started.updatedAt, 'status_changed', 'not_started'), event(reset, reset.updatedAt, 'status_changed', 'in_progress')]];
+  const movedAt = '2026-10-14T02:00:00.000Z';
+  const rows = [{ ...arrangement(initial, period), validUntil: movedAt }, arrangement(initial, second, movedAt)];
+  for (const history of histories) {
+    assert.equal(summarizePeriod(period, history, rows, '2026-10-14T01:30:00.000Z')[0]?.status, 'not_started');
+    for (const now of [movedAt, '2026-10-21T00:00:00.000Z']) assert.equal(summarizePeriod(period, history, rows, now).length, 0);
+    assert.equal(summarizePeriod(second, history, rows, '2026-10-21T00:00:00.000Z')[0]?.status, 'not_started');
+    assert.equal(summarizePeriod(period, history, [...rows, arrangement(initial, period, '2026-10-15T00:00:00.000Z')], '2026-10-16T00:00:00.000Z').length, 1);
+  }
+});
+
+test('改期后回退未开始同样移除，仍进行中或已完成保留实际执行', () => {
+  const movedAt = '2026-10-14T00:00:00.000Z';
+  const started = transitionTask(initial, 'in_progress', '2026-10-13T01:00:00.000Z');
+  const history = [event(initial, initial.createdAt, 'created', null), event(started, started.updatedAt, 'status_changed', 'not_started')];
+  const rows = [{ ...arrangement(initial, period), validUntil: movedAt }, arrangement(initial, second, movedAt)];
+  assert.equal(summarizePeriod(period, history, rows, movedAt)[0]?.status, 'in_progress');
+  for (const status of ['not_started', 'completed'] as const) {
+    const changed = transitionTask(started, status, '2026-10-15T00:00:00.000Z');
+    const result = summarizePeriod(period, [...history, event(changed, changed.updatedAt, 'status_changed', 'in_progress')], rows, changed.updatedAt);
+    assert.equal(result.length, status === 'completed' ? 1 : 0);
+  }
+});
+
+test('区间结束后改期和回退不改写当时安排与状态，午夜取消保留前一区间', () => {
+  const boundary = periodWindow(period).endExclusive;
+  const created = event(initial, initial.createdAt, 'created', null);
+  for (const movedAt of [boundary, '2026-10-20T00:00:00.000Z']) {
+    const rows: V2ArrangementHistory[] = [{ ...arrangement(initial, period), validUntil: movedAt }, arrangement(initial, second, movedAt)];
+    assert.equal(summarizePeriod(period, [created], rows, '2026-10-21T00:00:00.000Z')[0]?.status, 'not_started');
+  }
+  const started = transitionTask(initial, 'in_progress', '2026-10-13T00:00:00.000Z');
+  const reset = transitionTask(started, 'not_started', boundary);
+  const history = [created, event(started, started.updatedAt, 'status_changed', 'not_started'), event(reset, reset.updatedAt, 'status_changed', 'in_progress')];
+  const rows = [{ ...arrangement(initial, period), validUntil: '2026-10-14T00:00:00.000Z' }, arrangement(initial, second)];
+  assert.equal(summarizePeriod(period, history, rows, '2026-10-21T00:00:00.000Z')[0]?.status, 'in_progress');
 });

@@ -139,6 +139,34 @@ async function smoke(): Promise<void> {
     assert.equal((await state()).tasks.find((row) => row.id === secondId)?.milestoneId, null);
     stage = 'effort and completion';
     await verifyEffort({ source, lead, manager, developer, periodId: period.id, nextId: next.id, projectId, call, state });
+    stage = 'rescheduled not-started summary';
+    for (const mode of ['never_started', 'reset_first', 'move_first']) {
+      const id = v2ResultSchema.parse(await call('tasks', lead, { ...command, operationId: randomUUID(), task: { ...taskInput, title: `总结改期验收 ${mode}` } })).objectIds[0]; assert.ok(id);
+      const currentTask = async () => { const task = (await state()).tasks.find((row) => row.id === id); assert.ok(task); return task; };
+      const setStatus = async (status: 'not_started' | 'in_progress') => call('edit', developer, { action: 'save_task', operationId: randomUUID(), taskId: id, version: (await currentTask()).version, status });
+      const summaryContains = async (expected: boolean) => {
+        const summary = z.array(z.object({ taskId: z.string() })).parse(await call(`summary?periodId=${period.id}`, lead));
+        assert.equal(summary.some((row) => row.taskId === id), expected, mode);
+        const weekly = v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${period.id}&planPeriodId=${next.id}`, lead));
+        assert.equal(weekly.summary.some((row) => row.taskId === id), expected, mode);
+        assert.equal(weekly.taskOrders.find((row) => row.projectId === projectId && row.periodId === period.id)?.ids.includes(id), expected, mode);
+      };
+      await summaryContains(true);
+      if (mode !== 'never_started') await setStatus('in_progress');
+      if (mode === 'reset_first') await setStatus('not_started');
+      const version = (await currentTask()).version;
+      const arrangements = [{ periodId: next.id, plannedDays: null }];
+      const impact = v2ImpactSchema.parse(await call('impact', lead, { action: 'save_arrangements', taskId: id, version, arrangements }));
+      await call('edit', lead, { action: 'save_task', operationId: randomUUID(), taskId: id, version, arrangements, arrangementConfirmation: impact.confirmation });
+      if (mode === 'move_first') { await summaryContains(true); await setStatus('not_started'); }
+      await summaryContains(false);
+      const stored = z.array(z.object({ periodId: z.string() })).parse(await source.query('SELECT period_id AS periodId FROM v2_arrangements WHERE task_id=?', [id]));
+      assert.deepEqual(stored.map((row) => row.periodId), [next.id]);
+      const history = v2TaskHistorySchema.parse(await call(`history?taskId=${id}`, lead));
+      assert.equal(history.some((row) => row.snapshot.status === 'in_progress'), mode !== 'never_started');
+      await call('add-existing', lead, { action: 'add_existing', operationId: randomUUID(), periodId: period.id, tasks: [{ taskId: id, version: (await currentTask()).version }] });
+      await summaryContains(true);
+    }
     stage = 'team roles and member removal';
     const project = (await state()).projects.find((row) => row.id === projectId); assert.ok(project);
     const withoutDeveloper = { projectId, version: project.version, members: project.members.filter((row) => row.accountId !== developer.id) };
