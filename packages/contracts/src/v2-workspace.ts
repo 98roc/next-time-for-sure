@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { v2PersonalPreferencesSchema } from './v2-personal-work.js';
 import { v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
 import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2PlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
 import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organization.js';
@@ -17,6 +18,7 @@ export type V2Arrangement = z.infer<typeof v2ArrangementSchema>;
 export const v2PlacementSchema = z.object({ taskId: id, categoryId: id, position: z.number().int() });
 export const v2OrderSchema = z.object({ ids: z.array(id), version, manual: z.boolean().default(false) });
 export const v2WorkspaceSchema = z.object({
+  personalPreferences: v2PersonalPreferencesSchema,
   team: teamSchema.nullable(), teamMessages: v2TeamMessagesSchema, teamVersion: version, teamLeader: z.boolean(), today: v2DateSchema, naturalWeekStart: v2DateSchema,
   accounts: z.array(directoryAccountSchema), projects: z.array(v2ProjectSchema), periods: z.array(v2PeriodSchema),
   tasks: z.array(v2TaskSchema), arrangements: z.array(v2ArrangementSchema), milestones: z.array(v2MilestoneSchema), backlog: z.array(v2BacklogSchema),

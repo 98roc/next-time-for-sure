@@ -1,4 +1,12 @@
 /* 所有 V2.0 原型共用的控件基线；作用域不影响旧工作区。 */
+/* 周报和日报共用文字预览，不依赖某个页面根标识。 */
+.v2-scope .v2-text-report pre { white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.9 'Segoe UI','Microsoft YaHei',sans-serif;background:var(--v2-canvas);color:var(--v2-text);border-radius:8px;padding:16px;margin:14px 0; }
+.v2-scope .v2-report-meta,.v2-scope .v2-report-preview-head { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
+.v2-scope .v2-report-meta { color:var(--v2-muted);font-size:12px; }
+.v2-scope .v2-report-notice { display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px;margin:12px 0;background:var(--v2-selected);border-radius:7px;font-size:13px; }
+.v2-scope .v2-report-edit { display:grid;gap:8px;margin-top:14px; }
+.v2-scope .v2-report-edit textarea { width:100%;resize:vertical; }
+.v2-scope .v2-report-preview { margin-top:20px;padding-top:16px;border-top:1px solid var(--v2-line); }
 .v2-scope{--v2-accent:light-dark(#5066a6,#a8b9ee);--v2-on-accent:light-dark(#fff,#17191e);--v2-bg:light-dark(#fff,#20232a);--v2-canvas:light-dark(#f5f6f9,#17191e);--v2-text:light-dark(#242730,#edf0f5);--v2-muted:light-dark(#686e7c,#a3aab7);--v2-line:light-dark(#e3e6ed,#363b47);--v2-selected:light-dark(#eef1fa,#292f43);--v2-danger:light-dark(#a63232,#f2a0a0);font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif;color-scheme:light dark}
 .v2-scope{--nt-accent:var(--v2-accent);--nt-surface:var(--v2-bg);--nt-bg:var(--v2-canvas);--nt-text:var(--v2-text);--nt-muted:var(--v2-muted);--nt-line:var(--v2-line);--nt-selected:var(--v2-selected);--nt-good:light-dark(#28643a,#a2d5b0);--w-accent:var(--v2-accent);--w-surface:var(--v2-bg);--w-canvas:var(--v2-canvas);--w-text:var(--v2-text);--w-muted:var(--v2-muted);--w-line:var(--v2-line);--w-selected:var(--v2-selected);--w-on-accent:var(--v2-on-accent);--w-green:light-dark(#28643a,#9bd5aa);--w-green-bg:light-dark(#eaf4ed,#23372c)}
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button{border-radius:7px;min-height:36px;font-size:13px;cursor:pointer}

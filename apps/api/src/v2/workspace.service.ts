@@ -1,4 +1,5 @@
 import { readMessages } from './notifications.js';
+import { PersonalWorkRepository } from './personal-work.repository.js';
 import { readProjectOrders } from './project-orders.js';
 import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2Task, V2TaskCommand, V2TaskEdit, V2TeamCommand, V2Workspace } from '@ntfs/contracts';
@@ -43,6 +44,7 @@ export class V2WorkspaceService {
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { messages: [], version: 0 };
       return {
+        personalPreferences: await new PersonalWorkRepository(manager).preferences(context.actor.id),
         orders: await readProjectOrders(manager, context),
         team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessages: settings.messages, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,
         accounts: context.organization.accounts.filter((account) => account.teamId === context.teamId && context.teamId !== null),

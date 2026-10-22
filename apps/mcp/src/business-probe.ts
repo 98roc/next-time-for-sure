@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { identitySchema, v2WorkspaceSchema, v2ImpactSchema } from '@ntfs/contracts';
+import { identitySchema, v2WorkspaceSchema, v2ImpactSchema, v2SubtasksSchema, v2DailyReportSchema } from '@ntfs/contracts';
 import { z } from 'zod';
 
 /** 真实 stdio MCP 客户端调用 V2 API；协议证据不等同于真实外部模型客户端。 */
@@ -26,6 +26,17 @@ try {
   const body = { action: 'create_project', operationId: randomUUID(), task: { projectId: environment.NTFS_TEST_PROJECT, title: 'MCP V2真实任务', executorId: identity.id, periodId: period.id, priority: 3, plannedDays: null, milestoneId: null } };
   await call('business_command', { request: { path: 'v2/tasks', body } }); await call('business_command', { request: { path: 'v2/tasks', body } });
   const tasks = (await workspace()).tasks.filter((row) => row.title === body.task.title); assert.equal(tasks.length, 1); let task = tasks[0]; assert.ok(task);
+  // MCP 只访问 Token 所属人的私人清单与日报，同样使用版本及完整保存契约。
+  const child = { id: randomUUID(), title: 'MCP 私人步骤', completed: true };
+  const subtaskCommand = { action: 'save_subtasks', operationId: randomUUID(), taskId: task.id, version: 0, items: [child], removedIds: [] };
+  await call('business_command', { request: { path: 'v2/subtasks', body: subtaskCommand } });
+  await call('business_command', { request: { path: 'v2/subtasks', body: subtaskCommand } });
+  const subtasks = v2SubtasksSchema.parse(await call('business_query', { request: { path: 'v2/subtasks', query: { taskId: task.id } } })); assert.equal(subtasks.version, 1); assert.equal(subtasks.items[0]?.title, child.title);
+  assert.equal((await workspace()).tasks.find(row => row.id === task?.id)?.status, 'not_started');
+  const daily = v2DailyReportSchema.parse(await call('business_query', { request: { path: 'v2/daily', query: { on: initial.today } } })); assert.match(daily.generatedText, /（1）MCP 私人步骤/u);
+  await call('business_command', { request: { path: 'v2/daily', body: { action: 'save_daily', operationId: randomUUID(), on: initial.today, version: daily.text.version, sourceHash: daily.currentSourceHash, body: 'MCP 私人日报草稿' } } });
+  await call('business_command', { request: { path: 'v2/personal-settings', body: { action: 'set_completed_mode', operationId: randomUUID(), version: initial.personalPreferences.version, mode: 'period' } } });
+  assert.equal((await workspace()).personalPreferences.completedMode, 'period');
   const denied = await call('business_command', { request: { path: 'v2/tasks', body: { ...body, operationId: randomUUID(), task: { ...body.task, projectId: environment.NTFS_TEST_FOREIGN_PROJECT } } } }, true);
   assert.equal(z.object({ status: z.number() }).parse(denied).status, 403);
   // Agent 同样必须填写实际投入，估算不能替代完成结果；普通执行人可维护已有周期预计。
@@ -46,5 +57,5 @@ try {
   // 此处仅清理本脚本创建的随机夹具；正式 Agent 必须先取得具体影响确认。
   await call('business_command', { request: { path: 'v2/tasks', body: { ...command, operationId: randomUUID(), confirmation: preview.confirmation } } });
   assert.equal((await workspace()).tasks.some((row) => row.id === task.id), false);
-  console.log('PASS: authenticated V2 MCP list/query/write, effort and completion, idempotence, scope rejection, preview and version-bound confirmation.');
+  console.log('PASS: authenticated V2 MCP list/query/write, private subtasks/daily/preferences, effort and completion, idempotence, scope rejection, preview and version-bound confirmation.');
 } finally { await client.close(); }

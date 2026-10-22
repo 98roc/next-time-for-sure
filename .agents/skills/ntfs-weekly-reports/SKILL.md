@@ -13,3 +13,5 @@ description: 根据下次一定 V2.0 当前可见任务与历史整理周报和�
 - 复制当前显示的文字；项目筛选和按人员视角不能改变共享稿的管理范围。没有发布、审批或发布快照操作，保存结果不得称为发布成功。
 
 写入后回读 `v2/weekly` 核实文字、版本和同步状态。失败只报告实际错误，超时先查询确认，不编造执行记录。
+
+私人日报独立于团队周报：查询 `v2/daily`，query 为 `{ on: "YYYY-MM-DD" }`，默认取 workspace.today；只读取本人当日完成主任务和子任务，不将这些私人内容混入团队稿。保存同路径使用 save_daily、verify_daily、regenerate_daily，参数 on、version、sourceHash、body、operationId；重新生成仍需先展示 generatedText 并确认覆盖，完成后回读。项目默认跟随项目页顺序；本人偏好由 `v2/personal-settings` 维护（set_daily_project_order 的 projectIds 为当前有权项目完整顺序，null 恢复跟随；set_completed_mode 的 mode 为 day/period），使用 workspace.personalPreferences.version。日期模式和排序只作用于本人，不代表日报发布。

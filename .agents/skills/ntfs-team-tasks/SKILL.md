@@ -11,6 +11,7 @@ description: 在下次一定 V2.0 中查询、创建和维护单执行人项目�
 - 完成项目任务传 `completion: { actualDays, aiContribution }`；实际人天必填，允许0，最多两位小数，8小时为1人天。AI档位为 none/low/medium/high，分别为0%、大于0小于30%、30%至60%、大于60%；首次未填默认high。不得猜测实际人天；重开保留结果，再完成记录累计总数。私人任务不接受这两个字段。
 - 全量周期安排使用 `save_task.arrangements`，至少一行，日期不得重复、预计可空；普通执行人仅改现有周期的预计值。增删或改排先预览 `save_arrangements`，提交对应 `arrangementConfirmation`，与任务修改原子保存。创建可通过 `additionalArrangements` 带入其他周期。
 - 日期及排序使用 `v2/planning`；选择已有任务用 `v2/add-existing`，不要复制任务。不能取消最后一个安排，可原子改排。空预计天数与 0 不等价。
+- 私人一层子任务查询 `v2/subtasks`（query.taskId），完整保存用同路径 `save_subtasks`：taskId、version、items（id/title/completed）、removedIds、operationId。只允许本人当前执行的项目或个人任务；主子状态独立，不转交私人内容。先读取完整清单，保留未修改项及顺序；删除须展示具体子项并取得授权，明确列入 removedIds，不能靠漏传实现隐式删除。完成时间由服务端记录，不填日期、人员或工时。
 - 里程碑通过 `v2/projects` 维护。仅项目研发负责人手动确认完成；空节点或关联任务全部完成才允许。完成后任务回退保留节点完成状态及核验提醒，不自动重开。
 - 删除、取消安排、解除里程碑关联、完成节点等需先 `business_preview`（v2/impact），展示具体范围和阻塞项。仅在用户已授权该具体影响后提交返回的 confirmation；没有具体授权则先询问。版本变化重新预览，不自造令牌，不绕过 409。
 

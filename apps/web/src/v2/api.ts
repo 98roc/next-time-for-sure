@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { v2DailyReportSchema, v2SubtasksSchema, type V2DailyCommand, type V2PersonalSettingsCommand, type V2SubtasksCommand } from '@ntfs/contracts';
 import { v2MessagesSchema, apiErrorSchema, v2ImpactSchema, v2MemberImpactSchema, v2SummaryRowSchema, v2TaskHistorySchema, v2WeeklyStateSchema, v2WorkspaceSchema } from '@ntfs/contracts';
 import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2TaskCommand, V2TaskEdit, V2TeamCommand } from '@ntfs/contracts';
 import { IdentityApiError } from '../identity/api';
 
-export type Commands = { tasks: V2TaskCommand; projects: V2ProjectCommand; personal: V2PersonalCommand; planning: V2PlanningCommand; report: V2ReportCommand; team: V2TeamCommand; edit: V2TaskEdit; 'add-existing': V2AddExisting };
+export type Commands = { tasks: V2TaskCommand; projects: V2ProjectCommand; personal: V2PersonalCommand; planning: V2PlanningCommand; report: V2ReportCommand; team: V2TeamCommand; edit: V2TaskEdit; 'add-existing': V2AddExisting; subtasks: V2SubtasksCommand; daily: V2DailyCommand; 'personal-settings': V2PersonalSettingsCommand };
 const resultSchema = z.object({ objectIds: z.array(z.string().uuid()) });
 
 /** 同源 Cookie 认证；轮询标记为被动，业务写入不做自动重试。 */
@@ -35,3 +36,7 @@ export const sendCommand = <K extends keyof Commands>(path: K, body: Commands[K]
 
 /** 最近七天的本人消息，后台刷新不续期登录。 */
 export const readMessages = (page: number) => request(`notifications?page=${page}`, v2MessagesSchema, undefined, undefined, true);
+/** 只读本人当前执行任务的私人清单。 */
+export const readSubtasks = (taskId: string) => request(`subtasks?${new URLSearchParams({ taskId })}`, v2SubtasksSchema, undefined, undefined, true);
+/** 日期明确传递，日报不受看板搜索和来源筛选影响。 */
+export const readDaily = (on: string) => request(`daily?${new URLSearchParams({ on })}`, v2DailyReportSchema, undefined, undefined, true);

@@ -46,9 +46,9 @@ export async function withFixture(verify: (fixture: Fixture) => Promise<void>): 
       for (const { id } of teams) await db.query('DELETE b FROM v2_backlog b JOIN projects p ON p.id=b.project_id WHERE p.team_id=?', [id]);
       for (const { id } of accounts) {
         const tasks = z.array(z.object({ id: z.string() })).parse(await db.query('SELECT id FROM v2_tasks WHERE executor_id=? OR creator_id=?', [id, id]));
-        for (const task of tasks) { for (const table of ['v2_task_events', 'v2_arrangement_history', 'v2_arrangements', 'v2_placements']) await db.query(`DELETE FROM ${table} WHERE task_id=?`, [task.id]); await db.query('DELETE FROM v2_tasks WHERE id=?', [task.id]); }
+        for (const task of tasks) { for (const table of ['v2_personal_subtask_events', 'v2_personal_subtasks', 'v2_task_events', 'v2_arrangement_history', 'v2_arrangements', 'v2_placements']) await db.query(`DELETE FROM ${table} WHERE task_id=?`, [task.id]); await db.query('DELETE FROM v2_tasks WHERE id=?', [task.id]); }
         for (const table of ['v2_operations', 'audit_events']) await db.query(`DELETE FROM ${table} WHERE actor_id=?`, [id]);
-        for (const table of ['v2_categories', 'v2_personal_views']) await db.query(`DELETE FROM ${table} WHERE owner_id=?`, [id]);
+        for (const table of ['v2_daily_reports', 'v2_personal_preferences', 'v2_categories', 'v2_personal_views']) await db.query(`DELETE FROM ${table} WHERE owner_id=?`, [id]);
         for (const table of ['v2_notifications', 'login_sessions', 'personal_tokens']) await db.query(`DELETE FROM ${table} WHERE account_id=?`, [id]);
       }
       for (const { id } of teams) {

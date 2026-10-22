@@ -28,7 +28,7 @@ NTFS_TOKEN_FILE = 'G:\work\project\next-time-for-sure\.agent-token.local'
 
 | 工具 | 范围 |
 | --- | --- |
-| business_query | 身份、组织、V2 工作区、区间组合、任务历史与总结 |
+| business_query | 身份、组织、V2 工作区、区间组合、任务历史与总结、本人子任务和日报 |
 | business_command | 基础组织管理、V2 任务、待建、里程碑、个人分类、日期安排、共享文字及团队配置；复用网页严格契约 |
 | business_preview | 删除、取消安排、解除里程碑、完成里程碑、调整日期和成员配置的当前影响及确认摘要 |
 | system_health | 无需认证的工程探针，不表示身份或业务成功 |

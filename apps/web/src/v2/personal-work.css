@@ -1,0 +1,32 @@
+/* 新入口沿用现有低强调按钮；子任务不在卡片展开，不抢占主任务操作层级。 */
+#ntfs-my-work .mw-task-actions { display:flex;align-items:center;margin-left:auto;gap:0; }
+#ntfs-my-work .mw-task-actions .mw-advance { margin-left:0; }
+#ntfs-my-work.v2-scope .mw-task-actions .mw-subtasks { min-height:30px;font-size:12px;border:0;background:transparent;color:var(--mw-muted);padding:3px 7px; }
+#ntfs-my-work .mw-task-actions .mw-subtasks:hover { color:var(--mw-accent);background:var(--mw-selected); }
+#ntfs-my-work .mw-col-menu-panel .is-selected { color:var(--mw-accent);background:var(--mw-selected); }
+.v2-date-navigator { display:flex;align-items:center;gap:3px;min-width:0; }
+#ntfs-my-work.v2-scope .v2-date-navigator button { font-size:12px;padding:3px 5px;min-height:32px; }
+#ntfs-my-work .v2-date-navigator input { min-width:0;width:120px;flex:1;padding:5px 3px;min-height:33px;font-size:12px; }
+.v2-private-list-summary { color:var(--v2-muted);font-size:12px;margin-bottom:10px; }
+.v2-private-list { border-top:1px solid var(--v2-line); }
+.v2-private-row { display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--v2-line);background:var(--v2-bg); }
+#ntfs-my-work.v2-scope .v2-private-row .v2-sort-handle { min-height:28px;min-width:28px;padding:3px;border:0;background:transparent;color:var(--v2-muted);touch-action:none;cursor:grab; }
+.v2-private-name { flex:1;min-width:0;overflow-wrap:anywhere; }
+.v2-private-name input { width:100%; }
+.v2-private-row.is-completed .v2-private-name>span { text-decoration:line-through;color:var(--v2-muted); }
+.v2-scope .v2-private-row input[type=checkbox] { width:16px;height:16px;min-height:16px;padding:0;flex-shrink:0;accent-color:var(--v2-accent); }
+#ntfs-my-work.v2-scope .v2-private-row .v2-private-action { min-height:30px;font-size:12px;padding:3px 5px;border:0;background:transparent;color:var(--v2-muted); }
+#ntfs-my-work.v2-scope .v2-private-row .is-danger { color:var(--v2-danger); }
+.v2-private-add { display:flex;align-items:center;gap:8px;margin-top:16px; }
+.v2-private-add input { flex:1;min-width:0; }
+.v2-daily-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap; }
+.v2-daily-toolbar .mw-col-menu { margin-left:auto; }
+.v2-daily-toolbar .v2-date-navigator { max-width:100%; }
+@media(max-width:600px) {
+  .v2-private-row { gap:6px; }
+  .v2-subtask-row { display:grid;grid-template-columns:28px 18px minmax(0,1fr) auto auto; }
+  #ntfs-my-work .v2-private-add input,#ntfs-my-work .v2-private-name input { font-size:16px; }
+}
+@media(pointer:coarse) {
+  #ntfs-my-work.v2-scope .mw-task-actions .mw-subtasks,#ntfs-my-work.v2-scope .v2-private-row .v2-private-action,#ntfs-my-work.v2-scope .v2-date-navigator button { min-height:44px; }
+}

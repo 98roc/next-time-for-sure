@@ -15,7 +15,7 @@ export function usePointerSort({ root, move }: { root: RefObject<HTMLElement | n
     const container = root.current;
     if (!source || !list || !container || list.dataset.sortScope !== scope) return;
     event.stopPropagation();
-    const scrollArea = container.closest<HTMLElement>('.v2-main');
+    const scrollArea = container.closest<HTMLElement>('.v2-content, .v2-main');
     const origin = source.getBoundingClientRect(), initial = { x: event.clientX, y: event.clientY };
     const cards = Array.from(list.querySelectorAll<HTMLElement>('[data-sort-id]')).filter((card) => card.closest('[data-sort-scope]') === list);
     const index = cards.indexOf(source);
@@ -85,11 +85,11 @@ export function usePointerSort({ root, move }: { root: RefObject<HTMLElement | n
       begun = true;
       const clone = source.cloneNode(true);
       if (clone instanceof HTMLElement) {
-        ghost = clone; ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach((child) => child.removeAttribute('id'));
+        ghost = clone; ghost.removeAttribute('id'); ghost.removeAttribute('data-sort-id'); ghost.querySelectorAll('[id]').forEach((child) => child.removeAttribute('id'));
         ghost.classList.add('v2-drag-ghost'); ghost.style.width = `${origin.width}px`; ghost.style.height = `${origin.height}px`;
         ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
         // 留在页面样式作用域内，脱离滚动容器，避免浮层被裁切。
-        (container.closest('.v2-page') ?? container).append(ghost);
+        (container.closest('.v2-dialog-layout') ?? container.closest('.v2-page') ?? container).append(ghost);
       }
       source.classList.add('v2-sort-source');
       geometry.forEach(({ card }) => { if (card !== source) card.style.transition = reduceMotion ? 'none' : 'translate 150ms ease'; });

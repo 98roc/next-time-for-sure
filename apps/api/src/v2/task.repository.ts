@@ -34,7 +34,8 @@ export class V2TaskRepository {
   /** 事件快照保留当前业务字段而不保存认证或旧说明内容。 */
   async event(task: V2Task, actorId: string, action: V2TaskEvent['action'], beforeStatus: V2TaskEvent['beforeStatus']): Promise<void> {
     const names = z.array(z.object({ id: z.string(), name: z.string() })).parse(await this.manager.query('SELECT id,display_name AS name FROM accounts WHERE id IN (?,?)', [task.executorId, actorId]));
-    const snapshot = { task, executorName: names.find((row) => row.id === task.executorId)?.name ?? null, actorName: names.find((row) => row.id === actorId)?.name ?? null };
+    const projects = task.projectId ? z.array(z.object({ name: z.string() })).parse(await this.manager.query('SELECT name FROM projects WHERE id=?', [task.projectId])) : [];
+    const snapshot = { task, projectName: projects[0]?.name ?? null, executorName: names.find((row) => row.id === task.executorId)?.name ?? null, actorName: names.find((row) => row.id === actorId)?.name ?? null };
     await this.manager.query('INSERT INTO v2_task_events(id,task_id,sequence,actor_id,action,before_status,snapshot_json,occurred_at) VALUES (?,?,?,?,?,?,?,?)', [randomUUID(), task.id, task.version, actorId, action, beforeStatus, JSON.stringify(snapshot), dbTime(task.updatedAt)]);
   }
 
@@ -45,9 +46,9 @@ export class V2TaskRepository {
     const converted = z.array(z.object({ taskId: z.string() })).parse(await this.manager.query(`SELECT converted_task_id AS taskId FROM v2_backlog WHERE converted_task_id IN (${taskIds.map(() => '?').join(',')})`, taskIds));
     return rows.map(({ snapshot_json, ...row }) => {
       const decoded = decodeJson(snapshot_json);
-      const envelope = z.object({ task: v2TaskSchema, executorName: z.string().nullable(), actorName: z.string().nullable() }).safeParse(decoded);
+      const envelope = z.object({ task: v2TaskSchema, projectName: z.string().nullable().optional(), executorName: z.string().nullable(), actorName: z.string().nullable() }).safeParse(decoded);
       // 早期或迁移缺证据的快照明确保留空姓名，不拿现有账号姓名伪造历史。
-      return v2TaskEventSchema.parse({ ...row, fromBacklog: converted.some((item) => item.taskId === row.taskId), snapshot: envelope.success ? envelope.data.task : decoded, executorName: envelope.success ? envelope.data.executorName : null, actorName: envelope.success ? envelope.data.actorName : null });
+      return v2TaskEventSchema.parse({ ...row, fromBacklog: converted.some((item) => item.taskId === row.taskId), snapshot: envelope.success ? envelope.data.task : decoded, projectName: envelope.success ? envelope.data.projectName ?? null : null, executorName: envelope.success ? envelope.data.executorName : null, actorName: envelope.success ? envelope.data.actorName : null });
     });
   }
 

@@ -22,3 +22,4 @@ export * from './tokens.js';
 export * from './agent.js';
 export * from './v2.js';
 export * from './v2-workspace.js';
+export * from './v2-personal-work.js';

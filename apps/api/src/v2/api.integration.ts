@@ -1,5 +1,6 @@
 import { verifySorting } from './sorting.integration.js';
 import { verifyEffort } from './effort.integration.js';
+import { verifyPersonalWork } from './personal-work.integration.js';
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -211,6 +212,8 @@ async function smoke(): Promise<void> {
     await call('tasks', lead, { action: 'set_status', operationId: randomUUID(), taskId, version: latest.version, status: 'completed', completion: { actualDays: 1.25, aiContribution: 'high' } });
     const stale = v2WeeklyStateSchema.parse(await call(weeklyPath, leader)); assert.equal(stale.text.stale, true); assert.equal(stale.text.body, save.body);
     await call('report', leader, { ...save, action: 'regenerate', operationId: randomUUID(), version: 1 }, 409);
+    stage = 'private subtasks, daily report and preferences';
+    await verifyPersonalWork({ source, leader, lead, developer, manager, projectId, hiddenProjectId, teamId, periodId: period.id, call, state });
     stage = 'sorting defaults, manual and reset';
     await verifySorting({ source, leader, lead, manager, developer, projectId, hiddenProjectId, teamId, periodId: period.id, nextId: next.id, call, state });
     stage = 'messages batching, deduplication, offline baseline, history and expiry';
@@ -269,11 +272,13 @@ async function smoke(): Promise<void> {
     await source.transaction(async (db) => {
       const taskRows = z.array(z.object({ id: z.string() })).parse(await db.query(`SELECT id FROM v2_tasks WHERE team_id=? OR executor_id IN (${actors.map(() => '?').join(',')})`, [teamId, ...actors.map((actor) => actor.id)]));
       for (const { id } of taskRows) {
+        await db.query('DELETE FROM v2_personal_subtask_events WHERE task_id=?', [id]); await db.query('DELETE FROM v2_personal_subtasks WHERE task_id=?', [id]);
         await db.query('DELETE FROM v2_task_events WHERE task_id=?', [id]); await db.query('DELETE FROM v2_arrangement_history WHERE task_id=?', [id]); await db.query('DELETE FROM v2_arrangements WHERE task_id=?', [id]); await db.query('DELETE FROM v2_placements WHERE task_id=?', [id]);
       }
       await db.query('DELETE FROM v2_backlog WHERE project_id IN (?,?)', [projectId, hiddenProjectId]);
       for (const { id } of taskRows) await db.query('DELETE FROM v2_tasks WHERE id=?', [id]);
       for (const actor of actors) {
+        await db.query('DELETE FROM v2_daily_reports WHERE owner_id=?', [actor.id]); await db.query('DELETE FROM v2_personal_preferences WHERE owner_id=?', [actor.id]);
         await db.query('DELETE FROM v2_notifications WHERE account_id=?', [actor.id]); await db.query('DELETE FROM v2_operations WHERE actor_id=?', [actor.id]); await db.query('DELETE FROM v2_categories WHERE owner_id=?', [actor.id]); await db.query('DELETE FROM v2_personal_views WHERE owner_id=?', [actor.id]); await db.query('DELETE FROM login_sessions WHERE account_id=?', [actor.id]); await db.query('DELETE FROM audit_events WHERE actor_id=?', [actor.id]);
       }
       for (const table of ['v2_report_texts', 'v2_shared_orders', 'v2_object_events', 'v2_periods', 'v2_team_settings']) await db.query(`DELETE FROM ${table} WHERE team_id=?`, [teamId]);
