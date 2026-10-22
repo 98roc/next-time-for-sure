@@ -1,4 +1,6 @@
 import { notifyTask } from './notifications.js';
+import { v2ArrangementsInputSchema } from '@ntfs/contracts';
+import { applyCompletion } from './task-completion.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
@@ -17,7 +19,8 @@ export async function createProjectTask(manager: EntityManager, context: V2Conte
   if (!canCreateProjectTask(context.actor, project, input.executorId)) throw new ForbiddenException('没有安排该执行人的权限。');
   requireProjectMember(context, project, input.executorId);
   const periods = await new V2PlanningRepository(manager).periods(project.teamId);
-  if (!periods.some((period) => period.id === input.periodId)) throw new ConflictException('日期区间不存在或不属于本团队。');
+  const arrangements = v2ArrangementsInputSchema.parse([{ periodId: input.periodId, plannedDays: input.plannedDays }, ...(input.additionalArrangements ?? [])]);
+  if (arrangements.some((row) => !periods.some((period) => period.id === row.periodId))) throw new ConflictException('日期区间不存在或不属于本团队。');
   if (categoryId && input.executorId !== context.actor.id) throw new ForbiddenException('不能指定他人的个人分类。');
   const personal = new V2PersonalRepository(manager);
   await personal.ensure(input.executorId);
@@ -30,12 +33,12 @@ export async function createProjectTask(manager: EntityManager, context: V2Conte
     checkRule(() => validateMilestoneLink({ projectId: project.id, status }, milestone));
   }
   const now = new Date().toISOString();
-  const task: V2Task = { id: randomUUID(), kind: 'project', teamId: project.teamId, projectId: project.id, creatorId, executorId: input.executorId, milestoneId: input.milestoneId, title: input.title, priority: input.priority, status, version: 0, completedAt: status === 'completed' ? now : null, deletedAt: null, createdAt: now, updatedAt: now };
+  const task = checkRule(() => applyCompletion({ id: randomUUID(), kind: 'project', teamId: project.teamId, projectId: project.id, creatorId, executorId: input.executorId, milestoneId: input.milestoneId, title: input.title, priority: input.priority, status, version: 0, completedAt: status === 'completed' ? now : null, deletedAt: null, createdAt: now, updatedAt: now }, null, input.completion));
 
   // 任务、首个安排、状态事件和个人位置共同提交，任一失败回滚整条任务。
   const tasks = new V2TaskRepository(manager);
   await tasks.insert(task, context.actor.id);
-  await tasks.addArrangement(task, input.periodId, input.plannedDays, context.actor.id, now);
+  for (const row of arrangements) await tasks.addArrangement(task, row.periodId, row.plannedDays, context.actor.id, now);
   await personal.place(task, undefined, categoryId);
   await notifyTask(manager, context, task, 'created', fromBacklog);
   if (task.status === 'completed') await notifyTask(manager, context, task, 'completed');
@@ -62,8 +65,8 @@ export async function mutateTask(manager: EntityManager, context: V2Context, com
   let next: V2Task = { ...task, version: task.version + 1, updatedAt: now };
   switch (command.action) {
     case 'set_status': {
-      if (task.status === command.status && !command.categoryId) return [task.id];
-      next = { ...checkRule(() => transitionTask(task, command.status, now)), version: task.version + 1, updatedAt: now };
+      if (task.status === command.status && !command.categoryId && !command.completion) return [task.id];
+      next = { ...checkRule(() => applyCompletion(transitionTask(task, command.status, now), task.status, command.completion)), version: task.version + 1, updatedAt: now };
       if (command.categoryId && task.executorId !== context.actor.id) throw new ForbiddenException('不能指定他人的个人分类。');
       if (task.milestoneId) {
         const repository = new V2ProjectRepository(manager), milestone = await repository.milestone(task.milestoneId);

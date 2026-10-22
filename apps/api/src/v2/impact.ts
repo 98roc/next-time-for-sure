@@ -24,6 +24,7 @@ export async function previewImpact(manager: EntityManager, context: V2Context, 
     requireVersion(task.version, intent.version);
     if (intent.action === 'unlink_milestone') await authorizeProjectCommand(manager, context, { ...intent, operationId, confirmation: '0'.repeat(64) });
     else if (intent.action === 'delete_task') authorizeTaskCommand(context, { ...intent, action: 'delete', operationId, confirmation: '0'.repeat(64) }, task);
+    else if (intent.action === 'save_arrangements') authorizeTaskCommand(context, { action: 'add_arrangement', operationId, taskId: task.id, version: task.version, periodId: intent.arrangements[0]?.periodId ?? task.id, plannedDays: null }, task);
     else if (intent.action === 'change_arrangement') authorizeTaskCommand(context, { ...intent, operationId, confirmation: '0'.repeat(64), plannedDays: null }, task);
     else authorizeTaskCommand(context, { ...intent, operationId, confirmation: '0'.repeat(64) }, task);
     const rows = await tasks.arrangements([task.id]);
@@ -32,7 +33,13 @@ export async function previewImpact(manager: EntityManager, context: V2Context, 
     if (task.deletedAt) blockers.push('任务已删除');
     if (intent.action === 'delete_task') details.push('删除整条任务及所有当前区间安排；历史事件和人工文字保留。', ...rows.map((row) => { const period = periods.find((entry) => entry.id === row.periodId); return period ? `${period.startOn}—${period.endOn}` : row.periodId; }));
     else if (intent.action === 'unlink_milestone') { details.push('只解除里程碑关联，保留任务、执行人、日期区间和状态。'); if (!task.milestoneId) blockers.push('当前任务没有关联里程碑'); }
-    else {
+    else if (intent.action === 'save_arrangements') {
+      if (intent.arrangements.some((row) => !periods.some((period) => period.id === row.periodId))) blockers.push('目标区间不存在');
+      const label = (id: string) => { const period = periods.find((row) => row.id === id); return period ? `${period.startOn}—${period.endOn}` : id; };
+      details.push(...rows.filter((row) => !intent.arrangements.some((item) => item.periodId === row.periodId)).map((row) => `取消安排：${label(row.periodId)}`));
+      details.push(...intent.arrangements.filter((row) => !rows.some((item) => item.periodId === row.periodId)).map((row) => `新增安排：${label(row.periodId)}`));
+      details.push('保留任务及安排历史；预计投入按各周期独立保存。');
+    } else {
       const target = intent.action === 'change_arrangement' ? intent.targetPeriodId : null;
       inspect(() => { rearrangeTask(rows.map((row) => row.periodId), intent.periodId, target); });
       if (target && !periods.some((row) => row.id === target)) blockers.push('目标区间不存在');

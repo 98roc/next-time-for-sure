@@ -17,6 +17,16 @@ const title = z.string().trim().min(1).max(200);
 /** 区间投入最多两位小数，空代表未估算，零代表明确估算为零。 */
 export const v2PlannedDaysSchema = z.number().finite().min(0).max(9999.99).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8, '预计天数最多两位小数').nullable();
 
+/** 投入以八小时为一人天，允许明确填零；贡献档位不参与人天折算。 */
+export const v2ActualDaysSchema = z.number().finite().min(0).max(9999.99).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8, '实际人天最多两位小数').nullable();
+export const v2AiContributionSchema = z.enum(['none', 'low', 'medium', 'high']);
+export const v2AiContributionLabels: Record<z.infer<typeof v2AiContributionSchema>, string> = { none: '无 · 0%', low: '低 · 小于30%', medium: '中 · 30%–60%', high: '高 · 大于60%' };
+export const v2CompletionSchema = z.object({ actualDays: v2ActualDaysSchema, aiContribution: v2AiContributionSchema.nullable() }).strict();
+export type V2Completion = z.infer<typeof v2CompletionSchema>;
+export const v2ArrangementInputSchema = z.object({ periodId: v2IdSchema, plannedDays: v2PlannedDaysSchema }).strict();
+export const v2ArrangementsInputSchema = z.array(v2ArrangementInputSchema).min(1).max(100).refine((rows) => new Set(rows.map((row) => row.periodId)).size === rows.length, '日期区间不能重复');
+export type V2ArrangementInput = z.infer<typeof v2ArrangementInputSchema>;
+
 export const v2PeriodSchema = z.object({
   id: v2IdSchema, teamId: v2IdSchema, startOn: v2DateSchema, endOn: v2DateSchema, version: v2VersionSchema,
 }).strict().refine((value) => value.startOn <= value.endOn, '结束日期不能早于开始日期');
@@ -27,7 +37,12 @@ export const v2ProjectTaskInputSchema = z.object({
   projectId: v2IdSchema, title, executorId: v2IdSchema, periodId: v2IdSchema,
   priority: v2PrioritySchema.default(3), milestoneId: v2IdSchema.nullable().default(null),
   plannedDays: v2PlannedDaysSchema.default(null),
-}).strict();
+  additionalArrangements: z.array(v2ArrangementInputSchema).max(99).optional(),
+  completion: v2CompletionSchema.optional(),
+}).strict().refine((value) => {
+  const ids = [value.periodId, ...(value.additionalArrangements ?? []).map((row) => row.periodId)];
+  return new Set(ids).size === ids.length;
+}, '日期区间不能重复');
 export type V2ProjectTaskInput = z.infer<typeof v2ProjectTaskInputSchema>;
 
 /** 私人任务不接受项目、里程碑或团队排期字段，不通过接口猜测其归属。 */
@@ -38,11 +53,13 @@ const taskFields = {
   creatorId: v2IdSchema, executorId: v2IdSchema, version: v2VersionSchema,
   completedAt: v2InstantSchema.nullable(), createdAt: v2InstantSchema, updatedAt: v2InstantSchema,
   deletedAt: v2InstantSchema.nullable(),
+  actualDays: v2ActualDaysSchema.optional(), aiContribution: v2AiContributionSchema.nullable().optional(),
 };
 export const v2TaskSchema = z.discriminatedUnion('kind', [
   z.object({ ...taskFields, kind: z.literal('project'), teamId: v2IdSchema, projectId: v2IdSchema, milestoneId: v2IdSchema.nullable() }).strict(),
   z.object({ ...taskFields, kind: z.literal('private'), teamId: z.null(), projectId: z.null(), milestoneId: z.null() }).strict(),
 ]).refine((task) => task.kind !== 'private' || task.creatorId === task.executorId, '私人任务创建人和执行人必须是本人')
+  .refine((task) => task.kind !== 'private' || (task.actualDays == null && task.aiContribution == null), '私人任务不记录投入和AI贡献率')
   .refine((task) => task.status === 'completed' || task.completedAt === null, '未完成任务不能保留当前完成时间');
 export type V2Task = z.infer<typeof v2TaskSchema>;
 
@@ -80,7 +97,7 @@ export const v2TaskCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...command, action: z.literal('create_project'), task: v2ProjectTaskInputSchema, categoryId: v2IdSchema.optional() }).strict(),
   z.object({ ...command, action: z.literal('create_private'), task: v2PrivateTaskInputSchema }).strict(),
   z.object({ ...command, action: z.literal('create_batch'), tasks: z.array(v2ProjectTaskInputSchema).min(1).max(100) }).strict(),
-  z.object({ ...command, ...existing, action: z.literal('set_status'), status: v2StatusSchema, categoryId: v2IdSchema.optional() }).strict(),
+  z.object({ ...command, ...existing, action: z.literal('set_status'), status: v2StatusSchema, categoryId: v2IdSchema.optional(), completion: v2CompletionSchema.optional() }).strict(),
   z.object({ ...command, ...existing, action: z.literal('update_project'), title, executorId: v2IdSchema, priority: v2PrioritySchema, milestoneId: v2IdSchema.nullable(), milestoneConfirmation: z.string().regex(/^[a-f0-9]{64}$/u).optional() }).strict(),
   z.object({ ...command, ...existing, action: z.literal('update_private'), title, priority: v2PrioritySchema }).strict(),
   z.object({ ...command, ...existing, action: z.literal('delete'), confirmation: z.string().length(64) }).strict(),

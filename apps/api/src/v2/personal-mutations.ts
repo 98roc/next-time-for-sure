@@ -35,7 +35,7 @@ export async function mutatePersonal(manager: EntityManager, context: V2Context,
     if (!category) throw new ConflictException('分类不存在。');
     // 无效落点应在状态变更前发现；事务同时保护移动时发生的外部状态同步。
     if (command.beforeTaskId && !(await repository.placements(ownerId)).some((row) => row.taskId === command.beforeTaskId && row.categoryId === category.id && row.taskId !== task.id)) throw new ConflictException('目标位置已变化，请刷新。');
-    if (task.status !== category.status) await mutateTask(manager, context, { action: 'set_status', operationId: command.operationId, taskId: task.id, version: task.version, status: category.status, categoryId: category.id }, task);
+    if (task.status !== category.status || command.completion) await mutateTask(manager, context, { action: 'set_status', operationId: command.operationId, taskId: task.id, version: task.version, status: category.status, categoryId: category.id, ...(command.completion ? { completion: command.completion } : {}) }, task);
     await repository.place({ ...task, status: category.status }, task, category.id, command.beforeTaskId); return [task.id];
   }
   if (command.action === 'create_category') {

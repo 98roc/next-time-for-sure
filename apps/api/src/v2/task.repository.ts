@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { v2ArrangementSchema, v2TaskEventSchema, v2TaskSchema, type V2Task, type V2TaskEvent } from '@ntfs/contracts';
 import { dbTime, decodeJson, instantColumn } from './repository-utils.js';
 
-const taskSelect = `SELECT id,kind,team_id AS teamId,project_id AS projectId,creator_id AS creatorId,executor_id AS executorId,milestone_id AS milestoneId,title,priority,status,version,${instantColumn('completed_at','completedAt')},${instantColumn('deleted_at','deletedAt')},${instantColumn('created_at','createdAt')},${instantColumn('updated_at','updatedAt')} FROM v2_tasks`;
+const taskSelect = `SELECT id,kind,team_id AS teamId,project_id AS projectId,creator_id AS creatorId,executor_id AS executorId,milestone_id AS milestoneId,title,priority,status,version,actual_days + 0e0 AS actualDays,ai_contribution AS aiContribution,${instantColumn('completed_at','completedAt')},${instantColumn('deleted_at','deletedAt')},${instantColumn('created_at','createdAt')},${instantColumn('updated_at','updatedAt')} FROM v2_tasks`;
 
 /** 任务与安排集中访问；调用者必须在同一身份及组织事务内完成规则检查。 */
 export class V2TaskRepository {
@@ -21,13 +21,13 @@ export class V2TaskRepository {
 
   /** 创建任务和其事件，首个区间及个人位置由上层在同事务建立。 */
   async insert(task: V2Task, actorId: string): Promise<void> {
-    await this.manager.query(`INSERT INTO v2_tasks(id,kind,team_id,project_id,creator_id,executor_id,milestone_id,title,priority,status,completed_at,history_known_from,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [task.id, task.kind, task.teamId, task.projectId, task.creatorId, task.executorId, task.milestoneId, task.title, task.priority, task.status, dbTime(task.completedAt), dbTime(task.createdAt), task.version, dbTime(task.createdAt), dbTime(task.updatedAt)]);
+    await this.manager.query(`INSERT INTO v2_tasks(id,kind,team_id,project_id,creator_id,executor_id,milestone_id,title,priority,status,actual_days,ai_contribution,completed_at,history_known_from,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [task.id, task.kind, task.teamId, task.projectId, task.creatorId, task.executorId, task.milestoneId, task.title, task.priority, task.status, task.actualDays ?? null, task.aiContribution ?? null, dbTime(task.completedAt), dbTime(task.createdAt), task.version, dbTime(task.createdAt), dbTime(task.updatedAt)]);
     await this.event(task, actorId, 'created', null);
   }
 
   /** 每次聚合更新只追加一个对应版本事件，执行人代改由实际 actorId 留痕。 */
   async update(previous: V2Task, task: V2Task, actorId: string, action: V2TaskEvent['action'] = 'updated'): Promise<void> {
-    await this.manager.query('UPDATE v2_tasks SET title=?,executor_id=?,milestone_id=?,priority=?,status=?,completed_at=?,deleted_at=?,version=?,updated_at=? WHERE id=?', [task.title, task.executorId, task.milestoneId, task.priority, task.status, dbTime(task.completedAt), dbTime(task.deletedAt), task.version, dbTime(task.updatedAt), task.id]);
+    await this.manager.query('UPDATE v2_tasks SET title=?,executor_id=?,milestone_id=?,priority=?,status=?,completed_at=?,actual_days=?,ai_contribution=?,deleted_at=?,version=?,updated_at=? WHERE id=?', [task.title, task.executorId, task.milestoneId, task.priority, task.status, dbTime(task.completedAt), task.actualDays ?? null, task.aiContribution ?? null, dbTime(task.deletedAt), task.version, dbTime(task.updatedAt), task.id]);
     await this.event(task, actorId, action, previous.status);
   }
 

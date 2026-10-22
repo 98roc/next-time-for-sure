@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
 import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2PlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
 import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organization.js';
 
@@ -29,7 +30,7 @@ export const v2PersonalCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('rename_category'), version, categoryId: id, name }).strict(),
   z.object({ ...operation, action: z.literal('default_category'), version, categoryId: id }).strict(),
   z.object({ ...operation, action: z.literal('delete_category'), version, categoryId: id, receiverId: id, confirmation }).strict(),
-  z.object({ ...operation, action: z.literal('move_task'), version, taskId: id, taskVersion: version, categoryId: id, beforeTaskId: id.nullable() }).strict(),
+  z.object({ ...operation, action: z.literal('move_task'), version, taskId: id, taskVersion: version, categoryId: id, beforeTaskId: id.nullable(), completion: v2CompletionSchema.optional() }).strict(),
   z.object({ ...operation, action: z.literal('move_category'), version, categoryId: id, beforeCategoryId: id.nullable() }).strict(),
   z.object({ ...operation, action: z.literal('reorder_priority'), version }).strict(),
   z.object({ ...operation, action: z.literal('reset_order'), version }).strict(),
@@ -63,6 +64,7 @@ export type V2ReportCommand = z.infer<typeof v2ReportCommandSchema>;
 
 /** 同一个影响预览服务供页面和 Agent 使用；客户端不能自行构造确认摘要。 */
 export const v2ImpactIntentSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('save_arrangements'), taskId: id, version, arrangements: v2ArrangementsInputSchema }).strict(),
   z.object({ action: z.literal('delete_task'), taskId: id, version }).strict(),
   z.object({ action: z.literal('remove_arrangement'), taskId: id, version, periodId: id }).strict(),
   z.object({ action: z.literal('change_arrangement'), taskId: id, version, periodId: id, targetPeriodId: id }).strict(),
@@ -110,6 +112,7 @@ export const v2TaskEditSchema = z.object({
   ]).optional(),
   status: v2StatusSchema.optional(), categoryId: id.optional(), milestoneConfirmation: confirmation.optional(),
   arrangement: z.object({ periodId: id, targetPeriodId: id, plannedDays: v2PlannedDaysSchema, confirmation }).strict().optional(),
+  arrangements: v2ArrangementsInputSchema.optional(), arrangementConfirmation: confirmation.optional(), completion: v2CompletionSchema.optional(),
 }).strict();
 export type V2TaskEdit = z.infer<typeof v2TaskEditSchema>;
 export const v2AddExistingSchema = z.object({ ...operation, action: z.literal('add_existing'), periodId: id, tasks: z.array(z.object({ taskId: id, version }).strict()).min(1).max(100) }).strict();

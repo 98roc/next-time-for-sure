@@ -6,6 +6,7 @@ import { useModal, ModalPage } from './modal';
 import { currentPeriod, Feedback, PeriodSelect, priorityLabels, useAction } from './controls';
 import { TaskCreate } from './task-create';
 import { TaskEditor } from './task-editor';
+import { TaskCompletion, taskCompletion } from './task-results';
 import { CategoryForm, DeleteCategory } from './category-dialogs';
 import { usePersonalBoard } from './personal-board';
 import './board-drag.css';
@@ -57,7 +58,11 @@ export function PersonalPageV2() {
             <button className="mw-title" disabled={Boolean(board.pending)} onClick={() => modal.open(<TaskEditor task={task} />)}>{task.title}</button>
             <div className="mw-task-foot">
               {task.kind === 'project' && <div className="mw-task-date">{data.arrangements.filter((row) => row.taskId === task.id).map((row) => { const date = data.periods.find((item) => item.id === row.periodId); return date ? `${date.startOn} — ${date.endOn}` : ''; }).join('、')}</div>}
-              <button className="mw-advance" disabled={busy} onClick={() => { void action.act(() => run('tasks', { action: 'set_status', operationId: createOperationId(), taskId: task.id, version: task.version, status: task.status === 'not_started' ? 'in_progress' : task.status === 'in_progress' ? 'completed' : 'in_progress' })); }}>{task.status === 'not_started' && <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="m5 3 7 5-7 5Z" /></svg>}{task.status === 'not_started' ? '开始' : task.status === 'in_progress' ? '完成' : '重新打开'}</button>
+              <button className="mw-advance" disabled={busy} onClick={() => {
+                const command = { action: 'set_status' as const, operationId: createOperationId(), taskId: task.id, version: task.version, status: task.status === 'not_started' ? 'in_progress' as const : task.status === 'in_progress' ? 'completed' as const : 'in_progress' as const };
+                if (task.kind === 'project' && command.status === 'completed') modal.open(<TaskCompletion title={task.title} initial={taskCompletion(task)} arrangements={data.arrangements.filter((row) => row.taskId === task.id)} onConfirm={(completion) => run('tasks', { ...command, completion })} />);
+                else void action.act(() => run('tasks', command));
+              }}>{task.status === 'not_started' && <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="m5 3 7 5-7 5Z" /></svg>}{task.status === 'not_started' ? '开始' : task.status === 'in_progress' ? '完成' : '重新打开'}</button>
             </div>
           </article>
         )}{tasks.length === 0 && <div className="mw-empty">暂无任务</div>}</div>

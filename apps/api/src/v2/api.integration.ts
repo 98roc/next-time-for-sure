@@ -1,4 +1,5 @@
 import { verifySorting } from './sorting.integration.js';
+import { verifyEffort } from './effort.integration.js';
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -128,7 +129,7 @@ async function smoke(): Promise<void> {
     const audit = z.array(z.object({ count: z.coerce.number() })).parse(await source.query('SELECT COUNT(*) AS count FROM v2_object_events WHERE object_id=?', [milestoneId])); assert.equal(audit[0]?.count, 2);
     stage = 'milestone unlink confirmation cannot be bypassed by edit';
     const linkedTask = (await state()).tasks.find((row) => row.id === secondId); assert.ok(linkedTask);
-    await call('edit', lead, { action: 'save_task', operationId: randomUUID(), taskId: secondId, version: linkedTask.version, status: 'completed', details: { ...detail, title: linkedTask.title, milestoneId } });
+    await call('edit', lead, { action: 'save_task', operationId: randomUUID(), taskId: secondId, version: linkedTask.version, status: 'completed', completion: { actualDays: 1.25, aiContribution: 'high' }, details: { ...detail, title: linkedTask.title, milestoneId } });
     const unlinkVersion = linkedTask.version + 1;
     const unlinkEdit = { action: 'save_task', operationId: randomUUID(), taskId: secondId, version: unlinkVersion, details: { ...detail, title: linkedTask.title } };
     await call('edit', lead, unlinkEdit, 409);
@@ -136,6 +137,8 @@ async function smoke(): Promise<void> {
     const unlinkPreview = v2ImpactSchema.parse(await call('impact', lead, { action: 'unlink_milestone', taskId: secondId, version: unlinkVersion }));
     await call('edit', lead, { ...unlinkEdit, milestoneConfirmation: unlinkPreview.confirmation });
     assert.equal((await state()).tasks.find((row) => row.id === secondId)?.milestoneId, null);
+    stage = 'effort and completion';
+    await verifyEffort({ source, lead, manager, developer, periodId: period.id, nextId: next.id, projectId, call, state });
     stage = 'team roles and member removal';
     const project = (await state()).projects.find((row) => row.id === projectId); assert.ok(project);
     const withoutDeveloper = { projectId, version: project.version, members: project.members.filter((row) => row.accountId !== developer.id) };
@@ -177,7 +180,7 @@ async function smoke(): Promise<void> {
     await call('report', leader, save); await call('report', leader, { ...save, operationId: randomUUID() }, 409); await call('report', developer, { ...save, operationId: randomUUID() }, 403);
     const restricted = v2WeeklyStateSchema.parse(await call(weeklyPath, developer)); assert.equal(restricted.canEditText, false); assert.doesNotMatch(restricted.text.body, /团队手工稿|受限项目/);
     const latest = (await state()).tasks.find((task) => task.id === taskId); assert.ok(latest);
-    await call('tasks', lead, { action: 'set_status', operationId: randomUUID(), taskId, version: latest.version, status: 'completed' });
+    await call('tasks', lead, { action: 'set_status', operationId: randomUUID(), taskId, version: latest.version, status: 'completed', completion: { actualDays: 1.25, aiContribution: 'high' } });
     const stale = v2WeeklyStateSchema.parse(await call(weeklyPath, leader)); assert.equal(stale.text.stale, true); assert.equal(stale.text.body, save.body);
     await call('report', leader, { ...save, action: 'regenerate', operationId: randomUUID(), version: 1 }, 409);
     stage = 'sorting defaults, manual and reset';
@@ -207,12 +210,12 @@ async function smoke(): Promise<void> {
     assert.equal(conversionHistory[0]?.fromBacklog, true);
     const completedCategory = (await state(lead)).categories.find((row) => row.status === 'completed' && row.isDefault);
     assert.ok(completedCategory);
-    await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), categoryId: completedCategory.id, task: { ...messageBatch.tasks[0], executorId: lead.id, title: '负责人直接记录已完成工作' } });
+    await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), categoryId: completedCategory.id, task: { ...messageBatch.tasks[0], executorId: lead.id, title: '负责人直接记录已完成工作', completion: { actualDays: 0, aiContribution: 'none' } } });
     const ownCompletion = v2MessagesSchema.parse(await call('notifications', developer)).messages[0];
     assert.match(ownCompletion?.items[0]?.reasons.join('') ?? '', /完成/u);
     const completeId = batchResult.objectIds[0]; assert.ok(completeId);
     const leadBefore = v2MessagesSchema.parse(await call('notifications', lead));
-    const completeCommand = { action: 'set_status', operationId: randomUUID(), taskId: completeId, version: 0, status: 'completed' };
+    const completeCommand = { action: 'set_status', operationId: randomUUID(), taskId: completeId, version: 0, status: 'completed', completion: { actualDays: 1.25, aiContribution: 'high' } };
     await call('tasks', developer, completeCommand);
     await call('tasks', developer, completeCommand);
     const completedMessages = v2MessagesSchema.parse(await call('notifications', lead));

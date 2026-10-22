@@ -79,3 +79,9 @@ SQL 不创建管理员，也不提供公共默认密码。生产环境只初始�
 `TeamMessages1792368002000` 将 `v2_team_settings.message` 的非空原文转换为 `messages_json` 第一项，空白转换为空数组，再移除旧列；新列有中文注释。迁移可在 DDL 中断后重跑，已转换的列表不覆盖，不支持退回单条。
 
 升级需先备份并停止旧 API 写入，执行迁移，再启动同版本 API、网页及 MCP；旧客户端的 `teamMessage` / `set_message` 已替换为 `teamMessages` / `set_messages`（参数 `messages`）。普通迁移不修改生产配置，本次执行环境及证据见实施记录。
+
+## 任务投入与完成结果（2026-10-22）
+
+`TaskEffort1792627200000` 为 `v2_tasks` 增加可空的 `actual_days DECIMAL(6,2)` 与 `ai_contribution VARCHAR(10)`，均含中文注释；不回填历史值，周期预计投入仍保存在 `v2_arrangements`。任务结果与版本、操作事件同事务写入。
+
+本地 `127.0.0.1:3306/next_time_for_sure` 的 MySQL 5.7.35 已执行，待执行迁移为 0，中文表字段注释 413/413。生产尚未执行此迁移；发布时先备份并停写，执行迁移后再启动匹配版本的 API、网页和 MCP。旧客户端完成项目任务时未传实际投入会被新 API 拒绝，需同步更新。1.0.0 空库快照保持不变，导入后继续执行增量迁移。

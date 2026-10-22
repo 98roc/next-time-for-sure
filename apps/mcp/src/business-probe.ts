@@ -25,9 +25,19 @@ try {
   const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
   const body = { action: 'create_project', operationId: randomUUID(), task: { projectId: environment.NTFS_TEST_PROJECT, title: 'MCP V2真实任务', executorId: identity.id, periodId: period.id, priority: 3, plannedDays: null, milestoneId: null } };
   await call('business_command', { request: { path: 'v2/tasks', body } }); await call('business_command', { request: { path: 'v2/tasks', body } });
-  const tasks = (await workspace()).tasks.filter((row) => row.title === body.task.title); assert.equal(tasks.length, 1); const task = tasks[0]; assert.ok(task);
+  const tasks = (await workspace()).tasks.filter((row) => row.title === body.task.title); assert.equal(tasks.length, 1); let task = tasks[0]; assert.ok(task);
   const denied = await call('business_command', { request: { path: 'v2/tasks', body: { ...body, operationId: randomUUID(), task: { ...body.task, projectId: environment.NTFS_TEST_FOREIGN_PROJECT } } } }, true);
   assert.equal(z.object({ status: z.number() }).parse(denied).status, 403);
+  // Agent 同样必须填写实际投入，估算不能替代完成结果；普通执行人可维护已有周期预计。
+  const missingResult = await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'completed' } } }, true);
+  assert.equal(z.object({ status: z.number() }).parse(missingResult).status, 409);
+  await call('business_command', { request: { path: 'v2/edit', body: { action: 'save_task', operationId: randomUUID(), taskId: task.id, version: task.version, arrangements: [{ periodId: period.id, plannedDays: 1.25 }], status: 'completed', completion: { actualDays: 0, aiContribution: null } } } });
+  let updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
+  assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high');
+  assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.plannedDays, 1.25);
+  await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'not_started' } } });
+  updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
+  assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high');
   const intent = { action: 'delete_task', taskId: task.id, version: task.version };
   const preview = v2ImpactSchema.parse(await call('business_preview', { request: { path: 'v2/impact', body: intent } })); assert.equal(preview.blockers.length, 0);
   const command = { action: 'delete', taskId: task.id, version: task.version };
@@ -36,5 +46,5 @@ try {
   // 此处仅清理本脚本创建的随机夹具；正式 Agent 必须先取得具体影响确认。
   await call('business_command', { request: { path: 'v2/tasks', body: { ...command, operationId: randomUUID(), confirmation: preview.confirmation } } });
   assert.equal((await workspace()).tasks.some((row) => row.id === task.id), false);
-  console.log('PASS: authenticated V2 MCP list/query/write, idempotence, scope rejection, preview and version-bound confirmation.');
+  console.log('PASS: authenticated V2 MCP list/query/write, effort and completion, idempotence, scope rejection, preview and version-bound confirmation.');
 } finally { await client.close(); }
