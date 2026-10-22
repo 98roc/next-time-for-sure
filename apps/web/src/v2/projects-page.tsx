@@ -35,18 +35,40 @@ function ProjectOverview({ periodId, openProject, sort, sorting }: { sorting: bo
   return <div ref={sort.root}>{sort.feedback}<div {...sort.listProps}>{sort.ids.map((id) => {
     const project = data.projects.find((row) => row.id === id); if (!project) return null;
     if (sorting) return <div className="v2-project-sort-row" key={id} {...sort.rowProps(id)}>{sort.handle(id, project.name, true)}</div>;
-    const rows = (query.data ?? []).filter((row) => row.projectId === project.id).sort((a, b) => (a.priority ?? 3) - (b.priority ?? 3) || (a.createdAt ?? '9999').localeCompare(b.createdAt ?? '9999') || a.taskId.localeCompare(b.taskId)), backlog = data.backlog.filter((row) => row.projectId === project.id);
-    const leads = project.members.filter((row) => row.roles.includes('project_lead')).map((row) => data.accounts.find((account) => account.id === row.accountId)?.displayName ?? '历史成员').join('、');
-    return <article className="nt-project" key={project.id} {...sort.rowProps(project.id)}> <header className="nt-project-head nt-row nt-between"><div className="nt-row v2-project-summary"><h3>{sort.handle(project.id, project.name)}<button className="nt-link" onClick={() => openProject(project.id)}>{project.name} →</button></h3><p className="nt-muted">未开始 {rows.filter((row) => row.status === 'not_started').length} · 进行中 {rows.filter((row) => row.status === 'in_progress').length} · 已完成 {rows.filter((row) => row.status === 'completed').length}</p></div><span className="nt-caption">研发负责人 {leads}</span></header><div className={`nt-columns ${backlog.length ? '' : 'nt-full'}`}><section className="nt-section"><SummaryTable rows={rows} projectId={project.id} /></section>{backlog.length > 0 && <section className="nt-section"><BacklogSummary projectId={project.id} /></section>}</div></article>;
+    const rows = (query.data ?? []).filter((row) => row.projectId === project.id).sort((a, b) => (a.priority ?? 3) - (b.priority ?? 3) || (a.createdAt ?? '9999').localeCompare(b.createdAt ?? '9999') || a.taskId.localeCompare(b.taskId));
+    return <ProjectSummaryCard key={project.id} projectId={project.id} rows={rows} projectSort={sort} openProject={openProject} />;
   })}{!data.projects.length && <div className="nt-empty">暂无可见项目，请联系团队负责人加入项目。</div>}</div></div>;
 }
 
+/** 项目标题集中展示区间统计与任务排序入口；排序仍沿用项目页的原有权限及作用域。 */
+function ProjectSummaryCard({ projectId, rows, projectSort, openProject }: { projectId: string; rows: V2SummaryRow[]; projectSort: ReturnType<typeof useProjectSort>; openProject: (id: string) => void }) {
+  const { data } = useWorkspace();
+  const taskSort = useProjectSort(rows.map((row) => row.taskId), 'tasks', projectId);
+  const project = data.projects.find((row) => row.id === projectId);
+  if (!project) return null;
+  const hasBacklog = data.backlog.some((row) => row.projectId === projectId);
+  const leads = project.members.filter((row) => row.roles.includes('project_lead')).map((row) => data.accounts.find((account) => account.id === row.accountId)?.displayName ?? '历史成员').join('、');
+
+  return <article className="nt-project v2-project-overview-card" {...projectSort.rowProps(projectId)}>
+    <header className="nt-project-head nt-row nt-between">
+      <div className="nt-row v2-project-summary">
+        <h3 className="v2-project-title">{projectSort.handle(projectId, project.name)}<button className="nt-link" onClick={() => openProject(projectId)}>{project.name}<span className="v2-project-arrow" aria-hidden="true"> →</span></button></h3>
+        <p className="nt-muted v2-project-counts"><span>区间任务 {rows.length}</span><span>未开始 {rows.filter((row) => row.status === 'not_started').length}</span><span>进行中 {rows.filter((row) => row.status === 'in_progress').length}</span><span>已完成 {rows.filter((row) => row.status === 'completed').length}</span></p>
+      </div>
+      <div className="nt-row v2-project-actions"><span className="nt-caption">研发负责人 {leads}</span>{taskSort.reset}</div>
+    </header>
+    <div className={`nt-columns ${hasBacklog ? '' : 'nt-full'}`}>
+      <section className="nt-section"><SummaryTable rows={rows} sort={taskSort} /></section>
+      {hasBacklog && <section className="nt-section"><BacklogSummary projectId={projectId} /></section>}
+    </div>
+  </article>;
+}
+
 /** 项目汇总表突出执行情况，未知历史不推算为未开始或已完成。 */
-function SummaryTable({ rows, projectId }: { rows: V2SummaryRow[]; projectId: string }) {
+function SummaryTable({ rows, sort }: { rows: V2SummaryRow[]; sort: ReturnType<typeof useProjectSort> }) {
   const { data } = useWorkspace(), modal = useModal();
-  const sort = useProjectSort(rows.map((row) => row.taskId), 'tasks', projectId);
   const ordered = sort.ids.flatMap((id) => rows.filter((row) => row.taskId === id));
-  return <div ref={sort.root}><div className="v2-section-heading"><h4>区间任务 · {rows.length}</h4>{sort.reset}</div>{sort.feedback}<div {...sort.listProps}>{rows.length ? <div className="nt-scroll"><table className="nt-table"><thead><tr><th>任务</th><th>执行人</th><th>优先级</th><th>状态</th></tr></thead><tbody>{ordered.map((row) => <tr key={row.taskId} {...sort.rowProps(row.taskId)}><td>{sort.handle(row.taskId, row.title ?? '历史任务')}<button className="nt-link" onClick={() => { const task = data.tasks.find((item) => item.id === row.taskId); modal.open(task ? <TaskEditor task={task} historicalStatus={row.status ? v2StatusLabels[row.status] : '不可还原'} /> : <TaskHistory taskId={row.taskId} />); }}>{row.title ?? '历史内容不可还原'}</button>{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.historyIncomplete && <small className="v2-outside">早期历史不完整</small>}</td><td>{row.executorName ?? '历史姓名不可还原'}</td><td>{row.priority ?? '—'}</td><td><StatusBadge status={row.status} /></td></tr>)}</tbody></table></div> : <div className="nt-empty">该区间暂无安排或执行记录</div>}</div></div>;
+  return <div ref={sort.root}>{sort.feedback}<div {...sort.listProps}>{rows.length ? <div className="nt-scroll"><table className="nt-table"><thead><tr><th>任务</th><th>执行人</th><th>优先级</th><th>状态</th></tr></thead><tbody>{ordered.map((row) => <tr key={row.taskId} {...sort.rowProps(row.taskId)}><td>{sort.handle(row.taskId, row.title ?? '历史任务')}<button className="nt-link" onClick={() => { const task = data.tasks.find((item) => item.id === row.taskId); modal.open(task ? <TaskEditor task={task} historicalStatus={row.status ? v2StatusLabels[row.status] : '不可还原'} /> : <TaskHistory taskId={row.taskId} />); }}>{row.title ?? '历史内容不可还原'}</button>{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.historyIncomplete && <small className="v2-outside">早期历史不完整</small>}</td><td>{row.executorName ?? '历史姓名不可还原'}</td><td>{row.priority ?? '—'}</td><td><StatusBadge status={row.status} /></td></tr>)}</tbody></table></div> : <div className="nt-empty">该区间暂无安排或执行记录</div>}</div></div>;
 }
 
 /** 任务页默认全部未完成，日期筛选不默认隐藏积压和未来安排。 */
