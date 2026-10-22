@@ -10,13 +10,14 @@ import { Confirmation, Confirmations } from './confirmation';
 import { readHistory } from './api';
 import { TaskArrangements } from './task-arrangements';
 import { taskCompletion, TaskResultFields } from './task-results';
+import { orderArrangements } from './arrangement-order';
 
 /** 共用详情分离任务字段、周期安排及完成结果，权限按字段执行，整份草稿一次保存。 */
-export function TaskEditor({ task, periodId, historicalStatus }: { task: V2Task; periodId?: string; historicalStatus?: string }) {
+export function TaskEditor({ task, historicalStatus }: { task: V2Task; historicalStatus?: string }) {
   const { data, user, run, notify } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
   const project = data.projects.find((row) => row.id === task.projectId), manage = task.kind === 'private' || Boolean(project?.canManage), self = task.executorId === user.id;
   const canStatus = manage || self, canDelete = manage || (task.creatorId === user.id && task.status === 'not_started');
-  const [originalArrangements] = useState(() => data.arrangements.filter((row) => row.taskId === task.id).map(({ periodId: id, plannedDays }) => ({ periodId: id, plannedDays })).sort((a, b) => Number(b.periodId === periodId) - Number(a.periodId === periodId)));
+  const [originalArrangements] = useState(() => orderArrangements(data.arrangements.filter((row) => row.taskId === task.id).map(({ periodId, plannedDays }) => ({ periodId, plannedDays })), data.periods));
   const [arrangements, setArrangements] = useState(originalArrangements);
   const [draft, setDraft] = useState<V2ProjectTaskInput>({ projectId: task.projectId ?? '', title: task.title, priority: task.priority, executorId: task.executorId, milestoneId: task.milestoneId, periodId: originalArrangements[0]?.periodId ?? '', plannedDays: originalArrangements[0]?.plannedDays ?? null });
   const [status, setStatus] = useState(task.status), [completion, setCompletion] = useState(() => taskCompletion(task));

@@ -3,6 +3,7 @@ import { v2AiContributionLabels, v2AiContributionSchema, type V2ArrangementInput
 import { Field, Feedback, periodLabel, useAction } from './controls';
 import { ModalPage, useModal } from './modal';
 import { useWorkspace } from './workspace';
+import { orderArrangements } from './arrangement-order';
 
 /** 空和零分别表示未填写及明确零投入；重开时带回原结果。 */
 export function taskCompletion(task: V2Task): V2Completion { return { actualDays: task.actualDays ?? null, aiContribution: task.aiContribution ?? null }; }
@@ -19,7 +20,7 @@ export function TaskResultFields({ value, onChange, required = false, disabled =
 export function TaskCompletion({ title, initial, arrangements, onConfirm, onDone }: { title: string; initial?: V2Completion; arrangements: V2ArrangementInput[]; onConfirm: (value: V2Completion) => Promise<unknown>; onDone?: () => void }) {
   const { data } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
   const [value, setValue] = useState<V2Completion>({ actualDays: initial?.actualDays ?? null, aiContribution: initial?.aiContribution ?? 'high' });
-  const estimates = arrangements.filter((row) => row.plannedDays !== null);
+  const estimates = orderArrangements(arrangements.filter((row) => row.plannedDays !== null), data.periods);
   const cancel = () => { if (modal.canBack) modal.back(); else modal.finish(); };
   return <ModalPage title="完成任务" subtitle={` · ${title}`} compact busy={action.busy} hideCloseAction onClose={cancel} actions={<><button disabled={action.busy} onClick={cancel}>取消</button><button type="submit" form={formId} className="nt-primary" disabled={action.busy}>确认完成</button></>}>
     {estimates.length > 0 && <section className="v2-estimate-reference"><span>预计投入（人天）</span>{estimates.map((row) => { const period = data.periods.find((item) => item.id === row.periodId); return <div key={row.periodId}><span>{period ? periodLabel(period) : '周期已变化'}</span><strong>{row.plannedDays}</strong></div>; })}</section>}
