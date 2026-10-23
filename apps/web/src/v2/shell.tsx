@@ -13,6 +13,7 @@ import './components.css';
 import './adaptations.css';
 import './shell.css';
 import './sorting.css';
+import './project-heading.css';
 
 const navigation = [
   { to: '/personal', label: '我的工作' },

@@ -24,24 +24,3 @@
   white-space:nowrap;vertical-align:middle;color:light-dark(#855a18,#e3bb7d);background:light-dark(#fff3df,#392f22);
 }
 #nt-project .nt-table .v2-planning-badge { margin-left:10px; }
-/* 汇总页以项目标题建立分组层级，统计与操作自然换行，不挤压长项目名。 */
-#nt-project .v2-project-overview-card > .nt-project-head {
-  background:color-mix(in srgb,var(--v2-selected) 48%,var(--v2-bg));border-radius:9px 9px 0 0;
-}
-#nt-project .v2-project-summary { flex:1;min-width:0;column-gap:20px;row-gap:6px; }
-#nt-project .v2-project-title { display:flex;align-items:center;gap:8px;min-width:0;max-width:100%; }
-#nt-project .v2-project-title::before { content:'';width:4px;height:24px;border-radius:2px;background:var(--v2-accent);flex-shrink:0; }
-#nt-project.v2-scope .v2-project-title > .nt-link { min-width:0;font-size:20px;font-weight:650;line-height:1.45; }
-#nt-project .v2-project-arrow { color:var(--v2-muted);font-size:15px;font-weight:400;white-space:nowrap; }
-#nt-project .v2-project-counts { display:flex;flex-wrap:wrap;gap:4px 8px; }
-#nt-project .v2-project-counts span { white-space:nowrap; }
-#nt-project .v2-project-counts span + span::before { content:'·';margin-right:8px; }
-#nt-project .v2-project-actions { margin-left:auto;min-width:0; }
-#nt-project .v2-project-actions .nt-caption { overflow-wrap:anywhere; }
-@media(max-width:650px) {
-  #nt-project .v2-project-summary { flex-basis:100%; }
-  #nt-project .v2-project-title { flex-basis:100%; }
-  #nt-project.v2-scope .v2-project-title > .nt-link { font-size:18px; }
-}
-.v2-navigation-warning{position:fixed;z-index:10000;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:var(--surface,#fff);color:var(--text,#222);border:1px solid var(--line,#ddd);border-radius:12px;padding:18px;box-shadow:0 12px 40px #0003;max-width:95vw}
-#ntfs-my-work .mw-card-list>div:has(>.mw-task),#ntfs-weekly-demo .w-task-list>div:has(>.w-task-row){display:contents}

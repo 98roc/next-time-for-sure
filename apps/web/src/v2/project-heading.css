@@ -1,0 +1,34 @@
+/* 两个入口共用标题层级；业务统计与操作可换行，长名称不挤出视口。 */
+:is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-heading {
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:12px 18px;
+  background:color-mix(in srgb,var(--v2-selected) 48%,var(--v2-bg));border-bottom:1px solid var(--v2-line);border-radius:9px 9px 0 0;
+}
+:is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-summary {
+  display:flex;align-items:center;flex-wrap:wrap;flex:1;min-width:0;gap:6px 12px;
+}
+:is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-title {
+  display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;margin:0;
+}
+.v2-scope .v2-project-title::before { content:'';width:4px;height:24px;border-radius:2px;background:var(--v2-accent);flex-shrink:0; }
+:is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-link {
+  min-width:0;color:var(--v2-text);text-decoration:none;overflow-wrap:anywhere;
+}
+:is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-link:hover { color:var(--v2-accent); }
+.v2-scope .v2-project-link:focus-visible { outline:2px solid var(--v2-accent);outline-offset:3px;border-radius:2px; }
+:is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-title > .v2-project-link { font-size:20px;font-weight:650;line-height:1.45; }
+.v2-scope .v2-project-arrow { color:var(--v2-muted);font-size:15px;font-weight:400;white-space:nowrap; }
+.v2-scope .v2-project-actions { display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-left:auto;min-width:0;max-width:100%; }
+.v2-scope .v2-project-leads { font-size:12px;overflow-wrap:anywhere; }
+#nt-project .v2-project-counts { display:flex;flex-wrap:wrap;gap:4px 8px;margin:0; }
+#nt-project .v2-project-counts span { white-space:nowrap; }
+#nt-project .v2-project-counts span + span::before { content:'·';margin-right:8px; }
+#ntfs-weekly-demo.v2-scope .w-project > .v2-project-heading { border:1px solid var(--v2-line);border-radius:9px;margin:12px 0 10px; }
+#ntfs-weekly-demo.v2-scope .v2-project-heading .w-drag { width:auto;flex-basis:auto;min-height:28px;padding:3px;border:0;background:transparent;color:var(--v2-muted); }
+#ntfs-weekly-demo.v2-scope .v2-project-heading .w-plan-actions { margin:0; }
+#ntfs-weekly-demo.v2-scope .w-project.is-empty { border-bottom:0; }
+@media(max-width:650px) {
+  :is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-heading { padding:12px; }
+  :is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-summary,
+  :is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-title { flex-basis:100%; }
+  :is(#nt-project,#ntfs-weekly-demo).v2-scope .v2-project-title > .v2-project-link { font-size:18px; }
+}

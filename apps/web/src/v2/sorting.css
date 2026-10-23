@@ -27,8 +27,6 @@
 .v2-scope .v2-order-popover small { display:block; margin-top:4px; font-size:11px; color:var(--v2-muted); }
 .v2-scope .v2-section-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:30px; margin-bottom:6px; }
 #nt-project .v2-section-heading h4 { margin:0; }
-#nt-project .v2-project-summary { gap:12px; }
-#nt-project .v2-project-summary p { margin:0; }
 #nt-project .nt-project-head { gap:10px; padding-block:12px; }
 #ntfs-weekly-demo .w-periods>.w-field { display:flex; align-items:center; gap:12px; padding:10px 14px; font-size:12px; white-space:nowrap; }
 #ntfs-weekly-demo .w-periods>.w-field select { flex:1; min-width:0; }
