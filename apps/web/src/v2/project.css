@@ -18,9 +18,10 @@
 #nt-project .nt-link-list{list-style:none;margin:12px 0 0;padding:0}
 #nt-project .nt-link-list li{padding:10px 0;border-bottom:1px solid var(--nt-line);display:flex;justify-content:space-between;gap:10px}
 #nt-project [hidden]{display:none!important}
-#nt-project .nt-date-scroll{overflow-x:auto;padding:2px 0 16px;scroll-behavior:smooth;scroll-snap-type:x proximity}
-#nt-project .nt-date-columns{display:grid;grid-auto-flow:column;grid-auto-columns:224px;gap:14px;width:max-content;min-width:100%}
-#nt-project .nt-date-column{scroll-snap-align:start;width:224px;min-width:0}
+/* 根据实际内容宽度换行，侧栏展开时也保持卡片可读。 */
+#nt-project .nt-milestone-layout{container-type:inline-size;min-width:0}
+#nt-project .nt-date-columns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 14px;align-items:start}
+#nt-project .nt-date-column{min-width:0}
 #nt-project .nt-date-heading{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:2px solid var(--nt-accent);margin-bottom:12px;background:var(--nt-selected);border-radius:7px 7px 0 0}
 #nt-project .nt-date-heading time{font-size:14px;font-weight:500}
 #nt-project .nt-date-heading small{display:block;font-size:12px;color:var(--nt-muted)}
@@ -36,8 +37,15 @@
 #nt-project .nt-link-list li{flex-wrap:wrap}
 #nt-project button.nt-quiet{border:0;background:transparent;color:var(--nt-muted);font-size:12px;padding:6px 4px}
 #nt-project button.nt-quiet:hover{color:var(--nt-accent);background:var(--nt-selected)}
-#nt-project .nt-unplanned-list{display:grid;gap:12px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-@media(prefers-reduced-motion:reduce){#nt-project .nt-date-scroll{scroll-behavior:auto}}
+#nt-project .nt-unplanned-list{display:grid;gap:12px;margin-top:16px;grid-template-columns:repeat(3,minmax(0,1fr))}
+#nt-project .nt-unplanned-panel{margin-top:20px}
+#nt-project .nt-unplanned-panel h3{font-size:14px;font-weight:500}
+#nt-project .nt-milestone-layout .nt-lane-card{min-width:0;overflow-wrap:anywhere}
+#nt-project .nt-milestone-layout .nt-lane-card footer{flex-wrap:wrap}
+#nt-project .nt-unplanned-panel .nt-lane-card{display:flex;flex-direction:column}
+#nt-project .nt-unplanned-panel .nt-lane-card>.nt-link{flex:1;min-height:64px}
+@container(max-width:760px){#nt-project .nt-date-columns,#nt-project .nt-unplanned-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container(max-width:480px){#nt-project .nt-date-columns,#nt-project .nt-unplanned-list{grid-template-columns:minmax(0,1fr)}#nt-project .nt-unplanned-panel .nt-lane-card>.nt-link{min-height:42px}}
 @media(max-width:640px){#nt-project .nt-task-fields{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px}#nt-project .nt-task-fields .nt-period{grid-column:1/-1}#nt-project .nt-task-fields input,#nt-project .nt-task-fields select{font-size:16px}}
 
 #nt-project button.nt-history-entry{width:100%;text-align:left;margin-top:18px;padding:12px 14px;background:var(--nt-bg);color:var(--nt-muted);font-size:12px;border-radius:8px}
