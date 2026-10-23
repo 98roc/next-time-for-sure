@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import type { V2ProjectTaskInput, V2Workspace } from '@ntfs/contracts';
 import { Field, priorityLabels } from './controls';
 import { TaskArrangements } from './task-arrangements';
+import { milestoneOptions } from './milestone-options';
 
 /** 项目、计划和个人入口复用同一字段组，差异只由权限和默认值传入。 */
-export function TaskFields({ value, onChange, data, selfId, disabled = false, onlySelf = false, showArrangement = true, children }: { value: V2ProjectTaskInput; onChange: (value: V2ProjectTaskInput) => void; data: V2Workspace; selfId: string; disabled?: boolean; onlySelf?: boolean; showArrangement?: boolean; children?: ReactNode }) {
+export function TaskFields({ value, onChange, data, selfId, disabled = false, onlySelf = false, showArrangement = true, originalMilestoneId = null, children }: { value: V2ProjectTaskInput; onChange: (value: V2ProjectTaskInput) => void; data: V2Workspace; selfId: string; disabled?: boolean; onlySelf?: boolean; showArrangement?: boolean; originalMilestoneId?: string | null; children?: ReactNode }) {
   const project = data.projects.find((row) => row.id === value.projectId);
   const members = data.accounts.filter((account) => project?.members.some((member) => member.accountId === account.id) || account.id === value.executorId);
   return <><div className="v2-fields">
@@ -12,7 +13,7 @@ export function TaskFields({ value, onChange, data, selfId, disabled = false, on
     <Field label="执行人"><select required disabled={disabled || onlySelf} value={value.executorId} onChange={(event) => onChange({ ...value, executorId: event.target.value })}><option value="">请选择执行人</option>{members.map((account) => <option key={account.id} value={account.id} disabled={(account.disabled || (onlySelf && account.id !== selfId)) && account.id !== value.executorId}>{account.displayName}{account.disabled ? '（已停用）' : ''}</option>)}</select></Field>
     <PriorityField value={value.priority} disabled={disabled} onChange={(priority) => onChange({ ...value, priority })} />
     {children}
-    <Field label="关联里程碑" full><select disabled={disabled} value={value.milestoneId ?? ''} onChange={(event) => onChange({ ...value, milestoneId: event.target.value || null })}><option value="">不关联里程碑</option>{data.milestones.filter((row) => row.projectId === value.projectId).map((row) => <option key={row.id} value={row.id}>{row.title}{row.status === 'completed' ? '（已完成）' : ''}</option>)}</select></Field>
+    <Field label="关联里程碑" full><select disabled={disabled} value={value.milestoneId ?? ''} onChange={(event) => onChange({ ...value, milestoneId: event.target.value || null })}><option value="">不关联里程碑</option>{milestoneOptions(data.milestones, value.projectId, originalMilestoneId).map((row) => <option key={row.id} value={row.id}>{row.title}{row.status === 'completed' ? '（已完成）' : ''}</option>)}</select></Field>
   </div>{showArrangement && <TaskArrangements value={[{ periodId: value.periodId, plannedDays: value.plannedDays }, ...(value.additionalArrangements ?? [])]} periods={data.periods} canSchedule canEstimate disabled={disabled} onChange={(arrangements) => { const [first, ...additionalArrangements] = arrangements; if (first) onChange({ ...value, ...first, additionalArrangements }); }} />}</>;
 }
 

@@ -88,6 +88,8 @@ export type V2Category = z.infer<typeof v2CategorySchema>;
 export const v2MilestoneSchema = z.object({
   id: v2IdSchema, projectId: v2IdSchema, title, expectedOn: v2DateSchema.nullable(),
   ownerId: v2IdSchema, status: z.enum(['open', 'completed']), needsReview: z.boolean(), version: v2VersionSchema,
+  /** 服务端返回的真实创建时间，用于关联选项同日排序；旧快照可暂缺。 */
+  createdAt: v2InstantSchema.optional(),
 }).strict();
 export type V2Milestone = z.infer<typeof v2MilestoneSchema>;
 

@@ -122,6 +122,10 @@ async function smoke(): Promise<void> {
     stage = 'milestone and operator audit';
     const milestoneResult = v2ResultSchema.parse(await call('projects', lead, { action: 'create_milestone', operationId: randomUUID(), projectId, title: '阶段验收', ownerId: lead.id, expectedOn: null }));
     const milestoneId = milestoneResult.objectIds[0]; assert.ok(milestoneId);
+    const createdMilestone = (await state(lead)).milestones.find((row) => row.id === milestoneId);
+    const milestoneCreation = z.array(z.object({ createdAt: z.string() })).parse(await source.query("SELECT CONCAT(DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s.'),LEFT(DATE_FORMAT(created_at,'%f'),3),'Z') AS createdAt FROM v2_milestones WHERE id=?", [milestoneId]));
+    assert.ok(createdMilestone?.createdAt);
+    assert.equal(createdMilestone.createdAt, milestoneCreation[0]?.createdAt, '里程碑创建时间按数据库原值返回，支持下拉框同日排序');
     await call('impact', leader, { action: 'complete_milestone', milestoneId, version: 0 }, 403);
     const finishIntent = { action: 'complete_milestone', milestoneId, version: 0 };
     const finish = v2ImpactSchema.parse(await call('impact', lead, finishIntent));
