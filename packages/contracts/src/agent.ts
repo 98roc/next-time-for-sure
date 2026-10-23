@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { organizationCommandSchema } from './organization.js';
 import { v2TaskCommandSchema } from './v2.js';
 import { v2DailyQuerySchema, v2DailyCommandSchema, v2SubtasksCommandSchema, v2PersonalSettingsCommandSchema } from './v2-personal-work.js';
-import { v2ImpactIntentSchema, v2ProjectCommandSchema, v2PersonalCommandSchema, v2PlanningCommandSchema, v2ReportCommandSchema, v2TeamCommandSchema, v2TaskEditSchema, v2AddExistingSchema, v2MemberImpactInputSchema, v2PeriodPairSchema } from './v2-workspace.js';
+import { v2ImpactIntentSchema, v2ProjectCommandSchema, v2PersonalCommandSchema, v2PlanningCommandSchema, v2ReportCommandSchema, v2TeamCommandSchema, v2TaskEditSchema, v2MemberImpactInputSchema, v2PeriodPairSchema } from './v2-workspace.js';
 const id = z.string().uuid();
 const empty = z.object({}).strict();
 
@@ -37,5 +37,4 @@ export const agentCommandSchema = z.discriminatedUnion('path', [
   z.object({ path: z.literal('v2/report'), body: v2ReportCommandSchema }).strict(),
   z.object({ path: z.literal('v2/team'), body: v2TeamCommandSchema }).strict(),
   z.object({ path: z.literal('v2/edit'), body: v2TaskEditSchema }).strict(),
-  z.object({ path: z.literal('v2/add-existing'), body: v2AddExistingSchema }).strict(),
 ]);

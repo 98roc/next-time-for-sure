@@ -4,6 +4,7 @@ import type { DataSource } from 'typeorm';
 import { z } from 'zod';
 import { v2WeeklyStateSchema, type V2Workspace } from '@ntfs/contracts';
 import { v2ResultSchema } from './repository-utils.js';
+import { verifyWeeklyOrderMigration } from './weekly-order-migration.integration.js';
 
 type Actor = { id: ReturnType<typeof randomUUID>; token: string; csrf: string };
 type Harness = {
@@ -15,13 +16,14 @@ type Harness = {
 /** 复用随机团队夹具，真实 HTTP 覆盖默认/手动/恢复、权限、隔离及数据库保存；由主夹具清理。 */
 export async function verifySorting(h: Harness): Promise<void> {
   const { source, call, state, leader, lead, manager, developer, projectId, hiddenProjectId, teamId, periodId, nextId } = h;
+  await verifyWeeklyOrderMigration(source);
   const projectScope = `project-page:tasks:${projectId}`;
   const order = (snapshot: V2Workspace, scope = projectScope) => {
     const result = snapshot.orders.find((row) => row.scope === scope); assert.ok(result); return result;
   };
   const weekly = async (actor = leader) => v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${periodId}&planPeriodId=${nextId}`, actor));
   const create = async (priority: number) => {
-    const result = v2ResultSchema.parse(await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId: nextId, executorId: developer.id, title: `排序验收 ${priority}`, priority, milestoneId: null, plannedDays: null } }));
+    const result = v2ResultSchema.parse(await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId: nextId, executorId: developer.id, title: `排序验收 ${priority}`, priority, milestoneId: null, plannedDays: 1 } }));
     const id = result.objectIds[0]; assert.ok(id); return id;
   };
   const resetPersonal = async () => call('personal', developer, { action: 'reset_order', operationId: randomUUID(), version: (await state(developer)).personalVersion });
@@ -105,7 +107,7 @@ export async function verifySorting(h: Harness): Promise<void> {
   assert.deepEqual(selected(order(await state(), backlogScope).ids, [ba, bb]), [ba, bb]);
   await call('planning', lead, { action: 'reorder_project_items', operationId: randomUUID(), projectId, target: 'backlog', version: order(await state(), backlogScope).version, ids: [randomUUID()] }, 409);
 
-  // 全团队顺序经过受限读取仍完整；周报项目组按总结区间独立保存。
+  // 全团队顺序经过受限读取仍完整；周报跨周期共享，与项目页顺序保持独立。
   await source.query("UPDATE projects SET created_at='2026-01-01 00:00:00' WHERE id=?", [projectId]);
   await source.query("UPDATE projects SET created_at='2026-01-02 00:00:00' WHERE id=?", [hiddenProjectId]);
   const projectOrder = order(await state(), 'project-page:projects');
@@ -117,7 +119,17 @@ export async function verifySorting(h: Harness): Promise<void> {
   await call('planning', leader, { action: 'reorder_projects', periodId, operationId: randomUUID(), version: week.projectOrder.version, projectIds: [projectId, hiddenProjectId] });
   const periods = (await state()).periods, after = periods[periods.findIndex((row) => row.id === nextId) + 1]; assert.ok(after);
   const another = v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${nextId}&planPeriodId=${after.id}`, leader));
-  assert.deepEqual(another.projectOrder.ids, [hiddenProjectId, projectId]);
+  assert.deepEqual(another.projectOrder.ids, [projectId, hiddenProjectId]);
+  assert.deepEqual(another.projectOrder, (await weekly()).projectOrder);
+  await call('planning', lead, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: another.projectOrder.version, projectIds: [hiddenProjectId, projectId] }, 403);
+  await call('planning', leader, { action: 'reorder_projects', periodId: nextId, operationId: randomUUID(), version: week.projectOrder.version, projectIds: [hiddenProjectId, projectId] }, 409);
+  await call('planning', leader, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: another.projectOrder.version, reset: true, projectIds: [] });
+  const resetProjects = (await weekly()).projectOrder;
+  assert.equal(resetProjects.manual, false);
+  assert.deepEqual(resetProjects.ids, [hiddenProjectId, projectId]);
+  assert.deepEqual(v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${nextId}&planPeriodId=${after.id}`, leader)).projectOrder, resetProjects);
+  assert.deepEqual(order(await state(), 'project-page:projects').ids, [projectId, hiddenProjectId]);
+  await call('planning', leader, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: resetProjects.version, projectIds: [projectId, hiddenProjectId] });
   assert.deepEqual((await weekly(lead)).projectOrder.ids, [projectId]);
   const newProject = v2ResultSchema.parse(await call('team', leader, { action: 'create_project', operationId: randomUUID(), name: '排序验收新项目', members: [{ accountId: lead.id, roles: ['project_lead'] }, { accountId: manager.id, roles: ['project_manager'] }] })).objectIds[0];
   assert.ok(newProject);
@@ -136,6 +148,6 @@ export async function verifySorting(h: Harness): Promise<void> {
   const persisted = z.array(z.object({ scope_key: z.string(), manual_order: z.coerce.number(), version: z.number() })).parse(await source.query('SELECT scope_key,manual_order,version FROM v2_shared_orders WHERE team_id=?', [teamId]));
   assert.equal(persisted.find((row) => row.scope_key === projectScope)?.manual_order, 0);
   assert.equal(persisted.find((row) => row.scope_key === backlogScope)?.manual_order, 1);
-  assert.ok(persisted.some((row) => row.scope_key === `projects:${periodId}` && row.version > 0));
-  console.log('Sorting API/MySQL verified: defaults, manual order, prepend, reset, stale versions, permissions, hidden items and independent pages/periods.');
+  assert.ok(persisted.some((row) => row.scope_key === 'weekly:projects' && row.version > 0));
+  console.log('Sorting API/MySQL verified: defaults, manual order, prepend, reset, stale versions, permissions, hidden items, independent pages/tasks and shared weekly project order.');
 }

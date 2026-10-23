@@ -39,12 +39,11 @@ export async function mutatePlanning(manager: EntityManager, context: V2Context,
   let newestIds: string[] | undefined;
   let scope: string, ids: string[], allowed: string[], requested: string[];
   if (command.action === 'reorder_projects') {
-    if (command.page === 'projects') scope = 'project-page:projects';
-    else {
+    scope = command.page === 'projects' ? 'project-page:projects' : 'weekly:projects';
+    // 兼容旧客户端携带区间，但区间不再决定项目组排序作用域。
+    if (command.page !== 'projects' && command.periodId) {
       const periods = await repository.periods(teamId);
-      const period = command.periodId ? periods.find((row) => row.id === command.periodId) : periods.find((row) => row.startOn <= today && row.endOn >= today);
-      if (!period) throw new ConflictException('日期区间不存在。');
-      scope = `projects:${period.id}`;
+      if (!periods.some((row) => row.id === command.periodId)) throw new ConflictException('日期区间不存在。');
     }
     ids = context.organization.projects.filter((project) => project.teamId === teamId).map((project) => project.id);
     allowed = ids; requested = command.projectIds;

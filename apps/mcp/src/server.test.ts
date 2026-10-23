@@ -4,7 +4,7 @@ import { createServer } from './server.js';
 import { agentQuerySchema, agentCommandSchema, agentPreviewSchema } from '@ntfs/contracts';
 
 test('V2 whitelist rejects legacy business routes, token management and unexpected input', () => {
-  for (const path of ['tokens', 'work/requests', 'assignments', 'personal/items', 'weekly-plans', 'reports', 'lifecycle/impact', 'notifications']) {
+  for (const path of ['tokens', 'work/requests', 'assignments', 'personal/items', 'weekly-plans', 'reports', 'lifecycle/impact', 'notifications', 'v2/add-existing']) {
     assert.equal(agentQuerySchema.safeParse({ path, query: {} }).success, false);
     assert.equal(agentCommandSchema.safeParse({ path, body: {} }).success, false);
     assert.equal(agentPreviewSchema.safeParse({ path, body: {} }).success, false);

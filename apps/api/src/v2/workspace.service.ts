@@ -2,7 +2,7 @@ import { readMessages } from './notifications.js';
 import { PersonalWorkRepository } from './personal-work.repository.js';
 import { readProjectOrders } from './project-orders.js';
 import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
-import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2Task, V2TaskCommand, V2TaskEdit, V2TeamCommand, V2Workspace } from '@ntfs/contracts';
+import type { V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2TaskCommand, V2TaskEdit, V2TeamCommand, V2Workspace } from '@ntfs/contracts';
 import { DatabaseService } from '../database/database.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { loadV2Context, requireVersion } from './context.js';
@@ -136,21 +136,4 @@ export class V2WorkspaceService {
     });
   }
 
-  /** 选择已有任务整批加入同一区间；已有关系不覆盖，预计投入统一留空。 */
-  async addExisting(token: string, csrf: string, command: V2AddExisting) {
-    return this.database.transaction(async (manager) => {
-      const context = await loadV2Context(manager, this.identity, token, csrf), repository = new V2TaskRepository(manager);
-      if (new Set(command.tasks.map((row) => row.taskId)).size !== command.tasks.length) throw new ConflictException('任务不能重复选择。');
-      const selected: { task: V2Task; action: Extract<V2TaskCommand, { action: 'add_arrangement' }> }[] = [];
-      for (const item of command.tasks) {
-        const task = requireTask(context, await repository.get(item.taskId));
-        const action: Extract<V2TaskCommand, { action: 'add_arrangement' }> = { ...item, operationId: command.operationId, action: 'add_arrangement', periodId: command.periodId, plannedDays: null };
-        authorizeTaskCommand(context, action, task); selected.push({ task, action });
-      }
-      return executeOnce(manager, context.actor.id, command, async () => {
-        for (const item of selected) { requireVersion(item.task.version, item.action.version); await mutateTask(manager, context, item.action, item.task); }
-        return { objectIds: selected.map((row) => row.task.id) };
-      });
-    });
-  }
 }

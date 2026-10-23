@@ -23,7 +23,7 @@ try {
   const workspace = async () => v2WorkspaceSchema.parse(await call('business_query', { request: { path: 'v2/workspace', query: {} } }));
   const initial = await workspace(); assert.equal(initial.projects.some((row) => row.id === environment.NTFS_TEST_FOREIGN_PROJECT), false);
   const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
-  const body = { action: 'create_project', operationId: randomUUID(), task: { projectId: environment.NTFS_TEST_PROJECT, title: 'MCP V2真实任务', executorId: identity.id, periodId: period.id, priority: 3, plannedDays: null, milestoneId: null } };
+  const body = { action: 'create_project', operationId: randomUUID(), task: { projectId: environment.NTFS_TEST_PROJECT, title: 'MCP V2真实任务', executorId: identity.id, periodId: period.id, priority: 3, plannedDays: 1, milestoneId: null } };
   await call('business_command', { request: { path: 'v2/tasks', body } }); await call('business_command', { request: { path: 'v2/tasks', body } });
   const tasks = (await workspace()).tasks.filter((row) => row.title === body.task.title); assert.equal(tasks.length, 1); let task = tasks[0]; assert.ok(task);
   // MCP 只访问 Token 所属人的私人清单与日报，同样使用版本及完整保存契约。

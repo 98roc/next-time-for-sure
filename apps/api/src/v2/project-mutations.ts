@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import type { V2ProjectCommand } from '@ntfs/contracts';
-import { requireProject, requireProjectMember, requireVersion, type V2Context } from './context.js';
+import { requireVersion, type V2Context } from './context.js';
 import { V2ProjectRepository } from './project.repository.js';
 import { V2TaskRepository } from './task.repository.js';
 import { createProjectTask } from './task-mutations.js';
@@ -38,16 +38,14 @@ export async function mutateProject(manager: EntityManager, context: V2Context, 
     return [task.id];
   }
   if (command.action === 'create_milestone') {
-    requireProjectMember(context, requireProject(context, command.projectId), command.ownerId);
     const id = randomUUID();
-    await repository.saveMilestone({ id, projectId: command.projectId, ownerId: command.ownerId, title: command.title, expectedOn: command.expectedOn, status: 'open', needsReview: false, version: 0 }, true, context.actor.id); return [id];
+    await repository.saveMilestone({ id, projectId: command.projectId, title: command.title, expectedOn: command.expectedOn, status: 'open', needsReview: false, version: 0 }, true, context.actor.id); return [id];
   }
   const milestone = await repository.milestone(command.milestoneId);
   if (!milestone) throw new ConflictException('里程碑不存在。');
   requireVersion(milestone.version, command.version);
   if (command.action === 'edit_milestone') {
-    if (milestone.ownerId !== command.ownerId) requireProjectMember(context, requireProject(context, milestone.projectId), command.ownerId);
-    await repository.saveMilestone({ ...milestone, title: command.title, expectedOn: command.expectedOn, ownerId: command.ownerId, version: milestone.version + 1 }, false, context.actor.id);
+    await repository.saveMilestone({ ...milestone, title: command.title, expectedOn: command.expectedOn, version: milestone.version + 1 }, false, context.actor.id);
   } else {
     await requireConfirmation(manager, context, { action: command.action, milestoneId: milestone.id, version: command.version }, command.confirmation, today);
     await repository.saveMilestone({ ...milestone, status: command.action === 'complete_milestone' ? 'completed' : 'open', needsReview: false, version: milestone.version + 1 }, false, context.actor.id);

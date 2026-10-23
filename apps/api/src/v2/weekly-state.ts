@@ -24,7 +24,7 @@ export async function buildWeeklyState(manager: EntityManager, context: V2Contex
 
   // 读取全团队项目顺序后仅投影有权项目；受限查询不回写或删除隐藏项目。
   const allProjectIds = context.organization.projects.filter((project) => project.teamId === context.teamId).map((project) => project.id);
-  const fullOrder = await planning.order(context.teamId, `projects:${summaryPeriod.id}`, allProjectIds);
+  const fullOrder = await planning.order(context.teamId, 'weekly:projects', allProjectIds);
   const projectOrder = { ids: fullOrder.ids.filter((id) => context.projects.some((project) => project.id === id)), version: fullOrder.version, manual: fullOrder.manual };
   const taskOrders: V2WeeklyState['taskOrders'] = [];
   for (const project of context.projects) for (const period of [summaryPeriod, planPeriod]) {

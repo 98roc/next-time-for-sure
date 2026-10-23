@@ -11,11 +11,20 @@ type Harness = { source: DataSource; lead: Actor; developer: Actor; manager: Act
 /** 随机项目内真实API及数据库回读，复用主夹具清理，不修改用户任务。 */
 export async function verifyEffort(h: Harness): Promise<void> {
   const { source, lead, developer, manager, periodId, nextId, projectId, call, state } = h;
-  const input = { projectId, executorId: developer.id, title: '人天与AI验收', periodId, plannedDays: null };
+  const input = { projectId, executorId: developer.id, title: '人天与AI验收', periodId, plannedDays: 1 };
   await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { ...input, additionalArrangements: [{ periodId, plannedDays: 1 }] } }, 400);
+  for (const plannedDays of [null, undefined, -1, 0.001, 10000]) {
+    await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { ...input, plannedDays } }, 400);
+  }
+  await call('tasks', lead, { action: 'create_batch', operationId: randomUUID(), tasks: [input, { ...input, plannedDays: null }] }, 400);
   const id = v2ResultSchema.parse(await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: input })).objectIds[0]; assert.ok(id);
   const current = async () => { const task = (await state(developer)).tasks.find((row) => row.id === id); assert.ok(task); return task; };
   const edit = async (actor: Actor, fields: object, expected = 200) => call('edit', actor, { action: 'save_task', operationId: randomUUID(), taskId: id, version: (await current()).version, ...fields }, expected);
+  await edit(developer, { arrangements: [{ periodId, plannedDays: null }] }, 400);
+  await call('tasks', lead, { action: 'add_arrangement', operationId: randomUUID(), taskId: id, version: (await current()).version, periodId: nextId, plannedDays: null }, 400);
+  await call('tasks', lead, { action: 'change_arrangement', operationId: randomUUID(), taskId: id, version: (await current()).version, periodId, targetPeriodId: nextId, plannedDays: null, confirmation: '0'.repeat(64) }, 400);
+  await edit(developer, { arrangements: [{ periodId, plannedDays: 0 }] });
+  assert.equal((await state()).arrangements.find((row) => row.taskId === id)?.plannedDays, 0);
   await edit(manager, { completion: { actualDays: 1, aiContribution: 'high' } }, 403);
   await edit(developer, { arrangements: [{ periodId, plannedDays: 1.25 }] });
   await edit(developer, { arrangements: [{ periodId: nextId, plannedDays: 2 }] }, 403);
@@ -35,7 +44,7 @@ export async function verifyEffort(h: Harness): Promise<void> {
   await edit(developer, { status: 'completed' });
   assert.equal((await current()).actualDays, 2.5); assert.equal((await current()).aiContribution, 'medium');
   const version = (await current()).version;
-  const rows = [{ periodId, plannedDays: 1.25 }, { periodId: nextId, plannedDays: null }];
+  const rows = [{ periodId, plannedDays: 1.25 }, { periodId: nextId, plannedDays: 1 }];
   const intent = { action: 'save_arrangements', taskId: id, version, arrangements: rows };
   const preview = v2ImpactSchema.parse(await call('impact', lead, intent));
   await edit(lead, { arrangements: rows, arrangementConfirmation: '0'.repeat(64), completion: { actualDays: 8, aiContribution: 'none' } }, 409);

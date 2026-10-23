@@ -49,6 +49,8 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const history = orderedHistory(group);
     const known = history.filter((event) => event.occurredAt < end);
     const snapshot = known.at(-1)?.snapshot;
+    // 截止回看时已删除的任务不再进入总结；区间结束后的删除不改写该区间历史。
+    if (snapshot?.deletedAt) continue;
     const relevant = arrangements.filter((arrangement) => {
       if (arrangement.taskId !== taskId || arrangement.periodId !== period.id || (arrangement.validUntil !== null && arrangement.validUntil <= window.start)) return false;
       // 迁移可在区间结束后承接旧安排；展示该关联但不把补录时刻倒填为提前计划。

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { v2PersonalPreferencesSchema } from './v2-personal-work.js';
 import { v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
-import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2PlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
+import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2RequiredPlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
 import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organization.js';
 
 const operation = { operationId: id };
@@ -44,8 +44,8 @@ export const v2ProjectCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('edit_backlog'), backlogId: id, version, title: z.string().trim().min(1).max(200), priority: v2PrioritySchema }).strict(),
   z.object({ ...operation, action: z.literal('delete_backlog'), backlogId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('convert_backlog'), backlogId: id, version, task: v2ProjectTaskInputSchema }).strict(),
-  z.object({ ...operation, action: z.literal('create_milestone'), projectId: id, title: z.string().trim().min(1).max(200), expectedOn: v2DateSchema.nullable(), ownerId: id }).strict(),
-  z.object({ ...operation, action: z.literal('edit_milestone'), milestoneId: id, version, title: z.string().trim().min(1).max(200), expectedOn: v2DateSchema.nullable(), ownerId: id }).strict(),
+  z.object({ ...operation, action: z.literal('create_milestone'), projectId: id, title: z.string().trim().min(1).max(200), expectedOn: v2DateSchema.nullable() }).strict(),
+  z.object({ ...operation, action: z.literal('edit_milestone'), milestoneId: id, version, title: z.string().trim().min(1).max(200), expectedOn: v2DateSchema.nullable() }).strict(),
   z.object({ ...operation, action: z.literal('complete_milestone'), milestoneId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('reopen_milestone'), milestoneId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('unlink_milestone'), taskId: id, version, confirmation }).strict(),
@@ -103,7 +103,7 @@ export const v2TeamCommandSchema = z.discriminatedUnion('action', [
 export type V2TeamCommand = z.infer<typeof v2TeamCommandSchema>;
 export const v2MemberImpactInputSchema = z.object({ projectId: id, version, members: v2ProjectMembersSchema }).strict();
 export type V2MemberImpactInput = z.infer<typeof v2MemberImpactInputSchema>;
-export const v2MemberImpactSchema = z.object({ removedIds: z.array(id), blockers: z.array(z.object({ kind: z.enum(['task', 'milestone', 'role']), id: z.string(), title: z.string(), accountId: id.nullable() })) });
+export const v2MemberImpactSchema = z.object({ removedIds: z.array(id), blockers: z.array(z.object({ kind: z.enum(['task', 'role']), id: z.string(), title: z.string(), accountId: id.nullable() })) });
 
 /** 共用编辑弹窗一次保存任务与当前安排，不能出现一半成功一半失败。 */
 export const v2TaskEditSchema = z.object({
@@ -113,12 +113,10 @@ export const v2TaskEditSchema = z.object({
     z.object({ kind: z.literal('private'), title: z.string().trim().min(1).max(200), priority: v2PrioritySchema }).strict(),
   ]).optional(),
   status: v2StatusSchema.optional(), categoryId: id.optional(), milestoneConfirmation: confirmation.optional(),
-  arrangement: z.object({ periodId: id, targetPeriodId: id, plannedDays: v2PlannedDaysSchema, confirmation }).strict().optional(),
+  arrangement: z.object({ periodId: id, targetPeriodId: id, plannedDays: v2RequiredPlannedDaysSchema, confirmation }).strict().optional(),
   arrangements: v2ArrangementsInputSchema.optional(), arrangementConfirmation: confirmation.optional(), completion: v2CompletionSchema.optional(),
 }).strict();
 export type V2TaskEdit = z.infer<typeof v2TaskEditSchema>;
-export const v2AddExistingSchema = z.object({ ...operation, action: z.literal('add_existing'), periodId: id, tasks: z.array(z.object({ taskId: id, version }).strict()).min(1).max(100) }).strict();
-export type V2AddExisting = z.infer<typeof v2AddExistingSchema>;
 
 /** 消息内容按任务合并，不设已读状态；游标字符串避免数据库大整数精度丢失。 */
 export const v2MessageItemSchema = z.object({ taskId: id, projectId: id, projectName: z.string(), title: z.string(), reasons: z.array(z.string()) });

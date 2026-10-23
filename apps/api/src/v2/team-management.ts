@@ -5,7 +5,6 @@ import { v2MemberImpactSchema, type V2MemberImpactInput, type V2TeamCommand } fr
 import { requireVersion, type V2Context } from './context.js';
 import { OrganizationRepository } from '../organization/organization.repository.js';
 import { V2TaskRepository } from './task.repository.js';
-import { V2ProjectRepository } from './project.repository.js';
 import { V2PlanningRepository } from './planning.repository.js';
 
 /** 团队内部配置仅团队负责人可维护，超管不代管业务。 */
@@ -21,13 +20,12 @@ export async function memberImpact(manager: EntityManager, context: V2Context, i
   if (!project) throw new ForbiddenException('项目不存在或无权维护。');
   requireVersion(project.version, input.version);
   const removedIds = project.members.filter((row) => !input.members.some((next) => next.accountId === row.accountId)).map((row) => row.accountId);
-  const blockers: { kind: 'task' | 'milestone' | 'role'; id: string; title: string; accountId: string | null }[] = [];
+  const blockers: { kind: 'task' | 'role'; id: string; title: string; accountId: string | null }[] = [];
   for (const [role, label] of [['project_manager', '项目经理'], ['project_lead', '项目研发负责人']]) {
     if (!input.members.some((row) => row.roles.some((entry) => entry === role))) blockers.push({ kind: 'role', id: role ?? '', title: `至少保留一名${label}`, accountId: null });
   }
   const tasks = await new V2TaskRepository(manager).visible(context.actor.id, [project.id]);
   for (const task of tasks) if (task.kind === 'project' && task.status !== 'completed' && removedIds.includes(task.executorId)) blockers.push({ kind: 'task', id: task.id, title: task.title, accountId: task.executorId });
-  for (const milestone of await new V2ProjectRepository(manager).milestones([project.id])) if (milestone.status !== 'completed' && removedIds.includes(milestone.ownerId)) blockers.push({ kind: 'milestone', id: milestone.id, title: milestone.title, accountId: milestone.ownerId });
   return v2MemberImpactSchema.parse({ removedIds, blockers });
 }
 

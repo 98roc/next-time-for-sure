@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, HttpCode, Post, Query, Req } from '@nestjs/common';
 import type { IncomingMessage } from 'node:http';
 import { z } from 'zod';
-import { v2AddExistingSchema, v2IdSchema, v2ImpactIntentSchema, v2MemberImpactInputSchema, v2PeriodPairSchema, v2PersonalCommandSchema, v2PlanningCommandSchema, v2ProjectCommandSchema, v2ReportCommandSchema, v2TaskCommandSchema, v2TaskEditSchema, v2TeamCommandSchema } from '@ntfs/contracts';
+import { v2IdSchema, v2ImpactIntentSchema, v2MemberImpactInputSchema, v2PeriodPairSchema, v2PersonalCommandSchema, v2PlanningCommandSchema, v2ProjectCommandSchema, v2ReportCommandSchema, v2TaskCommandSchema, v2TaskEditSchema, v2TeamCommandSchema } from '@ntfs/contracts';
 import { assertBusinessOrigin, businessToken, csrfHeader, parseBody } from '../identity/http.js';
 import { V2WorkspaceService } from './workspace.service.js';
 
@@ -54,7 +54,4 @@ export class V2WorkspaceController {
   /** 编辑弹窗一次保存。 */
   @Post('edit') @HttpCode(200)
   edit(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.edit(businessToken(request), csrfHeader(request), parseBody(v2TaskEditSchema, body)); }
-  /** 批量选择既有任务沿用原任务标识。 */
-  @Post('add-existing') @HttpCode(200)
-  addExisting(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.addExisting(businessToken(request), csrfHeader(request), parseBody(v2AddExistingSchema, body)); }
 }

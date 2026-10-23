@@ -9,6 +9,7 @@ const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODUL
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, colorScheme: 'dark' });
 const fixture = sortingFixture(), commands = [], errors = [];
+fixture.workspace.periods.push({ ...fixture.workspace.periods[1], id: '00000000-0000-4000-8000-000000000003', startOn: '2026-11-02', endOn: '2026-11-08' });
 let failNext = false;
 const base = process.env.UI_TEST_URL || 'http://127.0.0.1:5174';
 const evidence = fileURLToPath(new URL('../../../.cache/sorting-ux-evidence/', import.meta.url));
@@ -32,7 +33,9 @@ await page.route('**/api/v1/**', async (route) => {
     }
     return route.fulfill({ json: { objectIds: [] } });
   }
-  const data = path.endsWith('/auth/me') ? fixture.identity : path.endsWith('/workspace') ? fixture.workspace : path.endsWith('/weekly') ? fixture.weekly : path.endsWith('/summary') ? fixture.summary : null;
+  const params = new URL(request.url()).searchParams;
+  const weekly = { ...fixture.weekly, summaryPeriod: fixture.workspace.periods.find((row) => row.id === params.get('summaryPeriodId')) ?? fixture.weekly.summaryPeriod, planPeriod: fixture.workspace.periods.find((row) => row.id === params.get('planPeriodId')) ?? fixture.weekly.planPeriod };
+  const data = path.endsWith('/auth/me') ? fixture.identity : path.endsWith('/workspace') ? fixture.workspace : path.endsWith('/weekly') ? weekly : path.endsWith('/summary') ? fixture.summary : null;
   return route.fulfill({ status: data ? 200 : 404, json: data ?? { message: 'Unmocked endpoint' } });
 });
 const ids = (scope) => page.locator(`[data-sort-scope="${scope}"]`).evaluate((list) => [...list.querySelectorAll('[data-sort-id]')].filter((row) => row.closest('[data-sort-scope]') === list).map((row) => row.dataset.sortId));
@@ -71,6 +74,16 @@ try {
   await page.getByRole('button', { name: '项目排序', exact: true }).click();
   await drag('projects', 0, 3, { stationary: true });
   assert.equal((await ids('projects'))[3], fixture.workspace.projects[0].id);
+  const savedProjects = await ids('projects');
+  for (const period of [fixture.workspace.periods[1], fixture.workspace.periods[0]]) {
+    const loaded = page.waitForResponse((response) => response.url().includes('/weekly?') && response.url().includes(`summaryPeriodId=${period.id}`));
+    await page.getByLabel('总结区间', { exact: true }).selectOption(period.id);
+    await loaded;
+    assert.deepEqual(await ids('projects'), savedProjects, '切换周期保持项目顺序');
+  }
+  await page.reload();
+  await page.getByRole('button', { name: '项目排序', exact: true }).click();
+  assert.deepEqual(await ids('projects'), savedProjects, '刷新保持已保存项目顺序');
   await drag('projects', 3, 0);
   await drag('projects', 0, 2, { cancel: true });
   await drag('projects', 0, 2, { outside: true });

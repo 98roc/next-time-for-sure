@@ -13,7 +13,7 @@ type Harness = { source: DataSource; leader: Actor; lead: Actor; developer: Acto
 export async function verifyPersonalWork(h: Harness): Promise<void> {
   const { source, leader, lead, developer, manager, projectId, hiddenProjectId, teamId, periodId, call, state } = h;
   const today = (await state()).today, yesterday = shiftDate(today, -1);
-  const taskId = v2ResultSchema.parse(await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId, executorId: developer.id, title: '私人步骤父任务' } })).objectIds[0]; assert.ok(taskId);
+  const taskId = v2ResultSchema.parse(await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId, executorId: developer.id, title: '私人步骤父任务', plannedDays: 1 } })).objectIds[0]; assert.ok(taskId);
   const read = async () => v2SubtasksSchema.parse(await call(`subtasks?taskId=${taskId}`, developer));
   const daily = async (on = today, actor = developer) => v2DailyReportSchema.parse(await call(`daily?on=${on}`, actor));
   const current = async () => { const task = (await state(developer)).tasks.find((row) => row.id === taskId); assert.ok(task); return task; };

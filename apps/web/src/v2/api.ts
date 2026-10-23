@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { v2DailyReportSchema, v2SubtasksSchema, type V2DailyCommand, type V2PersonalSettingsCommand, type V2SubtasksCommand } from '@ntfs/contracts';
 import { v2MessagesSchema, apiErrorSchema, v2ImpactSchema, v2MemberImpactSchema, v2SummaryRowSchema, v2TaskHistorySchema, v2WeeklyStateSchema, v2WorkspaceSchema } from '@ntfs/contracts';
-import type { V2AddExisting, V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2TaskCommand, V2TaskEdit, V2TeamCommand } from '@ntfs/contracts';
+import type { V2ImpactIntent, V2MemberImpactInput, V2PersonalCommand, V2PlanningCommand, V2ProjectCommand, V2ReportCommand, V2TaskCommand, V2TaskEdit, V2TeamCommand } from '@ntfs/contracts';
 import { IdentityApiError } from '../identity/api';
 
-export type Commands = { tasks: V2TaskCommand; projects: V2ProjectCommand; personal: V2PersonalCommand; planning: V2PlanningCommand; report: V2ReportCommand; team: V2TeamCommand; edit: V2TaskEdit; 'add-existing': V2AddExisting; subtasks: V2SubtasksCommand; daily: V2DailyCommand; 'personal-settings': V2PersonalSettingsCommand };
+export type Commands = { tasks: V2TaskCommand; projects: V2ProjectCommand; personal: V2PersonalCommand; planning: V2PlanningCommand; report: V2ReportCommand; team: V2TeamCommand; edit: V2TaskEdit; subtasks: V2SubtasksCommand; daily: V2DailyCommand; 'personal-settings': V2PersonalSettingsCommand };
 const resultSchema = z.object({ objectIds: z.array(z.string().uuid()) });
 
 /** 同源 Cookie 认证；轮询标记为被动，业务写入不做自动重试。 */

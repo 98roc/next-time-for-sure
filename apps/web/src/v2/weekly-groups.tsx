@@ -6,7 +6,6 @@ import { useModal } from './modal';
 import { Feedback, periodLabel, priorityLabels, PlanningBadge, StatusBadge } from './controls';
 import { TaskCreate } from './task-create';
 import { TaskEditor, TaskHistory } from './task-editor';
-import { ExistingTasks } from './planning-dialogs';
 import { usePointerSort } from './drag';
 import { OrderMenu } from './order-menu';
 import { useSortFeedback } from './sort-feedback';
@@ -25,7 +24,7 @@ export function WeeklyGroups({ state, filter, view, sorting }: { state: V2Weekly
     const original = orderIds(key), ids = original.filter((value) => value !== id), index = beforeId === null ? ids.length : ids.indexOf(beforeId); if (index < 0 || !original.includes(id)) return;
     ids.splice(index, 0, id); if (ids.join() === original.join()) return;
     action.save(key, ids, async () => {
-      if (key === 'projects') await run('planning', { action: 'reorder_projects', periodId: state.summaryPeriod.id, operationId: createOperationId(), version: state.projectOrder.version, projectIds: ids });
+      if (key === 'projects') await run('planning', { action: 'reorder_projects', page: 'weekly', operationId: createOperationId(), version: state.projectOrder.version, projectIds: ids });
       else {
         const [side, projectId, executorId] = key.split('|'); if ((side !== 'summary' && side !== 'plan') || !projectId || executorId === 'unknown') return;
         const periodId = side === 'summary' ? state.summaryPeriod.id : state.planPeriod.id;
@@ -56,12 +55,12 @@ export function WeeklyGroups({ state, filter, view, sorting }: { state: V2Weekly
   }
   function taskList(side: 'summary' | 'plan', projectId: string, person?: string) {
     const selected = ordered(side, projectId, person), key = scope(side, projectId, person), allowed = Boolean(data.projects.find((row) => row.id === projectId)?.canManage) && person !== 'unknown';
-    return <><div className="w-task-list" data-sort-scope={key}>{selected.map((row) => <div key={row.id}><div className="w-task-row" data-sort-id={row.id}>{handle(row.id, key, row.title, allowed)}<div className="w-task-info"><button className="w-task-title" onClick={() => { const task = data.tasks.find((item) => item.id === row.id); modal.open(task ? <TaskEditor task={task} {...(side === 'summary' ? { historicalStatus: row.status ? v2StatusLabels[row.status] : '不可还原' } : {})} /> : <TaskHistory taskId={row.id} />); }}>{row.title}</button><div className="w-task-meta"><StatusBadge status={row.status} />{side === 'summary' ? <>{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.planning === 'unknown' && <PlanningBadge>计划性不可还原</PlanningBadge>}{row.incomplete && <span>早期历史不完整</span>}</> : <span title={`优先级 ${row.priority ?? 3}`}>{priorityLabels[(row.priority ?? 3) - 1]}</span>}</div></div>{person === undefined && <span className="w-task-person">{row.executorName}</span>}{side === 'plan' && <span className="w-task-days">{row.days === null ? '未估算' : `${row.days} 天`}</span>}</div></div>)}{!selected.length && <div className="w-empty">{side === 'summary' ? '该区间暂无任务记录' : '暂无安排，可选择已有任务或批量新增'}</div>}</div></>;
+    return <><div className="w-task-list" data-sort-scope={key}>{selected.map((row) => <div key={row.id}><div className="w-task-row" data-sort-id={row.id}>{handle(row.id, key, row.title, allowed)}<div className="w-task-info"><button className="w-task-title" onClick={() => { const task = data.tasks.find((item) => item.id === row.id); modal.open(task ? <TaskEditor task={task} {...(side === 'summary' ? { historicalStatus: row.status ? v2StatusLabels[row.status] : '不可还原' } : {})} /> : <TaskHistory taskId={row.id} />); }}>{row.title}</button><div className="w-task-meta"><StatusBadge status={row.status} />{side === 'summary' ? <>{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.planning === 'unknown' && <PlanningBadge>计划性不可还原</PlanningBadge>}{row.incomplete && <span>早期历史不完整</span>}</> : <span title={`优先级 ${row.priority ?? 3}`}>{priorityLabels[(row.priority ?? 3) - 1]}</span>}</div></div>{person === undefined && <span className="w-task-person">{row.executorName}</span>}{side === 'plan' && <span className="w-task-days">{row.days === null ? '未估算' : `${row.days} 天`}</span>}</div></div>)}{!selected.length && <div className="w-empty">{side === 'summary' ? '该区间暂无任务记录' : '暂无安排，可批量新增任务'}</div>}</div></>;
   }
   /** 空项目行和展开后的计划栏共用入口，权限提示保持一致。 */
   function planActions(projectId: string) {
     const project = data.projects.find((row) => row.id === projectId);
-    return <div className="w-plan-actions"><button className="w-button" disabled={!project?.canManage} title={!project?.canManage ? '仅团队负责人或本项目研发负责人可调整已有任务安排' : undefined} onClick={() => modal.open(<ExistingTasks projectId={projectId} periodId={state.planPeriod.id} />)}>选择已有任务</button><button className="w-button primary" disabled={!project?.canCreate} title={!project?.canCreate ? '仅项目经理角色请在待建任务中提出事项' : undefined} onClick={() => modal.open(<TaskCreate projectId={projectId} periodId={state.planPeriod.id} batch />)}>＋ 批量新增</button></div>;
+    return <div className="w-plan-actions"><button className="w-button primary" disabled={!project?.canCreate} title={!project?.canCreate ? '仅项目经理角色请在待建任务中提出事项' : undefined} onClick={() => modal.open(<TaskCreate projectId={projectId} periodId={state.planPeriod.id} batch />)}>＋ 批量新增</button></div>;
   }
   function column(side: 'summary' | 'plan', projectId: string) {
     const selected = ordered(side, projectId);

@@ -23,7 +23,7 @@ await withFixture(async ({ base, call, source, developer, leader, projectId, oth
   assert.equal((await call('tokens', { ...developer, cookie: `ntfs_session=bearer:${issued.token}`, csrf: '' })).status, 401);
   assert.equal((await call('tokens/revoke', leader, { id: issued.id })).status, 403);
   const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
-  const command = { action: 'create_project', operationId: randomUUID(), task: { projectId, title: 'Token V2任务', executorId: developer.id, periodId: period.id, priority: 3, milestoneId: null, plannedDays: null } };
+  const command = { action: 'create_project', operationId: randomUUID(), task: { projectId, title: 'Token V2任务', executorId: developer.id, periodId: period.id, priority: 3, milestoneId: null, plannedDays: 1 } };
   assert.equal((await call('v2/tasks', auth, command)).status, 200); assert.equal((await call('v2/tasks', auth, command)).status, 200);
   assert.equal((await workspace()).tasks.filter((row) => row.title === command.task.title).length, 1);
   assert.equal((await call('v2/tasks', auth, { ...command, operationId: randomUUID(), task: { ...command.task, projectId: otherProjectId } })).status, 403);

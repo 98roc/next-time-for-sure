@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { v2BacklogSchema, v2MilestoneSchema, type V2Backlog, type V2Milestone } from '@ntfs/contracts';
 import { instantColumn } from './repository-utils.js';
 
-const milestoneSelect = `SELECT id,project_id AS projectId,owner_id AS ownerId,title,DATE_FORMAT(expected_on,'%Y-%m-%d') AS expectedOn,status,needs_review AS needsReview,version,${instantColumn('created_at', 'createdAt')} FROM v2_milestones`;
+const milestoneSelect = `SELECT id,project_id AS projectId,title,DATE_FORMAT(expected_on,'%Y-%m-%d') AS expectedOn,status,needs_review AS needsReview,version,${instantColumn('created_at', 'createdAt')} FROM v2_milestones`;
 const backlogSelect = `SELECT id,project_id AS projectId,creator_id AS creatorId,title,priority,version,converted_task_id AS convertedTaskId,${instantColumn('deleted_at', 'deletedAt')},${instantColumn('created_at', 'createdAt')} FROM v2_backlog`;
 const milestones = z.array(v2MilestoneSchema.extend({ needsReview: z.union([z.boolean(), z.number()]).transform(Boolean) }));
 
@@ -28,11 +28,11 @@ export class V2ProjectRepository {
   async deleteBacklog(id: string): Promise<void> { await this.manager.query('UPDATE v2_backlog SET deleted_at=UTC_TIMESTAMP(3),version=version+1 WHERE id=?', [id]); }
   /** 转换由上层同事务创建任务并记实际转换人。 */
   async convertBacklog(id: string, taskId: string, actorId: string): Promise<void> { await this.manager.query('UPDATE v2_backlog SET converted_task_id=?,converted_by=?,version=version+1 WHERE id=?', [taskId, actorId, id]); }
-  /** 里程碑归属只用于移出检查，完成权限不绑定该字段。 */
+  /** 保存里程碑及实际操作人；不再记录人员归属。 */
   async saveMilestone(row: V2Milestone, create: boolean, actorId: string): Promise<void> {
     const previous = create ? null : await this.milestone(row.id);
-    if (create) await this.manager.query('INSERT INTO v2_milestones(id,project_id,owner_id,title,expected_on,status,needs_review,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))', [row.id, row.projectId, row.ownerId, row.title, row.expectedOn, row.status, Number(row.needsReview), row.version]);
-    else await this.manager.query('UPDATE v2_milestones SET owner_id=?,title=?,expected_on=?,status=?,needs_review=?,version=?,updated_at=UTC_TIMESTAMP(3) WHERE id=?', [row.ownerId, row.title, row.expectedOn, row.status, Number(row.needsReview), row.version, row.id]);
+    if (create) await this.manager.query('INSERT INTO v2_milestones(id,project_id,title,expected_on,status,needs_review,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))', [row.id, row.projectId, row.title, row.expectedOn, row.status, Number(row.needsReview), row.version]);
+    else await this.manager.query('UPDATE v2_milestones SET title=?,expected_on=?,status=?,needs_review=?,version=?,updated_at=UTC_TIMESTAMP(3) WHERE id=?', [row.title, row.expectedOn, row.status, Number(row.needsReview), row.version, row.id]);
     await this.manager.query("INSERT INTO v2_object_events(id,team_id,project_id,object_id,actor_id,action,payload_json,occurred_at) SELECT ?,team_id,id,?,?,'milestone.saved',?,UTC_TIMESTAMP(3) FROM projects WHERE id=?", [randomUUID(), row.id, actorId, JSON.stringify({ before: previous, after: row }), row.projectId]);
   }
 }

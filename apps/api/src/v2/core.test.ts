@@ -24,9 +24,35 @@ function arrangement(task: V2Task, target: V2Period, from = '2026-10-10T00:00:00
   return { id: randomUUID(), taskId: task.id, periodId: target.id, validFrom: from, validUntil: null, provenance: 'scheduled', plannedDays: null };
 }
 
+test('V2 周期内删除任意状态任务后不再显示总结，周期结束也不复现', () => {
+  const deletedAt = '2026-10-14T01:00:00.000Z';
+  for (const status of ['not_started', 'in_progress', 'completed'] as const) {
+    const task: V2Task = { ...initial, status, completedAt: status === 'completed' ? initial.createdAt : null };
+    const deleted: V2Task = { ...task, version: 1, updatedAt: deletedAt, deletedAt };
+    const history: V2TaskEvent[] = [event(task, task.createdAt, 'created', null), event(deleted, deletedAt, 'deleted', status)];
+    const rows: V2ArrangementHistory[] = [{ ...arrangement(task, period), validUntil: deletedAt }, { ...arrangement(task, second), validUntil: deletedAt }];
+    assert.equal(summarizePeriod(period, history, rows, '2026-10-13T00:00:00.000Z').length, 1);
+    for (const now of [deletedAt, '2026-10-21T00:00:00.000Z']) {
+      assert.equal(summarizePeriod(period, history, rows, now).length, 0);
+      assert.equal(summarizePeriod(second, history, rows, now).length, 0);
+    }
+  }
+});
+
+test('V2 区间结束后的删除保留先前事实，含上海周界同毫秒删除', () => {
+  const task = { ...initial, status: 'in_progress' as const };
+  for (const deletedAt of ['2026-10-18T16:00:00.000Z', '2026-10-20T01:00:00.000Z']) {
+    const history = [event(task, task.createdAt, 'created', null), event({ ...task, deletedAt, version: 1 }, deletedAt, 'deleted', task.status)];
+    const rows = [{ ...arrangement(task, period), validUntil: deletedAt }];
+    assert.equal(summarizePeriod(period, history, rows, '2026-10-21T00:00:00.000Z')[0]?.status, 'in_progress');
+    assert.equal(summarizePeriod(second, history, rows, '2026-10-21T00:00:00.000Z').length, 0);
+  }
+});
+
 test('V2 输入拒绝多人、无区间、旧审批和私人项目字段，不将空估算变为零', () => {
-  const fields = { projectId, title: '事项', executorId: executor, periodId: period.id };
-  assert.equal(v2ProjectTaskInputSchema.parse(fields).plannedDays, null);
+  const fields = { projectId, title: '事项', executorId: executor, periodId: period.id, plannedDays: 1 };
+  assert.equal(v2ProjectTaskInputSchema.safeParse({ ...fields, plannedDays: undefined }).success, false);
+  assert.equal(v2ProjectTaskInputSchema.safeParse({ ...fields, plannedDays: null }).success, false);
   assert.equal(v2ProjectTaskInputSchema.parse({ ...fields, plannedDays: 0 }).plannedDays, 0);
   for (const invalid of [{ ...fields, periodId: undefined }, { ...fields, executorId: [executor, lead] }, { ...fields, plannedDays: 0.123 }, { ...fields, description: '旧说明' }]) assert.equal(v2ProjectTaskInputSchema.safeParse(invalid).success, false);
   assert.equal(v2PrivateTaskInputSchema.safeParse({ title: '私人', projectId }).success, false);
@@ -92,7 +118,7 @@ test('取消最后安排被拒绝，原子改排不覆盖目标已有区间', ()
 });
 
 test('任意项目研发负责人可确认里程碑，团队负责人不自动取得确认权', () => {
-  const milestone: V2Milestone = { id: randomUUID(), projectId, title: '目标', expectedOn: null, ownerId: executor, status: 'open', needsReview: false, version: 0 };
+  const milestone: V2Milestone = { id: randomUUID(), projectId, title: '目标', expectedOn: null, status: 'open', needsReview: false, version: 0 };
   assert.equal(canConfirmMilestone(actor(lead), milestone, project), true);
   assert.equal(canConfirmMilestone(actor(leader), milestone, project), false);
   assert.equal(canConfirmMilestone(actor(executor), milestone, project), false);

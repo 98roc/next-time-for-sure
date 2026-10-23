@@ -48,6 +48,7 @@ try {
     await page.goto(base + path);
     const buttons = page.getByRole('button', { name: task.title, exact: true });
     await buttons.first().waitFor();
+    if (path === '/weekly-plans') assert.equal(await page.getByRole('button', { name: '选择已有任务', exact: true }).count(), 0);
     const count = path === '/weekly-plans' ? 2 : 1;
     for (let index = 0; index < count; index++) {
       await buttons.nth(index).click();
@@ -64,12 +65,30 @@ try {
   assert.deepEqual(await values(), [later.id], '删除命中的周期，不误删旁边行');
   await active.getByRole('button', { name: '＋ 追加安排', exact: true }).click();
   assert.deepEqual(await values(), [later.id, periods[0].id], '本次草稿追加到末尾');
+  await active.getByRole('button', { name: '保存', exact: true }).click();
+  assert.equal(saved.length, 0, '空预计投入不能提交');
+  await active.getByLabel('本周期预计投入（人天）1', { exact: true }).fill('0');
+  await active.getByLabel('本周期预计投入（人天）2', { exact: true }).fill('1.25');
   await save();
   assert.deepEqual(saved[0].arrangements.map((row) => row.periodId), [later.id, periods[0].id]);
   await page.getByRole('button', { name: task.title, exact: true }).click();
   assert.deepEqual(await values(), [periods[0].id, later.id], '保存重开统一按日期');
-  assert.deepEqual(await estimates(), ['', ''], '改排和追加预计留空');
+  assert.deepEqual(await estimates(), ['1.25', '0'], '改排和追加必须填写预计，零值有效');
   await close();
+  // 共用创建表单必填投入；里程碑新建、详情和编辑均不出现人员归属。
+  await page.goto(base + `/work?project=${task.projectId}&tab=milestones`);
+  await page.getByRole('button', { name: '＋ 新增里程碑', exact: true }).click();
+  await active.getByLabel('阶段目标', { exact: true }).waitFor();
+  assert.equal(await active.getByLabel('责任归属', { exact: true }).count(), 0);
+  assert.equal(await active.locator('select').count(), 0);
+  await close();
+  fixture.workspace.milestones = [{ id: randomUUID(), projectId: task.projectId, title: '无负责人目标', expectedOn: null, status: 'open', needsReview: false, version: 0 }];
+  await page.reload();
+  await page.getByRole('button', { name: '无负责人目标', exact: true }).click();
+  assert.equal(await active.getByText('责任归属', { exact: true }).count(), 0);
+  await active.getByRole('button', { name: '编辑', exact: true }).click();
+  await active.getByLabel('阶段目标', { exact: true }).waitFor();
+  assert.equal(await active.locator('select').count(), 0);
   assert.deepEqual(errors, []);
-  console.log('PASS: consistent period order across project/personal/both weekly sides, stable edit rows, correct deletion and chronological reopen. Mock API only.');
+  console.log('PASS: consistent period order across project/personal/both weekly sides, stable edit rows, correct deletion, required estimates including zero, no existing-task selector and no milestone owner fields. Mock API only.');
 } finally { await browser.close(); }

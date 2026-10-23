@@ -49,7 +49,7 @@ async function smoke(): Promise<void> {
     const state = async (actor = leader) => v2WorkspaceSchema.parse(await call('workspace', actor));
     const initial = await state(); const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
     const next = initial.periods[initial.periods.indexOf(period) + 1]; assert.ok(next);
-    const taskInput = { projectId, executorId: developer.id, periodId: period.id, title: '同一任务跨入口', priority: 3, milestoneId: null, plannedDays: null };
+    const taskInput = { projectId, executorId: developer.id, periodId: period.id, title: '同一任务跨入口', priority: 3, milestoneId: null, plannedDays: 1 };
     const command = { action: 'create_project', operationId: randomUUID(), task: taskInput };
     stage = 'create and idempotence';
     const created = v2ResultSchema.parse(await call('tasks', lead, command)), taskId = created.objectIds[0]; assert.ok(taskId);
@@ -79,7 +79,7 @@ async function smoke(): Promise<void> {
     const move = v2ImpactSchema.parse(await call('impact', lead, moveIntent));
     await call('tasks', lead, { ...moveIntent, operationId: randomUUID(), plannedDays: 1.25, confirmation: move.confirmation });
     const moved = await state(); assert.equal(moved.arrangements.filter((row) => row.taskId === taskId).length, 1); assert.equal(moved.arrangements.find((row) => row.taskId === taskId)?.periodId, next.id);
-    stage = 'atomic editor and selected existing tasks';
+    stage = 'atomic editor and explicit arrangements';
     const editing = moved.tasks.find((row) => row.id === taskId); assert.ok(editing);
     const detail = { kind: 'project', title: '合并保存后的名称', priority: 2, executorId: developer.id, milestoneId: null };
     await call('edit', developer, { action: 'save_task', operationId: randomUUID(), taskId, version: editing.version, details: detail }, 403);
@@ -91,13 +91,12 @@ async function smoke(): Promise<void> {
     await call('edit', lead, editCommand); await call('edit', lead, editCommand);
     const edited = await state(); assert.equal(edited.tasks.find((row) => row.id === taskId)?.title, detail.title); assert.equal(edited.arrangements.find((row) => row.taskId === taskId)?.plannedDays, 0);
     const editedTask = edited.tasks.find((row) => row.id === taskId); assert.ok(editedTask);
-    const secondResult = v2ResultSchema.parse(await call('tasks', lead, { ...command, operationId: randomUUID(), task: { ...taskInput, title: '选择已有任务原子性' } }));
+    const secondResult = v2ResultSchema.parse(await call('tasks', lead, { ...command, operationId: randomUUID(), task: { ...taskInput, title: '明确追加周期安排' } }));
     const secondId = secondResult.objectIds[0]; assert.ok(secondId);
-    const selected = { action: 'add_existing', operationId: randomUUID(), periodId: next.id, tasks: [{ taskId, version: editedTask.version }, { taskId: secondId, version: 99 }] };
-    await call('add-existing', lead, selected, 409);
-    assert.equal((await state()).arrangements.some((row) => row.taskId === taskId && row.periodId === next.id), false);
-    await call('add-existing', lead, { ...selected, tasks: [{ taskId, version: editedTask.version }, { taskId: secondId, version: 0 }] });
-    const selectedState = await state(); assert.equal(selectedState.arrangements.filter((row) => [taskId, secondId].includes(row.taskId) && row.periodId === next.id && row.plannedDays === null).length, 2);
+    await call('add-existing', lead, { action: 'add_existing', operationId: randomUUID(), periodId: next.id, tasks: [{ taskId, version: editedTask.version }] }, 404);
+    await call('tasks', lead, { action: 'add_arrangement', operationId: randomUUID(), taskId, version: editedTask.version, periodId: next.id, plannedDays: 1 });
+    await call('tasks', lead, { action: 'add_arrangement', operationId: randomUUID(), taskId: secondId, version: 0, periodId: next.id, plannedDays: 0 });
+    const selectedState = await state(); assert.equal(selectedState.arrangements.filter((row) => [taskId, secondId].includes(row.taskId) && row.periodId === next.id && row.plannedDays !== null).length, 2);
     const futureSummary = z.array(z.object({ taskId: z.string() })).parse(await call(`summary?periodId=${next.id}`, lead)); assert.ok(futureSummary.some((row) => row.taskId === secondId));
     stage = 'filtered shared order preserves other people';
     const thirdTask = v2ResultSchema.parse(await call('tasks', lead, { ...command, operationId: randomUUID(), task: { ...taskInput, executorId: lead.id, periodId: next.id, title: '排序中保留其他人员' } }));
@@ -120,11 +119,20 @@ async function smoke(): Promise<void> {
     assert.equal((await state()).tasks.some((task) => task.id === privateResult.objectIds[0]), false);
     await call(`history?taskId=${privateResult.objectIds[0]}`, leader, undefined, 404);
     stage = 'milestone and operator audit';
-    const milestoneResult = v2ResultSchema.parse(await call('projects', lead, { action: 'create_milestone', operationId: randomUUID(), projectId, title: '阶段验收', ownerId: lead.id, expectedOn: null }));
+    const milestoneResult = v2ResultSchema.parse(await call('projects', lead, { action: 'create_milestone', operationId: randomUUID(), projectId, title: '阶段验收', expectedOn: null }));
     const milestoneId = milestoneResult.objectIds[0]; assert.ok(milestoneId);
     const createdMilestone = (await state(lead)).milestones.find((row) => row.id === milestoneId);
     const milestoneCreation = z.array(z.object({ createdAt: z.string() })).parse(await source.query("SELECT CONCAT(DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s.'),LEFT(DATE_FORMAT(created_at,'%f'),3),'Z') AS createdAt FROM v2_milestones WHERE id=?", [milestoneId]));
     assert.ok(createdMilestone?.createdAt);
+    assert.equal(Object.hasOwn(createdMilestone, 'ownerId'), false);
+    const legacyOwners = z.array(z.object({ ownerId: z.string().nullable() })).parse(await source.query('SELECT owner_id AS ownerId FROM v2_milestones WHERE id=?', [milestoneId]));
+    assert.equal(legacyOwners[0]?.ownerId, null);
+    // 旧归属仅留档：不再阻止无未完成任务的成员移出，项目角色仍须保留。
+    await source.query('UPDATE v2_milestones SET owner_id=? WHERE id=?', [manager.id, milestoneId]);
+    const membership = (await state()).projects.find((row) => row.id === projectId); assert.ok(membership);
+    const removal = v2MemberImpactSchema.parse(await call('members-impact', leader, { projectId, version: membership.version, members: membership.members.filter((row) => row.accountId !== manager.id).map((row) => row.accountId === lead.id ? { ...row, roles: ['project_lead', 'project_manager'] } : row) }));
+    assert.deepEqual(removal.blockers, []);
+
     assert.equal(createdMilestone.createdAt, milestoneCreation[0]?.createdAt, '里程碑创建时间按数据库原值返回，支持下拉框同日排序');
     await call('impact', leader, { action: 'complete_milestone', milestoneId, version: 0 }, 403);
     const finishIntent = { action: 'complete_milestone', milestoneId, version: 0 };
@@ -160,7 +168,7 @@ async function smoke(): Promise<void> {
       if (mode !== 'never_started') await setStatus('in_progress');
       if (mode === 'reset_first') await setStatus('not_started');
       const version = (await currentTask()).version;
-      const arrangements = [{ periodId: next.id, plannedDays: null }];
+      const arrangements = [{ periodId: next.id, plannedDays: 1 }];
       const impact = v2ImpactSchema.parse(await call('impact', lead, { action: 'save_arrangements', taskId: id, version, arrangements }));
       await call('edit', lead, { action: 'save_task', operationId: randomUUID(), taskId: id, version, arrangements, arrangementConfirmation: impact.confirmation });
       if (mode === 'move_first') { await summaryContains(true); await setStatus('not_started'); }
@@ -169,8 +177,29 @@ async function smoke(): Promise<void> {
       assert.deepEqual(stored.map((row) => row.periodId), [next.id]);
       const history = v2TaskHistorySchema.parse(await call(`history?taskId=${id}`, lead));
       assert.equal(history.some((row) => row.snapshot.status === 'in_progress'), mode !== 'never_started');
-      await call('add-existing', lead, { action: 'add_existing', operationId: randomUUID(), periodId: period.id, tasks: [{ taskId: id, version: (await currentTask()).version }] });
+      await call('tasks', lead, { action: 'add_arrangement', operationId: randomUUID(), periodId: period.id, taskId: id, version: (await currentTask()).version, plannedDays: 1 });
       await summaryContains(true);
+    }
+    stage = 'deleted tasks disappear from current summary and generated text';
+    for (const status of ['not_started', 'in_progress', 'completed'] as const) {
+      const title = `周报删除验收 ${status}`;
+      const id = v2ResultSchema.parse(await call('tasks', lead, { ...command, operationId: randomUUID(), task: { ...taskInput, title } })).objectIds[0]; assert.ok(id);
+      if (status !== 'not_started') await call('edit', lead, { action: 'save_task', operationId: randomUUID(), taskId: id, version: 0, status, ...(status === 'completed' ? { completion: { actualDays: 1, aiContribution: 'none' } } : {}) });
+      const task = (await state()).tasks.find((row) => row.id === id); assert.ok(task);
+      const readWeek = async (): Promise<z.infer<typeof v2WeeklyStateSchema>> => v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${period.id}&planPeriodId=${next.id}`, lead));
+      assert.equal((await readWeek()).summary.some((row) => row.taskId === id), true);
+      const intent = { action: 'delete_task', taskId: id, version: task.version };
+      const impact = v2ImpactSchema.parse(await call('impact', lead, { ...intent, action: 'delete_task' }));
+      await call('tasks', lead, { ...intent, action: 'delete', operationId: randomUUID(), confirmation: impact.confirmation });
+      const week = await readWeek();
+      assert.equal(week.summary.some((row) => row.taskId === id), false);
+      assert.equal(week.taskOrders.some((row) => row.ids.includes(id)), false);
+      assert.equal(week.generatedText.includes(title), false);
+      assert.equal((await state()).tasks.some((row) => row.id === id), false);
+      const history = v2TaskHistorySchema.parse(await call(`history?taskId=${id}`, lead));
+      assert.equal(history.at(-1)?.action, 'deleted');
+      const stored = z.array(z.object({ deleted: z.coerce.number(), arrangements: z.coerce.number() })).parse(await source.query('SELECT deleted_at IS NOT NULL AS deleted,(SELECT COUNT(*) FROM v2_arrangements WHERE task_id=?) AS arrangements FROM v2_tasks WHERE id=?', [id, id]));
+      assert.deepEqual(stored, [{ deleted: 1, arrangements: 0 }]);
     }
     stage = 'team roles and member removal';
     const project = (await state()).projects.find((row) => row.id === projectId); assert.ok(project);
@@ -225,7 +254,7 @@ async function smoke(): Promise<void> {
     const baseline = v2MessagesSchema.parse(await call('notifications?after=start', developer));
     assert.equal(baseline.messages.length, 0);
     await source.query('UPDATE project_members SET roles_json=? WHERE project_id=? AND account_id=?', [JSON.stringify(['developer', 'project_lead']), projectId, developer.id]);
-    const messageBatch = { action: 'create_batch', operationId: randomUUID(), tasks: [1, 2].map((index) => ({ projectId, executorId: developer.id, periodId: period.id, title: `消息批量验收${index}`, priority: 3, milestoneId: null, plannedDays: null })) };
+    const messageBatch = { action: 'create_batch', operationId: randomUUID(), tasks: [1, 2].map((index) => ({ projectId, executorId: developer.id, periodId: period.id, title: `消息批量验收${index}`, priority: 3, milestoneId: null, plannedDays: 1 })) };
     const batchResult = v2ResultSchema.parse(await call('tasks', lead, messageBatch));
     await call('tasks', lead, messageBatch);
     const afterMessages = v2MessagesSchema.parse(await call('notifications', developer));
