@@ -1,5 +1,5 @@
 #ntfs-my-work .mw-task-top { touch-action:none; }
-.v2-scope .v2-content h3 { font-size:16px!important; }
+.v2-scope .v2-content h3:not(.v2-ms-title):not(.v2-ms-project-title):not(.v2-ms-section-title) { font-size:16px!important; }
 .v2-scope dialog .v2-context { margin-bottom:16px!important; }
 .v2-scope dialog .v2-field { margin-bottom:4px; }
 .v2-scope dialog .v2-dialog-header { margin:0; }

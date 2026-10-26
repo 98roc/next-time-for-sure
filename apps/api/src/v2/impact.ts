@@ -54,7 +54,18 @@ export async function previewImpact(manager: EntityManager, context: V2Context, 
     requireVersion(milestone.version, intent.version);
     const related = (await tasks.visible(context.actor.id, [milestone.projectId])).filter((task) => task.milestoneId === milestone.id);
     title = milestone.title; facts = { milestone, tasks: related };
-    if (intent.action === 'complete_milestone') { inspect(() => validateMilestoneCompletion(milestone, related)); if (milestone.status !== 'open') blockers.push('里程碑已经完成'); details.push(`关联任务 ${related.length} 条；请确认阶段目标实际已达成。`); }
+    if (intent.action === 'edit_milestone') {
+      if (intent.title !== milestone.title) details.push(`目标名称：${milestone.title} → ${intent.title}`);
+      if (intent.expectedOn !== milestone.expectedOn) details.push(`截止日期：${milestone.expectedOn ?? '未规划'} → ${intent.expectedOn ?? '未规划'}`);
+      for (const item of intent.unlinkTasks ?? []) {
+        const task = related.find((row) => row.id === item.taskId);
+        if (!task) { blockers.push('待解除的任务已不属于此里程碑，请重新打开编辑。'); continue; }
+        inspect(() => requireVersion(task.version, item.version));
+        details.push(`解除关联：${task.title}`);
+      }
+      if (intent.unlinkTasks?.length) details.push('保留任务、执行人、状态及全部日期安排，仅解除里程碑关联。');
+    }
+    else if (intent.action === 'complete_milestone') { inspect(() => validateMilestoneCompletion(milestone, related)); if (milestone.status !== 'open') blockers.push('里程碑已经完成'); details.push(`关联任务 ${related.length} 条；请确认阶段目标实际已达成。`); }
     else { if (milestone.status !== 'completed') blockers.push('里程碑尚未完成'); details.push('重开目标并保留原完成历史，不修改关联任务状态。'); }
   } else if (intent.action === 'delete_backlog') {
     await authorizeProjectCommand(manager, context, { ...intent, operationId, confirmation: '0'.repeat(64) });

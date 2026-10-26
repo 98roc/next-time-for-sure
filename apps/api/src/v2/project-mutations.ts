@@ -45,10 +45,23 @@ export async function mutateProject(manager: EntityManager, context: V2Context, 
   if (!milestone) throw new ConflictException('里程碑不存在。');
   requireVersion(milestone.version, command.version);
   if (command.action === 'edit_milestone') {
+    // 先核验整个草稿，确认摘要绑定日期、关联任务与版本；任何失败都回滚整次保存。
+    if (command.expectedOn !== milestone.expectedOn || command.unlinkTasks?.length) {
+      if (!command.confirmation) throw new ConflictException('请先预览并确认里程碑变更。');
+      const { action, milestoneId, version, title, expectedOn, unlinkTasks } = command;
+      await requireConfirmation(manager, context, { action, milestoneId, version, title, expectedOn, unlinkTasks }, command.confirmation, today);
+    }
+    const tasks = new V2TaskRepository(manager);
+    for (const item of command.unlinkTasks ?? []) {
+      const task = requireTask(context, await tasks.get(item.taskId));
+      requireVersion(task.version, item.version);
+      if (task.deletedAt || task.kind !== 'project' || task.milestoneId !== milestone.id) throw new ConflictException('任务关联已变化，请重新打开编辑。');
+      await tasks.update(task, { ...task, milestoneId: null, version: task.version + 1, updatedAt: new Date().toISOString() }, context.actor.id);
+    }
     await repository.saveMilestone({ ...milestone, title: command.title, expectedOn: command.expectedOn, version: milestone.version + 1 }, false, context.actor.id);
   } else {
     await requireConfirmation(manager, context, { action: command.action, milestoneId: milestone.id, version: command.version }, command.confirmation, today);
     await repository.saveMilestone({ ...milestone, status: command.action === 'complete_milestone' ? 'completed' : 'open', needsReview: false, version: milestone.version + 1 }, false, context.actor.id);
   }
-  return [milestone.id];
+  return [milestone.id, ...(command.action === 'edit_milestone' ? command.unlinkTasks?.map((row) => row.taskId) ?? [] : [])];
 }

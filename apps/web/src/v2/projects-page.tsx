@@ -10,7 +10,8 @@ import { readSummary } from './api';
 import { TaskEditor, TaskHistory } from './task-editor';
 import { TaskCreate } from './task-create';
 import { BacklogSummary, BacklogList } from './backlog';
-import { MilestonePanel } from './milestones';
+import { MilestonePanel, MilestoneOverview } from './milestones';
+import { MilestoneIcon } from './milestone-parts';
 import { ProjectHeading } from './project-heading';
 
 /** 项目汇总、项目内页和里程碑总览共用当前授权项目，不建立独立任务副本。 */
@@ -22,7 +23,7 @@ export function ProjectsPageV2() {
   const [periodId, setPeriod] = useState(() => currentPeriod(data.periods, data.today)), [sorting, setSorting] = useState(false);
   const roles = (role: string) => project?.members.filter((row) => row.roles.some((value) => value === role)).map((row) => data.accounts.find((account) => account.id === row.accountId)?.displayName ?? '历史成员').join('、');
   if (project) return <><button className="nt-link" onClick={() => setParams({})}>← 项目汇总</button><div className="v2-page-heading"><h2>{project.name}</h2><p className="nt-muted">研发负责人 {roles('project_lead')} · 项目经理 {roles('project_manager')} · {project.members.length} 位成员</p></div><div className="nt-tabs">{[{ id: 'tasks', label: '任务' }, { id: 'milestones', label: '里程碑' }, { id: 'backlog', label: '待建任务' }].map((item) => <button key={item.id} aria-pressed={tab === item.id} onClick={() => setParams({ project: project.id, tab: item.id })}>{item.label}</button>)}</div>{tab === 'milestones' ? <MilestonePanel projectId={project.id} /> : tab === 'backlog' ? <BacklogList projectId={project.id} /> : <ProjectTasks projectId={project.id} />}</>;
-  if (allMilestones) return <><button className="nt-link" onClick={() => setParams({})}>← 项目汇总</button><h2 className="v2-page-heading">里程碑总览</h2>{projectSort.ids.map((id) => <MilestonePanel key={id} projectId={id} overview />)}{!data.projects.length && <div className="nt-empty">暂无可见项目</div>}</>;
+  if (allMilestones) return <><header className="v2-ms-page-heading"><div><button className="nt-link" onClick={() => setParams({})}>← 项目汇总</button><h2>里程碑总览</h2></div><time dateTime={data.today}><MilestoneIcon name="calendar-date" />今天 {data.today.replaceAll('-', ' / ')}</time></header><MilestoneOverview /></>;
   return <><div className="nt-row nt-between"><div><h2>项目</h2><p className="nt-muted">{data.teamLeader ? '本团队项目' : '我参与的项目'} · {data.projects.length} 个</p></div><button onClick={() => setParams({ view: 'milestones' })}>里程碑总览</button></div><div className="nt-tools"><div className="nt-row"><span className="nt-muted">任务执行情况</span>{data.teamLeader && <button aria-pressed={sorting} className={sorting ? 'nt-primary' : undefined} onClick={() => setSorting(!sorting)}>{sorting ? '完成排序' : '项目排序'}</button>}{sorting && projectSort.reset}</div><PeriodSelect label="汇总日期区间" periods={data.periods} value={periodId} onChange={setPeriod} /></div><ProjectOverview periodId={periodId} sort={projectSort} sorting={sorting} /></>;
 }
 

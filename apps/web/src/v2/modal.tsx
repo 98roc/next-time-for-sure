@@ -28,6 +28,9 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   }, [opened]);
   useEffect(() => {
     const page = dialog.current?.querySelector('[data-active="true"]');
+    // 排期入口明确指定日期焦点，优先于原生 dialog 打开时自动聚焦的返回按钮。
+    const preferred = page?.querySelector('[data-v2-autofocus]:not(:disabled)');
+    if (preferred instanceof HTMLElement) { preferred.focus(); return; }
     const remembered = active ? pageFocus.current.get(active) : undefined;
     if (remembered?.isConnected && page?.contains(remembered) && !remembered.matches(':disabled')) { remembered.focus(); return; }
     const field = page?.querySelector('input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[data-v2-back],button');
@@ -56,15 +59,15 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 }
 
 /** 可复用的表单视图，标题和底栏固定，滚动只发生于内容区。 */
-export function ModalPage({ title, children, actions, dirty = false, busy = false, wide = false, compact = false, subtitle, hideCloseAction = false, onClose }: { title: string; subtitle?: string; compact?: boolean; hideCloseAction?: boolean; children: ReactNode; actions?: ReactNode; dirty?: boolean; busy?: boolean; wide?: boolean; onClose?: () => void }) {
+export function ModalPage({ title, children, actions, dirty = false, busy = false, wide = false, compact = false, subtitle, hideCloseAction = false, onClose, className = '', closeLabel = '×', footerNote }: { title: string; subtitle?: string; compact?: boolean; hideCloseAction?: boolean; children: ReactNode; actions?: ReactNode; dirty?: boolean; busy?: boolean; wide?: boolean; onClose?: () => void; className?: string; closeLabel?: string; footerNote?: ReactNode }) {
   useNavigationGuard(dirty || busy);
   const flow = useModal(), page = useContext(PageContext), label = useId(), root = useRef<HTMLDivElement>(null);
   useEffect(() => { flow.dirty(page.key, dirty, busy); }, [flow, page.key, dirty, busy]);
   useEffect(() => { if (page.active) root.current?.closest('dialog')?.classList.toggle('v2-wide', wide); }, [page.active, wide]);
   useEffect(() => { if (page.active) root.current?.closest('dialog')?.classList.toggle('v2-compact', compact); }, [page.active, compact]);
-  return <div ref={root} className="v2-dialog-layout" aria-labelledby={label}>
-    <header className="v2-dialog-header">{flow.canBack && <button data-v2-back disabled={busy} onClick={flow.back}>← 返回</button>}<h2 id={label}>{title}{subtitle && <span className="v2-dialog-subtitle">{subtitle}</span>}</h2><button className="v2-close" aria-label="关闭" disabled={busy} onClick={onClose ?? (() => flow.close())}>×</button></header>
-    <div className="v2-content">{children}</div>{(!hideCloseAction || actions) && <footer className="v2-dialog-footer"><div className="v2-actions v2-footer-actions">{!hideCloseAction && <button disabled={busy} onClick={() => flow.close()}>关闭</button>}{actions}</div></footer>}
+  return <div ref={root} className={`v2-dialog-layout ${className}`} aria-labelledby={label}>
+    <header className="v2-dialog-header">{flow.canBack && <button data-v2-back disabled={busy} onClick={flow.back}>← 返回</button>}<h2 id={label}>{title}{subtitle && <span className="v2-dialog-subtitle">{subtitle}</span>}</h2><button className="v2-close" aria-label="关闭" disabled={busy} onClick={onClose ?? (() => flow.close())}>{closeLabel}</button></header>
+    <div className="v2-content">{children}</div>{(!hideCloseAction || actions) && <footer className="v2-dialog-footer">{footerNote}<div className="v2-actions v2-footer-actions">{!hideCloseAction && <button disabled={busy} onClick={() => flow.close()}>关闭</button>}{actions}</div></footer>}
   </div>;
 }
 

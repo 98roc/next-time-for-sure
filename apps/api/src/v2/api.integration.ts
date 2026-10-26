@@ -2,6 +2,7 @@ import { verifyTaskPeriods } from './task-period.integration.js';
 import { TaskRolloverService } from './task-rollover.service.js';
 import { verifySorting } from './sorting.integration.js';
 import { verifyEffort } from './effort.integration.js';
+import { verifyMilestoneEditor } from './milestone-editor.integration.js';
 import { verifyPersonalWork } from './personal-work.integration.js';
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
@@ -51,6 +52,11 @@ async function smoke(): Promise<void> {
     const state = async (actor = leader) => v2WorkspaceSchema.parse(await call('workspace', actor));
     const initial = await state(); const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
     const next = initial.periods[initial.periods.indexOf(period) + 1]; assert.ok(next);
+    if (process.argv.includes('--milestone-editor')) {
+      stage = 'atomic milestone editor';
+      await verifyMilestoneEditor({ source, lead, leader, developer, outsider, projectId, periodId: period.id, call, state });
+      return;
+    }
     const taskInput = { projectId, executorId: developer.id, periodId: period.id, title: '同一任务跨入口', priority: 3, milestoneId: null, plannedDays: 1 };
     const command = { action: 'create_project', operationId: randomUUID(), task: taskInput };
     stage = 'create and idempotence';
@@ -152,6 +158,8 @@ async function smoke(): Promise<void> {
     const unlinkPreview = v2ImpactSchema.parse(await call('impact', lead, { action: 'unlink_milestone', taskId: secondId, version: unlinkVersion }));
     await call('edit', lead, { ...unlinkEdit, milestoneConfirmation: unlinkPreview.confirmation });
     assert.equal((await state()).tasks.find((row) => row.id === secondId)?.milestoneId, null);
+    stage = 'atomic milestone editor';
+    await verifyMilestoneEditor({ source, lead, leader, developer, outsider, projectId, periodId: period.id, call, state });
     stage = 'effort and completion';
     await verifyEffort({ source, lead, manager, developer, periodId: period.id, nextId: next.id, projectId, call, state });
     stage = 'rescheduled not-started summary';

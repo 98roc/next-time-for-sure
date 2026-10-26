@@ -39,13 +39,19 @@ export const v2PersonalCommandSchema = z.discriminatedUnion('action', [
 ]);
 export type V2PersonalCommand = z.infer<typeof v2PersonalCommandSchema>;
 
+/** 编辑目标与解除关联作为一次保存；任务版本绑定打开编辑器时的快照。 */
+const milestoneEdit = {
+  milestoneId: id, version, title: z.string().trim().min(1).max(200), expectedOn: v2DateSchema.nullable(),
+  unlinkTasks: z.array(z.object({ taskId: id, version }).strict()).max(500).refine((rows) => new Set(rows.map((row) => row.taskId)).size === rows.length, '关联任务不可重复').optional(),
+};
+
 export const v2ProjectCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('create_backlog'), projectId: id, title: z.string().trim().min(1).max(200), priority: v2PrioritySchema }).strict(),
   z.object({ ...operation, action: z.literal('edit_backlog'), backlogId: id, version, title: z.string().trim().min(1).max(200), priority: v2PrioritySchema }).strict(),
   z.object({ ...operation, action: z.literal('delete_backlog'), backlogId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('convert_backlog'), backlogId: id, version, task: v2ProjectTaskInputSchema }).strict(),
   z.object({ ...operation, action: z.literal('create_milestone'), projectId: id, title: z.string().trim().min(1).max(200), expectedOn: v2DateSchema.nullable() }).strict(),
-  z.object({ ...operation, action: z.literal('edit_milestone'), milestoneId: id, version, title: z.string().trim().min(1).max(200), expectedOn: v2DateSchema.nullable() }).strict(),
+  z.object({ ...operation, action: z.literal('edit_milestone'), ...milestoneEdit, confirmation: confirmation.optional() }).strict(),
   z.object({ ...operation, action: z.literal('complete_milestone'), milestoneId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('reopen_milestone'), milestoneId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('unlink_milestone'), taskId: id, version, confirmation }).strict(),
@@ -66,6 +72,7 @@ export type V2ReportCommand = z.infer<typeof v2ReportCommandSchema>;
 
 /** 同一个影响预览服务供页面和 Agent 使用；客户端不能自行构造确认摘要。 */
 export const v2ImpactIntentSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('edit_milestone'), ...milestoneEdit }).strict(),
   z.object({ action: z.literal('save_arrangements'), taskId: id, version, arrangements: v2ArrangementsInputSchema }).strict(),
   z.object({ action: z.literal('delete_task'), taskId: id, version }).strict(),
   z.object({ action: z.literal('remove_arrangement'), taskId: id, version, periodId: id }).strict(),
