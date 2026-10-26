@@ -44,15 +44,17 @@ function SubtasksContent({ task, incoming, readError }: { task: V2Task; incoming
     modal.finish();
   }
   return <ModalPage title="子任务" subtitle="仅自己可见" dirty={dirty} busy={action.busy} actions={<button className="nt-primary" disabled={blocked || !dirty} onClick={() => { void action.act(save); }}>保存</button>}>
-    <p className="v2-context">{current?.title ?? task.title}</p><div className="v2-private-list-summary">已完成 {items.filter((row) => row.completed).length} / {items.length}</div>
+    <div className="v2-subtasks">
+    <div className="v2-subtasks-heading"><p className="v2-subtasks-title">{current?.title ?? task.title}</p><span className="v2-subtasks-progress">已完成 {items.filter((row) => row.completed).length} / {items.length}</span></div>
     {stale && <Feedback error="任务归属或子任务清单已变化。已保留你的输入，请重新打开核对。" />}
     <Feedback error={readError || action.error || error} />
     <div ref={sort.root} className="v2-private-list" {...sort.listProps}>{items.map((item) => <div key={item.id} data-sort-id={item.id} className={`v2-private-row v2-subtask-row ${item.completed ? 'is-completed' : ''}`}>
       {sort.handle(item.id, item.title)}<input type="checkbox" aria-label={`完成子任务：${item.title}`} checked={item.completed} disabled={blocked} onChange={(event) => setItems(items.map((row) => row.id === item.id ? { ...row, completed: event.target.checked } : row))} />
       <div className="v2-private-name">{editing === item.id ? <input aria-label="子任务名称" maxLength={200} value={item.title} disabled={blocked} onChange={(event) => setItems(items.map((row) => row.id === item.id ? { ...row, title: event.target.value } : row))} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); setEditing(null); } }} /> : <span>{item.title}</span>}</div>
       <button className="v2-private-action" disabled={blocked} onClick={() => setEditing(editing === item.id ? null : item.id)}>{editing === item.id ? '确定' : '编辑'}</button><button className="v2-private-action is-danger" disabled={blocked} onClick={() => remove(item)}>删除</button>
-    </div>)}{items.length === 0 && <p className="v2-context">暂无子任务</p>}</div>
+    </div>)}{items.length === 0 && <div className="v2-subtasks-empty"><span>暂无子任务</span><span>从下方添加一个步骤开始</span></div>}</div>
     <div className="v2-private-add"><input aria-label="新增子任务名称" placeholder="输入子任务名称" value={title} maxLength={200} disabled={blocked} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} /><button disabled={blocked} onClick={add}>添加</button></div>
+    </div>
   </ModalPage>;
 }
 

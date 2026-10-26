@@ -7,7 +7,6 @@
 .v2-date-navigator { display:flex;align-items:center;gap:3px;min-width:0; }
 #ntfs-my-work.v2-scope .v2-date-navigator button { font-size:12px;padding:3px 5px;min-height:32px; }
 #ntfs-my-work .v2-date-navigator input { min-width:0;width:120px;flex:1;padding:5px 3px;min-height:33px;font-size:12px; }
-.v2-private-list-summary { color:var(--v2-muted);font-size:12px;margin-bottom:10px; }
 .v2-private-list { border-top:1px solid var(--v2-line); }
 .v2-private-row { display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--v2-line);background:var(--v2-bg); }
 #ntfs-my-work.v2-scope .v2-private-row .v2-sort-handle { min-height:28px;min-width:28px;padding:3px;border:0;background:transparent;color:var(--v2-muted);touch-action:none;cursor:grab; }
@@ -19,6 +18,18 @@
 #ntfs-my-work.v2-scope .v2-private-row .is-danger { color:var(--v2-danger); }
 .v2-private-add { display:flex;align-items:center;gap:8px;margin-top:16px; }
 .v2-private-add input { flex:1;min-width:0; }
+/* 子任务上下文、清单和新增区分组展示；限定作用域，保留日报项目排序的布局。 */
+.v2-subtasks { display:grid;gap:16px; }
+.v2-subtasks-heading { display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap; }
+.v2-subtasks-title { margin:0;font-weight:500;overflow-wrap:anywhere;min-width:0;flex:1 1 200px; }
+.v2-subtasks-progress { color:var(--v2-muted);font-size:12px;white-space:nowrap; }
+.v2-subtasks .v2-private-list { border:1px solid var(--v2-line);border-radius:8px;padding:0 12px; }
+.v2-subtasks .v2-private-row:last-child { border-bottom:0; }
+.v2-subtasks-empty { display:grid;justify-items:center;align-content:center;gap:6px;min-height:100px;padding:16px;color:var(--v2-muted);text-align:center; }
+.v2-subtasks-empty>span:last-child { font-size:12px; }
+.v2-subtasks .v2-private-add { margin-top:0;align-items:stretch; }
+#ntfs-my-work.v2-scope .v2-subtasks .v2-private-add :is(input,button) { min-height:38px;padding:7px 10px;line-height:22px; }
+#ntfs-my-work.v2-scope .v2-subtasks input[type=checkbox] { padding:0;min-height:16px; }
 .v2-daily-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap; }
 .v2-daily-toolbar .mw-col-menu { margin-left:auto; }
 .v2-daily-toolbar .v2-date-navigator { max-width:100%; }
@@ -28,5 +39,6 @@
   #ntfs-my-work .v2-private-add input,#ntfs-my-work .v2-private-name input { font-size:16px; }
 }
 @media(pointer:coarse) {
+  #ntfs-my-work.v2-scope .v2-subtasks .v2-private-add :is(input,button) { min-height:44px; }
   #ntfs-my-work.v2-scope .mw-task-actions .mw-subtasks,#ntfs-my-work.v2-scope .v2-private-row .v2-private-action,#ntfs-my-work.v2-scope .v2-date-navigator button { min-height:44px; }
 }
