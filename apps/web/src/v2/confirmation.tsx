@@ -1,7 +1,8 @@
 import { useQueries } from '@tanstack/react-query';
 import type { V2ImpactIntent } from '@ntfs/contracts';
 import { readImpact } from './api';
-import { ModalPage, useModal } from './modal';
+import { useModal } from './modal';
+import { ConfirmationPage } from './confirmation-page';
 import { Feedback, useAction } from './controls';
 
 /** 真实影响与阻塞原因在同层展示，过期确认由服务端拒绝并保留当前草稿。 */
@@ -14,7 +15,7 @@ export function Confirmations({ intents, label, onConfirm, onDone, danger = fals
   const queries = useQueries({ queries: intents.map((intent) => ({ queryKey: ['v2', 'impact', intent], queryFn: () => readImpact(intent), retry: false, staleTime: 0 })) });
   const action = useAction(), modal = useModal();
   const ready = queries.every((query) => query.data && !query.data.blockers.length && !query.isFetching && !query.error);
-  return <ModalPage title={label} busy={action.busy} actions={<button className={danger ? 'v2-danger' : 'nt-primary'} disabled={!ready || action.busy} onClick={() => { if (ready) void action.act(async () => { await onConfirm(queries.flatMap((query) => query.data ? [query.data.confirmation] : [])); (onDone ?? modal.finish)(); }); }}>{label}</button>}>
+  return <ConfirmationPage title={label} busy={action.busy} actions={<button className={danger ? 'v2-danger' : 'nt-primary'} disabled={!ready || action.busy} onClick={() => { if (ready) void action.act(async () => { await onConfirm(queries.flatMap((query) => query.data ? [query.data.confirmation] : [])); (onDone ?? modal.finish)(); }); }}>{label.startsWith('确认') ? label : `确认${label}`}</button>}>
     {queries.map((query, index) => <section key={index}>{query.isPending && <p role="status">正在核对操作影响…</p>}{query.error && <Feedback error={query.error.message} />}{query.data && <><h3>{query.data.title}</h3><ul>{query.data.details.map((detail, position) => <li key={position}>{detail}</li>)}</ul>{query.data.blockers.map((reason) => <p className="v2-error" key={reason}>{reason}</p>)}</>}</section>)}<Feedback error={action.error} />{(queries.some((query) => query.error) || action.error) && <button onClick={() => { action.clear(); for (const query of queries) void query.refetch(); }}>重新核对影响</button>}
-  </ModalPage>;
+  </ConfirmationPage>;
 }

@@ -65,12 +65,12 @@ try {
   await page.waitForFunction(() => document.activeElement?.matches('input[type=date]'), undefined, { timeout: 3000 });
   await active.getByLabel('目标名称').fill('尚未保存');
   await active.getByRole('button', { name: '取消', exact: true }).click();
-  await page.getByRole('button', { name: '放弃修改并返回' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认放弃', exact: true }).click();
   assert.equal(saved.length, 0);
   await panel.getByRole('button', { name: '设置日期', exact: true }).click();
   await active.locator('input[type=date]').fill('2026-11-06');
   await active.getByRole('button', { name: '保存', exact: true }).click();
-  await active.getByRole('button', { name: '保存目标变更', exact: true }).click();
+  await active.getByRole('button', { name: '确认保存目标变更', exact: true }).click();
   await page.locator('dialog').waitFor({ state: 'hidden' });
   assert.equal(saved.length, 1); assert.equal(await panel.locator('.v2-ms-unplanned').count(), 0);
 
@@ -93,7 +93,7 @@ try {
   await active.getByRole('button', { name: '← 返回', exact: true }).click();
   assert.equal(await active.getByLabel('目标名称').inputValue(), '审计分支融合与功能测试（调整）');
   await active.getByRole('button', { name: '保存', exact: true }).click();
-  await active.getByRole('button', { name: '保存目标变更', exact: true }).click();
+  await active.getByRole('button', { name: '确认保存目标变更', exact: true }).click();
   await active.getByRole('button', { name: '编辑目标', exact: true }).waitFor();
   assert.equal(saved.length, 2); assert.equal(saved[1].unlinkTasks.length, 1); assert.equal(saved[1].confirmation, 'a'.repeat(64));
   await close();

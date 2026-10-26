@@ -23,15 +23,14 @@
 .v2-scope .v2-dialog-header{display:flex;align-items:flex-start;gap:10px;flex-wrap:nowrap;flex-shrink:0;padding:16px 20px;border-bottom:1px solid var(--v2-line);background:var(--v2-bg)}
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header h2{font-size:18px;font-weight:500;line-height:1.5;margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
 .v2-scope .v2-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) button,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-unsaved button{display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;font:inherit;font-size:13px;background:var(--v2-bg);color:var(--v2-text);border:1px solid var(--v2-line);border-radius:7px}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) button{display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;font:inherit;font-size:13px;background:var(--v2-bg);color:var(--v2-text);border:1px solid var(--v2-line);border-radius:7px}
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) :is(.nt-primary,.mw-primary,.primary){background:var(--v2-accent);color:var(--v2-on-accent);border-color:var(--v2-accent)}
-:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) .v2-danger,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-unsaved .v2-danger{color:var(--v2-danger);background:var(--v2-bg);border-color:var(--v2-line)}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-dialog-header,.v2-dialog-footer) .v2-danger{color:var(--v2-danger);background:var(--v2-bg);border-color:var(--v2-line)}
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{font-size:22px;width:36px;padding:0;border:0;background:transparent;margin-left:2px;flex-shrink:0}
 .v2-scope .v2-content{flex:1 1 auto;overflow:auto;overscroll-behavior:contain;padding:20px;min-height:0}
 .v2-scope .v2-content [data-records],.v2-scope .v2-content [data-batch-rows]{display:grid;gap:14px}
 .v2-scope .v2-context{font-size:12px;color:var(--v2-muted);margin:0 0 16px}
-.v2-scope .v2-unsaved{padding:12px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--v2-line);background:var(--v2-selected)}
-.v2-scope .v2-unsaved[hidden],.v2-scope [data-v2-back][hidden]{display:none!important}
+.v2-scope [data-v2-back][hidden]{display:none!important}
 .v2-scope .v2-content :is(input,select,textarea){box-sizing:border-box;max-width:100%;font:inherit;border:1px solid var(--v2-line);background:var(--v2-bg);color:var(--v2-text);border-radius:7px;padding:8px 10px}
 .v2-scope .v2-content :is(.nt-task-fields,.w-batch-row){display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px;border:1px solid var(--v2-line);border-radius:10px;background:var(--v2-canvas);margin:0}
 .v2-scope .v2-content :is(.nt-name,.nt-record-head,.nt-period,.w-batch-row .w-full){grid-column:1/-1}
@@ -39,7 +38,7 @@
 .v2-scope .v2-content :is(.nt-error,.mw-error,.w-error){color:var(--v2-danger)}
 .v2-scope .v2-content .v2-section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}
 .v2-scope .v2-content .v2-section-head h3{font-size:14px;font-weight:500;margin:0}
-@media(max-width:600px){.v2-scope .v2-dialog-header{padding:12px;gap:8px}.v2-scope .v2-dialog-footer{padding:12px;gap:12px}.v2-scope .v2-dialog-footer .v2-actions{flex-wrap:wrap}.v2-scope .v2-content{padding:16px}.v2-scope .v2-content :is(.nt-task-fields,.w-batch-row,.nt-fields,.w-form-grid,.mw-grid){grid-template-columns:minmax(0,1fr)}.v2-scope .v2-content :is(input,select,textarea){font-size:16px}.v2-scope .v2-unsaved{padding:12px}}
+@media(max-width:600px){.v2-scope .v2-dialog-header{padding:12px;gap:8px}.v2-scope .v2-dialog-footer{padding:12px;gap:12px}.v2-scope .v2-dialog-footer .v2-actions{flex-wrap:wrap}.v2-scope .v2-content{padding:16px}.v2-scope .v2-content :is(.nt-task-fields,.w-batch-row,.nt-fields,.w-form-grid,.mw-grid){grid-template-columns:minmax(0,1fr)}.v2-scope .v2-content :is(input,select,textarea){font-size:16px}}
 @media(pointer:coarse){:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button,:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{min-height:44px}:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-header .v2-close{width:44px}}
 
 .v2-scope .v2-dialog-footer{display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0;padding:16px 20px;border-top:1px solid var(--v2-line);background:var(--v2-bg)}
@@ -65,12 +64,6 @@
 .v2-scope .v2-completion-form .v2-estimate-reference>div>span{color:var(--v2-muted)}
 .v2-scope .v2-completion-form .v2-estimate-reference>div>span:nth-child(2){flex:1}
 .v2-scope .v2-completion-form strong{white-space:nowrap}
-.v2-scope .v2-completion-time{margin-top:16px}
-.v2-scope .v2-completion-time summary{display:flex;align-items:center;gap:12px;list-style:none;font-size:13px;min-height:32px;cursor:pointer}
-.v2-scope .v2-completion-time summary::-webkit-details-marker{display:none}
-.v2-scope .v2-completion-time time{margin-left:auto;font-variant-numeric:tabular-nums}
-.v2-scope .v2-completion-time-input{display:flex;gap:12px;align-items:center;margin-top:8px}
-.v2-scope .v2-completion-time-input input{flex:1;min-width:0}
 .v2-scope .v2-compact:has(.v2-completion-form) .v2-dialog-subtitle{display:block;margin:5px 0 0;font-size:13px}
 @media(max-width:700px){.v2-scope .v2-task-arrangement{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}.v2-scope .v2-task-arrangement .v2-field:first-child{grid-column:1/-1}}
 

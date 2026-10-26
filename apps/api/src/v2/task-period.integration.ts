@@ -33,13 +33,17 @@ export async function verifyTaskPeriods(h: Harness): Promise<void> {
   assert.equal(snapshot.arrangements.some((a) => a.taskId === futureId && a.periodId === current.id), false);
   await Promise.all([read(), read()]);
   assert.equal((await read()).arrangements.filter((a) => a.taskId === id && a.periodId === current.id).length, 1);
-  const complete = { action: 'set_status', operationId: randomUUID(), taskId: id, version: task.version, status: 'completed', completion: { actualDays: 0.2, aiContribution: 'high', completedAt } };
+  await call('tasks', developer, { action: 'set_status', operationId: randomUUID(), taskId: id, version: task.version, status: 'in_progress' });
+  task = (await read()).tasks.find((row) => row.id === id); assert.ok(task?.startedAt);
+  const complete = { action: 'set_status', operationId: randomUUID(), taskId: id, version: task.version, status: 'completed', completion: { actualDays: 0.2, aiContribution: 'high', startedAt: createdAt, completedAt } };
   await call('tasks', manager, complete, 403);
   await call('tasks', developer, { ...complete, completion: { ...complete.completion, completedAt: new Date(Date.now() + 86400000).toISOString() } }, 409);
-  await call('tasks', developer, { ...complete, completion: { ...complete.completion, completedAt: new Date(Date.parse(createdAt) - 1000).toISOString() } }, 409);
+  await call('tasks', developer, { ...complete, completion: { ...complete.completion, startedAt: new Date(Date.parse(completedAt) + 1000).toISOString() } }, 409);
   await call('tasks', developer, complete); await call('tasks', developer, complete);
   snapshot = await read(); task = snapshot.tasks.find((t) => t.id === id); assert.ok(task);
-  assert.equal(task.completedAt, completedAt);
+  assert.equal(task.completedAt, completedAt); assert.equal(task.startedAt, createdAt);
+  const storedStart = z.array(z.object({ startedAt: z.string() })).parse(await source.query("SELECT DATE_FORMAT(started_at,'%Y-%m-%dT%H:%i:%s.000Z') AS startedAt FROM v2_tasks WHERE id=?", [id]));
+  assert.equal(storedStart[0]?.startedAt, createdAt);
   assert.equal(snapshot.arrangements.some((a) => a.taskId === id && a.periodId === current.id), false);
   const summary = z.array(v2SummaryRowSchema).parse(await call(`summary?periodId=${old.id}`, developer));
   assert.equal(summary.find((t) => t.taskId === id)?.status, 'completed');
@@ -71,8 +75,23 @@ export async function verifyTaskPeriods(h: Harness): Promise<void> {
   assert.match(nextWeek.generatedText, /已有后续安排不追加（后续工作）/u);
   // 私人任务共用时间校验，但不引入项目人天或AI字段。
   const privateId = v2ResultSchema.parse(await call('tasks', developer, { action: 'create_private', operationId: randomUUID(), task: { title: '私人完成时间验收', priority: 3 } })).objectIds[0]; assert.ok(privateId);
-  const privateAt = new Date().toISOString();
-  await call('tasks', developer, { action: 'set_status', operationId: randomUUID(), taskId: privateId, version: 0, status: 'completed', completion: { completedAt: privateAt, actualDays: null, aiContribution: null } });
+  const privateAt = new Date(`${old.endOn}T12:00:00+08:00`).toISOString();
+  await call('tasks', developer, { action: 'set_status', operationId: randomUUID(), taskId: privateId, version: 0, status: 'completed', completion: { startedAt: createdAt, completedAt: privateAt, actualDays: null, aiContribution: null } });
   assert.equal((await read()).tasks.find((t) => t.id === privateId)?.completedAt, privateAt);
+  let privateTask = (await read()).tasks.find((row) => row.id === privateId); assert.ok(privateTask);
+  assert.equal(privateTask.startedAt, createdAt);
+  assert.match(v2DailyReportSchema.parse(await call(`daily?on=${old.endOn}`, developer)).generatedText, /私人完成时间验收/u);
+  const correct = { action: 'save_task', operationId: randomUUID(), taskId: privateId, version: privateTask.version, completion: { startedAt: null, actualDays: null, aiContribution: null } };
+  await call('edit', developer, correct);
+  await call('edit', developer, { ...correct, operationId: randomUUID() }, 409);
+  privateTask = (await read()).tasks.find((row) => row.id === privateId); assert.ok(privateTask);
+  assert.equal(privateTask.startedAt, null); assert.equal(privateTask.completedAt, privateAt);
+  await call('tasks', developer, { action: 'set_status', operationId: randomUUID(), taskId: privateId, version: privateTask.version, status: 'in_progress' });
+  privateTask = (await read()).tasks.find((row) => row.id === privateId); assert.ok(privateTask?.startedAt);
+  assert.equal(privateTask.completedAt, null);
+  await call('tasks', developer, { action: 'set_status', operationId: randomUUID(), taskId: privateId, version: privateTask.version, status: 'completed', completion: { startedAt: null, completedAt: privateAt, actualDays: null, aiContribution: null } });
+  const privateHistory = v2TaskHistorySchema.parse(await call(`history?taskId=${privateId}`, developer));
+  assert.ok(privateHistory.some((event) => event.snapshot.startedAt === createdAt));
+  assert.equal(privateHistory.at(-1)?.snapshot.startedAt, null);
   console.log('Task periods API/database passed: automatic carry, copied estimate, future plan protection, time validation, authorization, idempotence, historical summary/daily correction, work notes, touched-arrangement rollback and private completion.');
 }

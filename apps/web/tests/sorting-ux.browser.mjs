@@ -109,7 +109,7 @@ try {
   await page.getByLabel('编辑文字').fill('手工编辑保留验证');
   await page.getByRole('button', { name: '关闭', exact: true }).first().click();
   await page.getByText('有未保存的修改。', { exact: true }).waitFor();
-  await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '取消', exact: true }).click();
   assert.equal(await page.getByLabel('编辑文字').inputValue(), '手工编辑保留验证');
   await page.getByRole('button', { name: '保存文字', exact: true }).click();
   await page.getByRole('button', { name: '编辑', exact: true }).waitFor();

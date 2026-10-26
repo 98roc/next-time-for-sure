@@ -24,7 +24,8 @@ export const v2RequiredPlannedDaysSchema = v2PlannedDaysSchema.refine((value): b
 export const v2ActualDaysSchema = z.number().finite().min(0).max(9999.99).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8, '实际人天最多两位小数').nullable();
 export const v2AiContributionSchema = z.enum(['none', 'low', 'medium', 'high']);
 export const v2AiContributionLabels: Record<z.infer<typeof v2AiContributionSchema>, string> = { none: '无 · 0%', low: '低 · 小于30%', medium: '中 · 30%–60%', high: '高 · 大于60%' };
-export const v2CompletionSchema = z.object({ actualDays: v2ActualDaysSchema, aiContribution: v2AiContributionSchema.nullable(), completedAt: v2InstantSchema.optional() }).strict();
+/** 实际起止时间可补录；开始时间省略表示保留，null 表示明确清空。 */
+export const v2CompletionSchema = z.object({ actualDays: v2ActualDaysSchema, aiContribution: v2AiContributionSchema.nullable(), startedAt: v2InstantSchema.nullable().optional(), completedAt: v2InstantSchema.optional() }).strict();
 export type V2Completion = z.infer<typeof v2CompletionSchema>;
 /** 每个周期独立的工作内容；省略时兼容旧客户端，空串明确清空。 */
 export const v2WorkNoteSchema = z.string().trim().max(500);
@@ -58,6 +59,8 @@ const taskFields = {
   id: v2IdSchema, title, priority: v2PrioritySchema, status: v2StatusSchema,
   creatorId: v2IdSchema, executorId: v2IdSchema, version: v2VersionSchema,
   completedAt: v2InstantSchema.nullable(), createdAt: v2InstantSchema, updatedAt: v2InstantSchema,
+  /** 本轮实际开始时间；null 为未知或清空，省略兼容旧历史快照。 */
+  startedAt: v2InstantSchema.nullable().optional(),
   deletedAt: v2InstantSchema.nullable(),
   actualDays: v2ActualDaysSchema.optional(), aiContribution: v2AiContributionSchema.nullable().optional(),
 };

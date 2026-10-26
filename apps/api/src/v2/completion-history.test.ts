@@ -10,6 +10,15 @@ const teamId = randomUUID(), ownerId = randomUUID();
 const task: V2Task = { id: randomUUID(), kind: 'project', teamId, projectId: randomUUID(), creatorId: ownerId, executorId: ownerId, title: '补录测试', priority: 3, milestoneId: null, status: 'in_progress', completedAt: null, createdAt: '2026-10-20T01:00:00.000Z', updatedAt: '2026-10-20T01:00:00.000Z', deletedAt: null, version: 0 };
 const makeEvent = (snapshot: V2Task, action: V2TaskEvent['action']): V2TaskEvent => ({ id: randomUUID(), taskId: task.id, sequence: snapshot.version, actorId: ownerId, occurredAt: snapshot.updatedAt, snapshot, action, beforeStatus: 'in_progress', executorName: '执行人', actorName: '执行人' });
 
+test('晚建任务补录到创建前，日报保留完成且系统开始不会覆盖补录结果', () => {
+  const done: V2Task = { ...task, version: 1, status: 'completed', startedAt: '2026-10-18T01:00:00.000Z', completedAt: '2026-10-19T01:00:00.000Z', updatedAt: '2026-10-22T01:00:00.000Z' };
+  const events = [makeEvent(task, 'created'), makeEvent(done, 'status_changed')];
+  assert.equal(taskEventAt(events, '2026-10-20T00:00:00.000Z')?.snapshot.status, 'completed');
+  assert.equal(taskEventAt(events, '2026-10-23T00:00:00.000Z')?.snapshot.status, 'completed');
+  assert.equal(dailyRows(events, [], '2026-10-19T00:00:00.000Z', '2026-10-20T00:00:00.000Z').length, 1);
+  assert.equal(events[0]?.snapshot.status, 'in_progress');
+});
+
 test('周一补录周日完成只纠正完成归属，操作时间、旧名称和之后重开保留', () => {
   const completed: V2Task = { ...task, version: 2, status: 'completed', completedAt: '2026-10-25T10:00:00.000Z', updatedAt: '2026-10-26T01:00:00.000Z' };
   const events = [makeEvent(task, 'created'), makeEvent({ ...task, title: '周一改名', version: 1, updatedAt: '2026-10-26T00:00:00.000Z' }, 'updated'), makeEvent(completed, 'status_changed')];

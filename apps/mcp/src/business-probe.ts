@@ -42,13 +42,13 @@ try {
   // Agent 同样必须填写实际投入，估算不能替代完成结果；普通执行人可维护已有周期预计。
   const missingResult = await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'completed' } } }, true);
   assert.equal(z.object({ status: z.number() }).parse(missingResult).status, 409);
-  const completedAt = new Date().toISOString();
-  await call('business_command', { request: { path: 'v2/edit', body: { action: 'save_task', operationId: randomUUID(), taskId: task.id, version: task.version, arrangements: [{ periodId: period.id, plannedDays: 1.25, workNote: 'MCP本期验收' }], status: 'completed', completion: { actualDays: 0, aiContribution: null, completedAt } } } });
+  const completedAt = new Date().toISOString(), startedAt = new Date(Date.parse(task.createdAt) - 3_600_000).toISOString();
+  await call('business_command', { request: { path: 'v2/edit', body: { action: 'save_task', operationId: randomUUID(), taskId: task.id, version: task.version, arrangements: [{ periodId: period.id, plannedDays: 1.25, workNote: 'MCP本期验收' }], status: 'completed', completion: { actualDays: 0, aiContribution: null, startedAt, completedAt } } } });
   let updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
   assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high');
   assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.plannedDays, 1.25);
   assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.workNote, 'MCP本期验收');
-  assert.equal(task.completedAt, completedAt);
+  assert.equal(task.completedAt, completedAt); assert.equal(task.startedAt, startedAt);
   await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'not_started' } } });
   updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
   assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high');

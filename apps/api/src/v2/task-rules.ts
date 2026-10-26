@@ -1,10 +1,10 @@
 import type { V2Milestone, V2Task, V2Status } from '@ntfs/contracts';
 
-/** 状态变化只更新当前完成日期；历史由服务追加事件，不能覆盖原有事件。 */
+/** 开始及重开记录本轮开始；退回未开始清空起止，历史由不可变事件保留。 */
 export function transitionTask(task: V2Task, status: V2Status, now: string): V2Task {
   if (task.deletedAt) throw new Error('任务已删除');
   if (task.status === status) return task;
-  return { ...task, status, completedAt: status === 'completed' ? now : null, updatedAt: now, version: task.version + 1 };
+  return { ...task, status, startedAt: status === 'not_started' ? null : status === 'in_progress' ? now : task.startedAt ?? null, completedAt: status === 'completed' ? now : null, updatedAt: now, version: task.version + 1 };
 }
 
 /** 改排先校验整套最终关系，避免先删后加留下无区间或覆盖目标已有投入。 */

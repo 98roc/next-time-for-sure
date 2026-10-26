@@ -78,7 +78,7 @@ try {
   await rows().nth(1).getByRole('button', { name: '编辑', exact: true }).click(); await active.getByLabel('子任务名称', { exact: true }).fill('待删除步骤');
   await rows().nth(1).getByRole('button', { name: '删除', exact: true }).click(); await active.getByRole('button', { name: '确认删除', exact: true }).click();
   await rows().first().waitFor(); assert.equal(await rows().count(), 2);
-  await active.getByRole('button', { name: '关闭', exact: true }).last().click(); await page.getByText('有未保存的修改。').waitFor(); await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+  await active.getByRole('button', { name: '关闭', exact: true }).last().click(); await page.getByText('有未保存的修改。').waitFor(); await page.getByRole('alertdialog').getByRole('button', { name: '取消', exact: true }).click();
   await page.screenshot({ path: evidence + '/subtasks.png', fullPage: true });
   await active.getByRole('button', { name: '保存', exact: true }).click(); await page.locator('dialog').waitFor({ state: 'hidden' });
   assert.deepEqual(subtasks.items.map(i => i.title), ['补充省直用户校验', '修复部门与角色联动']);

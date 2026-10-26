@@ -1,3 +1,4 @@
+import { ConfirmationPage } from './confirmation-page';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { v2SubtaskInputSchema, type V2SubtaskInput, type V2Subtasks, type V2Task } from '@ntfs/contracts';
@@ -61,5 +62,5 @@ function SubtasksContent({ task, incoming, readError }: { task: V2Task; incoming
 /** 确认页使用自身的返回栈位置，只移除草稿项，不触发父清单的未保存退出。 */
 function ConfirmSubtaskDelete({ item, onConfirm }: { item: V2SubtaskInput; onConfirm: () => void }) {
   const modal = useModal();
-  return <ModalPage title="删除子任务" actions={<button className="v2-danger" onClick={() => { onConfirm(); modal.finish(); }}>确认删除</button>}><p>确认删除“{item.title}”？</p><p className="v2-context">不改变主任务状态，历史日报保留当时的完成记录。返回清单保存后生效。</p></ModalPage>;
+  return <ConfirmationPage title="删除子任务" actions={<button className="v2-danger" onClick={() => { onConfirm(); modal.finish(); }}>确认删除</button>}><p>确认删除“{item.title}”？</p><p className="v2-context">不改变主任务状态，历史日报保留当时的完成记录。返回清单保存后生效。</p></ConfirmationPage>;
 }

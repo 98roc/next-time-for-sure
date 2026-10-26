@@ -1,0 +1,8 @@
+.v2-scope .v2-execution-times{margin-top:20px;padding-top:18px;border-top:1px solid var(--v2-line)}
+.v2-scope .v2-execution-times.is-collapsible{margin-top:16px;padding-top:0;border-top:0}
+.v2-scope .v2-execution-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:400;color:var(--v2-muted)}
+.v2-scope .v2-execution-inputs{margin-top:12px}
+.v2-scope .v2-execution-inputs[hidden]{display:none}
+.v2-scope .v2-execution-end{display:flex;align-items:center;gap:10px;min-width:0}
+.v2-scope .v2-execution-end input{flex:1;min-width:0}
+.v2-scope .v2-execution-end button{flex-shrink:0}

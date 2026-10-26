@@ -51,7 +51,7 @@ export async function saveTask(manager: EntityManager, context: V2Context, task:
   next = { ...next, version: task.version + 1, updatedAt: now };
   await reconcileCompletion(manager, task, next, now);
   await personal.place(next, task, command.categoryId);
-  await tasks.update(task, next, context.actor.id, task.status !== next.status ? 'status_changed' : task.completedAt !== next.completedAt ? 'completion_corrected' : 'updated');
+  await tasks.update(task, next, context.actor.id, task.status !== next.status ? 'status_changed' : (task.completedAt !== next.completedAt || task.startedAt !== next.startedAt) ? 'completion_corrected' : 'updated');
   if (task.status !== 'completed' && next.status === 'completed') await notifyTask(manager, context, next, 'completed');
   if (command.arrangement) await mutateTask(manager, context, { ...command.arrangement, operationId: command.operationId, action: 'change_arrangement', taskId: task.id, version: next.version }, next);
 }

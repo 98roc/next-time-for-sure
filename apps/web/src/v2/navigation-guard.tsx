@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useBlocker } from 'react-router-dom';
+import { ConfirmDialog } from './confirm-dialog';
 
 const GuardContext = createContext<((id: string, dirty: boolean) => void) | null>(null);
 
@@ -23,7 +24,7 @@ export function NavigationGuard({ children }: { children: ReactNode }) {
     window.addEventListener('beforeunload', prevent);
     return () => window.removeEventListener('beforeunload', prevent);
   }, [dirty]);
-  return <GuardContext.Provider value={register}>{children}{blocker.state === 'blocked' && <div className="v2-navigation-warning" role="alert"><span>有未保存的修改，离开后将丢失。</span><button onClick={() => blocker.reset()}>继续编辑</button><button className="v2-danger" onClick={() => blocker.proceed()}>放弃修改并离开</button></div>}</GuardContext.Provider>;
+  return <GuardContext.Provider value={register}>{children}{blocker.state === 'blocked' && <ConfirmDialog title="离开当前页面" confirmLabel="确认离开" onCancel={() => blocker.reset()} onConfirm={() => blocker.proceed()}><p>有未保存的修改，离开后将丢失。</p></ConfirmDialog>}</GuardContext.Provider>;
 }
 
 /** 每个编辑器独立登记，卸载时只清理自己的保护状态。 */

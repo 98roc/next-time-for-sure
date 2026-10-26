@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ModalPage } from './modal';
 import { Feedback, useAction } from './controls';
+import { ConfirmDialog } from './confirm-dialog';
 
 export type ReportDraft = { body: string; sourceHash: string; version: number };
 type ReportState = { text: ReportDraft & { manual: boolean; stale: boolean }; generatedText: string; currentSourceHash: string };
@@ -29,7 +30,7 @@ export function ReportTextEditor({ title, scope, state, canEdit, readError, onSa
     <button className={draft ? undefined : 'nt-primary'} disabled={busy} onClick={() => { void copy(); }}>一键复制</button>
   </>}>
     <section className="v2-text-report" aria-label="文字内容">{toolbar?.(busy || dirty || preview !== null)}<div className="v2-report-meta"><span>{scope} · {state.text.manual ? '已手工编辑' : '随任务自动更新'}</span><span role="status">{copyStatus}</span></div><Feedback error={readError} />
-      {cancelEdit && <div className="v2-report-notice" role="alert"><span>放弃本次未保存的文字？</span><button onClick={() => setCancelEdit(false)}>继续编辑</button><button onClick={() => { setDraft(null); setCancelEdit(false); }}>放弃修改</button></div>}
+      {cancelEdit && <ConfirmDialog title="放弃文字修改" confirmLabel="确认放弃" onCancel={() => setCancelEdit(false)} onConfirm={() => { setDraft(null); setCancelEdit(false); }}><p>放弃本次未保存的文字？</p></ConfirmDialog>}
       {state.text.stale && <div className="v2-report-notice" role="status"><span>来源有更新，文字版尚未同步。已保留你的文字。</span>{canEdit && !draft && <button disabled={busy || Boolean(readError)} onClick={() => { void action.act(() => save('verify', { body: state.text.body, sourceHash: state.currentSourceHash, version: state.text.version })); }}>我已核对，保留当前文字</button>}</div>}
       {draft ? <label className="v2-report-edit">编辑文字<textarea ref={textarea} rows={15} maxLength={200000} value={draft.body} disabled={busy} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label> : <pre ref={text}>{state.text.body}</pre>}
       {preview && <section className="v2-report-preview"><div className="v2-report-preview-head"><h3>重新生成预览</h3><div className="v2-actions"><button disabled={busy} onClick={() => setPreview(null)}>保留原文</button><button className="nt-primary" disabled={busy || previewStale || Boolean(readError)} onClick={() => { void action.act(() => save('regenerate', preview)); }}>确认替换</button></div></div><pre>{preview.body}</pre>{previewStale && <div className="v2-report-notice">来源或文字已变化，请更新预览后再次确认。<button onClick={newPreview}>更新预览</button></div>}<small>确认替换会覆盖手工文字，并恢复自动更新。</small></section>}

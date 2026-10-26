@@ -29,7 +29,8 @@ try {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === 'POST') {
       const command = route.request().postDataJSON(); commands.push(command);
-      if (command.action === 'set_status') { Object.assign(task, { status: command.status, completedAt: command.completion?.completedAt ?? new Date().toISOString(), actualDays: command.completion?.actualDays, aiContribution: command.completion?.aiContribution, version: task.version + 1 }); w.placements[0].categoryId = w.categories[2].id; }
+      if (command.action === 'set_status') { Object.assign(task, { status: command.status, startedAt: command.completion?.startedAt ?? null, completedAt: command.completion?.completedAt ?? new Date().toISOString(), actualDays: command.completion?.actualDays, aiContribution: command.completion?.aiContribution, version: task.version + 1 }); w.placements[0].categoryId = w.categories[2].id; }
+      else if (command.action === 'save_task') Object.assign(task, command.completion, { version: task.version + 1 });
       else assert.equal(command.action, 'create_project');
       return route.fulfill({ json: { objectIds: [task.id] } });
     }
@@ -38,12 +39,17 @@ try {
   });
   const active = page.locator('dialog [data-active="true"]');
   await page.goto(`http://127.0.0.1:${address.port}/personal`);
+  await page.getByRole('button', { name: task.title, exact: true }).click();
+  await active.getByRole('heading', { name: '编辑任务', exact: true }).waitFor();
+  assert.equal(await active.getByLabel('实际开始时间（北京时间）').count(), 0);
+  await active.getByRole('button', { name: '关闭', exact: true }).last().click();
   await page.locator('.mw-task').filter({ has: page.getByRole('button', { name: task.title, exact: true }) }).getByRole('button', { name: '完成', exact: true }).click();
   await active.getByLabel('累计实际投入（人天）', { exact: true }).fill('0.2');
-  assert.equal(await active.locator('.v2-completion-time').getAttribute('open'), null);
-  assert.match(await active.locator('time').textContent(), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/u);
+  assert.equal(await active.getByRole('button', { name: '开始完成时间' }).getAttribute('aria-expanded'), 'false');
+  assert.equal(await active.getByLabel('实际开始时间（北京时间）').isVisible(), false);
   await page.screenshot({ path: evidence + '/completion-dark.png', fullPage: true });
-  await active.locator('.v2-completion-time summary').click();
+  await active.getByRole('button', { name: '开始完成时间' }).click();
+  await active.getByLabel('实际开始时间（北京时间）').fill('2026-10-19T09:15');
   await active.getByLabel('实际完成时间（北京时间）').fill('2026-10-20T18:30');
   await page.screenshot({ path: evidence + '/completion-expanded.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -51,8 +57,22 @@ try {
   await page.screenshot({ path: evidence + '/completion-mobile.png', fullPage: true });
   await active.getByRole('button', { name: '确认完成', exact: true }).click();
   await page.locator('dialog').waitFor({ state: 'hidden' });
+  assert.equal(commands.at(-1).completion.startedAt, '2026-10-19T01:15:00.000Z');
   assert.equal(commands.at(-1).completion.completedAt, '2026-10-20T10:30:00.000Z');
   await page.setViewportSize({ width: 1440, height: 950 });
+  await page.goto(`http://127.0.0.1:${address.port}/work?project=${task.projectId}`);
+  await page.getByLabel('任务状态范围').selectOption('done');
+  await page.getByRole('button', { name: task.title, exact: true }).click();
+  await active.getByRole('heading', { name: '编辑任务', exact: true }).waitFor();
+  assert.equal(await active.getByLabel('实际开始时间（北京时间）').inputValue(), '2026-10-19T09:15');
+  assert.equal(await active.getByLabel('实际完成时间（北京时间）').inputValue(), '2026-10-20T18:30');
+  assert.equal(await active.getByRole('heading', { name: '开始完成时间', exact: true }).count(), 1);
+  await page.screenshot({ path: evidence + '/editor-completed.png', fullPage: true });
+  await active.getByLabel('实际开始时间（北京时间）').fill('');
+  await active.getByRole('button', { name: '保存', exact: true }).click();
+  await page.locator('dialog').waitFor({ state: 'hidden' });
+  assert.equal(commands.at(-1).completion.startedAt, null);
+  await page.goto(`http://127.0.0.1:${address.port}/personal`);
   await page.getByRole('button', { name: '＋ 新建任务', exact: true }).click();
   await active.getByRole('heading', { name: '新建任务', exact: true }).waitFor();
   await active.getByLabel(/^任务来源/u).selectOption(w.projects[0].id);
@@ -71,5 +91,5 @@ try {
   await page.locator('dialog').waitFor({ state: 'hidden' });
   assert.equal(commands.at(-1).task.workNote, '完成审计分支合并，验证主要功能');
   assert.deepEqual(errors, []);
-  console.log('PASS task periods UI: concrete collapsed timestamp, editable Shanghai time payload, compact completion, same-row optional work note, dark/light/narrow layouts. Mock API only.');
+  console.log('PASS task periods UI: collapsed result-header time entry, editable start/end Shanghai time payload, compact completion, same-row optional work note, dark/light/narrow layouts. Mock API only.');
 } finally { await browser?.close(); await server.close(); }

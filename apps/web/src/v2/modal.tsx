@@ -2,13 +2,14 @@ import { createContext, useContext, useEffect, useId, useRef, useState } from 'r
 import type { ReactNode } from 'react';
 import { createOperationId } from '../identity/operation-id';
 import { useNavigationGuard } from './navigation-guard';
+import { ConfirmDialog } from './confirm-dialog';
 
 type Page = { key: string; content: ReactNode };
 type Flow = { open: (content: ReactNode) => void; push: (content: ReactNode) => void; back: () => void; close: (force?: boolean) => void; finishPage: (key: string) => void; canBack: boolean; dirty: (key: string, value: boolean, busy: boolean) => void };
 const FlowContext = createContext<Flow | null>(null);
 const PageContext = createContext({ key: '', active: false });
 
-/** 单个原生模态层保留返回栈与草稿，所有确认均在同层切换。 */
+/** 业务视图共用返回栈与草稿；未保存退出通过独立短确认弹窗保护。 */
 export function ModalProvider({ children }: { children: ReactNode }) {
   const [pages, setPages] = useState<Page[]>([]);
   const [pending, setPending] = useState<'close' | 'back' | null>(null);
@@ -53,8 +54,8 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     dirty: (key, value, busy) => { dirty.current.set(key, value); locked.current.set(key, busy); },
   };
   return <FlowContext.Provider value={flow}>{children}{opened && <dialog ref={dialog} className="v2-dialog" aria-label="工作操作" onFocusCapture={(event) => { if (active && event.target instanceof HTMLElement && event.target.closest('[data-active="true"]')) pageFocus.current.set(active, event.target); }} onCancel={(event) => { event.preventDefault(); navigate(pages.length > 1 ? 'back' : 'close'); }}>
-    {pending && <div className="v2-unsaved" role="alert"><span>有未保存的修改。</span><button onClick={() => setPending(null)}>继续编辑</button><button className="v2-danger" onClick={() => navigate(pending, true)}>放弃修改并{pending === 'back' ? '返回' : '关闭'}</button></div>}
     {pages.map((page) => <div key={page.key} hidden={page.key !== active} data-active={page.key === active}><PageContext.Provider value={{ key: page.key, active: page.key === active }}>{page.content}</PageContext.Provider></div>)}
+    {pending && <ConfirmDialog title="放弃未保存的修改" confirmLabel="确认放弃" onCancel={() => setPending(null)} onConfirm={() => navigate(pending, true)}><p>有未保存的修改。</p><p>确认放弃修改并{pending === 'back' ? '返回上一页' : '关闭'}？</p></ConfirmDialog>}
   </dialog>}</FlowContext.Provider>;
 }
 

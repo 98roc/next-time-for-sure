@@ -48,12 +48,13 @@ export function V2Shell({ user }: { user: Identity }) { return <WorkspaceProvide
 /** 根容器包住模态层以共享原型变量，业务数据由同一个工作区提供。 */
 function Frame() {
   const { collapsed, toggle } = useSidebarPreference();
-  const path = useLocation().pathname;
+  const location = useLocation(), path = location.pathname;
   const variant = path === '/personal' ? 'personal' : path === '/weekly-plans' ? 'weekly' : 'project';
   const id = variant === 'personal' ? 'ntfs-my-work' : variant === 'weekly' ? 'ntfs-weekly-demo' : 'nt-project';
   const pageClass = variant === 'weekly' ? 'w-app' : variant === 'project' ? 'nt-app' : '';
   const pageLabel = navigation.find((link) => link.to === path)?.label ?? '工作空间';
-  return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider>
+  // 只有确认通过的路由切换才重置弹窗，避免旧页面草稿残留在新页面上。
+  return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider key={location.key}>
     <div className={`v2-frame${collapsed ? ' is-sidebar-collapsed' : ''}`}>
       <Sidebar />
       <div className="v2-body">
