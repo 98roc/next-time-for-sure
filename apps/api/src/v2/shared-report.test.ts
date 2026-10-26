@@ -22,6 +22,17 @@ test('编辑期间来源改变保留人工文字与未同步提示，复制目�
   assert.throws(() => editReport(savedAgain, saved.version, '旧窗口覆盖', hash), /其他人/);
 });
 
+test('周报与计划各取本期工作，空内容不加括号，备注变化不覆盖手工稿', () => {
+  const task = { taskId: randomUUID(), title: '系统改造', executorName: '成员甲' };
+  const group = { projectId: randomUUID(), projectName: '项目甲' };
+  const withNotes: V2ReportSource = { ...source, summary: [{ ...group, tasks: [{ ...task, workNote: '完成联调' }] }], plan: [{ ...group, tasks: [{ ...task, workNote: '部署验证' }, { ...task, taskId: randomUUID(), title: '日常巡检', workNote: '  ' }] }] };
+  assert.equal(generateReportText(withNotes), '2026-10-12—2026-10-18\n项目甲\n1.系统改造（完成联调） 成员甲\n\n2026-10-19—2026-10-25\n项目甲\n1.系统改造（部署验证） 成员甲\n2.日常巡检 成员甲');
+  const saved = editReport(null, 0, '已编辑的正式周报', reportSourceHash(source));
+  assert.equal(presentReport(saved, withNotes).body, saved.body);
+  assert.equal(presentReport(saved, withNotes).stale, true);
+  assert.equal(confirmReport(saved, saved.version, reportSourceHash(withNotes), withNotes, true).body, generateReportText(withNotes));
+});
+
 test('过期重新生成被拒绝，确认新来源才替换，手工核对保留原文', () => {
   const hash = reportSourceHash(source);
   const saved = editReport(null, 0, '人工文字', hash);

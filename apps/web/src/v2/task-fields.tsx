@@ -14,7 +14,7 @@ export function TaskFields({ value, onChange, data, selfId, disabled = false, on
     <PriorityField value={value.priority} disabled={disabled} onChange={(priority) => onChange({ ...value, priority })} />
     {children}
     <Field label="关联里程碑" full><select disabled={disabled} value={value.milestoneId ?? ''} onChange={(event) => onChange({ ...value, milestoneId: event.target.value || null })}><option value="">不关联里程碑</option>{milestoneOptions(data.milestones, value.projectId, originalMilestoneId).map((row) => <option key={row.id} value={row.id}>{row.title}{row.status === 'completed' ? '（已完成）' : ''}</option>)}</select></Field>
-  </div>{showArrangement && <TaskArrangements value={[{ periodId: value.periodId, plannedDays: value.plannedDays }, ...(value.additionalArrangements ?? [])]} periods={data.periods} canSchedule canEstimate disabled={disabled} onChange={(arrangements) => { const [first, ...additionalArrangements] = arrangements; if (first) onChange({ ...value, ...first, additionalArrangements }); }} />}</>;
+  </div>{showArrangement && <TaskArrangements value={[{ periodId: value.periodId, plannedDays: value.plannedDays, workNote: value.workNote }, ...(value.additionalArrangements ?? [])]} periods={data.periods} canSchedule canEstimate disabled={disabled} onChange={(arrangements) => { const [first, ...additionalArrangements] = arrangements; if (first) onChange({ ...value, ...first, additionalArrangements }); }} />}</>;
 }
 
 /** 优先级采用固定五级，数字越小优先级越高。 */

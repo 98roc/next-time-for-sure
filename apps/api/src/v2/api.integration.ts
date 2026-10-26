@@ -1,3 +1,5 @@
+import { verifyTaskPeriods } from './task-period.integration.js';
+import { TaskRolloverService } from './task-rollover.service.js';
 import { verifySorting } from './sorting.integration.js';
 import { verifyEffort } from './effort.integration.js';
 import { verifyPersonalWork } from './personal-work.integration.js';
@@ -38,7 +40,7 @@ async function smoke(): Promise<void> {
       for (const [id, roles] of [[lead.id, ['project_lead']], [developer.id, ['developer']], [manager.id, ['project_manager']]]) await db.query('INSERT INTO project_members(project_id,account_id,roles_json) VALUES (?,?,?)', [projectId, id, JSON.stringify(roles)]);
       await db.query('INSERT INTO project_members(project_id,account_id,roles_json) VALUES (?,?,?)', [hiddenProjectId, outsider.id, JSON.stringify(['project_manager', 'project_lead', 'developer'])]);
     });
-    app = await NestFactory.create(AppModule, { logger: false }); app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new SafeExceptionFilter()); await app.listen(0, '127.0.0.1'); base = await app.getUrl();
+    app = await NestFactory.create(AppModule, { logger: false }); app.get(TaskRolloverService).onModuleDestroy(); app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new SafeExceptionFilter()); await app.listen(0, '127.0.0.1'); base = await app.getUrl();
 
     /** 只在测试内持有 Cookie，不写入文件或输出。 */
     async function call(path: string, actor: typeof leader, body?: unknown, expected = 200) {
@@ -171,7 +173,7 @@ async function smoke(): Promise<void> {
       const arrangements = [{ periodId: next.id, plannedDays: 1 }];
       const impact = v2ImpactSchema.parse(await call('impact', lead, { action: 'save_arrangements', taskId: id, version, arrangements }));
       await call('edit', lead, { action: 'save_task', operationId: randomUUID(), taskId: id, version, arrangements, arrangementConfirmation: impact.confirmation });
-      if (mode === 'move_first') { await summaryContains(true); await setStatus('not_started'); }
+      if (mode === 'move_first') { await summaryContains(false); await setStatus('not_started'); }
       await summaryContains(false);
       const stored = z.array(z.object({ periodId: z.string() })).parse(await source.query('SELECT period_id AS periodId FROM v2_arrangements WHERE task_id=?', [id]));
       assert.deepEqual(stored.map((row) => row.periodId), [next.id]);
@@ -292,6 +294,8 @@ async function smoke(): Promise<void> {
     assert.equal(v2MessagesSchema.parse(await call('notifications', developer)).total, 0);
     const remainingMessages = z.array(z.object({ count: z.coerce.number() })).parse(await source.query('SELECT COUNT(*) AS count FROM v2_notifications WHERE account_id=?', [developer.id]));
     assert.equal(remainingMessages[0]?.count, 0);
+    stage = 'task periods and completion time';
+    await verifyTaskPeriods({ source, lead, developer, manager, projectId, call, state });
     stage = 'revocation before idempotence';
     await source.query('DELETE FROM project_members WHERE project_id=? AND account_id=?', [projectId, lead.id]);
     assert.equal(v2MessagesSchema.parse(await call('notifications', lead)).total, 0);

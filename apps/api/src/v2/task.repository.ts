@@ -26,13 +26,13 @@ export class V2TaskRepository {
   }
 
   /** 每次聚合更新只追加一个对应版本事件，执行人代改由实际 actorId 留痕。 */
-  async update(previous: V2Task, task: V2Task, actorId: string, action: V2TaskEvent['action'] = 'updated'): Promise<void> {
+  async update(previous: V2Task, task: V2Task, actorId: string | null, action: V2TaskEvent['action'] = 'updated'): Promise<void> {
     await this.manager.query('UPDATE v2_tasks SET title=?,executor_id=?,milestone_id=?,priority=?,status=?,completed_at=?,actual_days=?,ai_contribution=?,deleted_at=?,version=?,updated_at=? WHERE id=?', [task.title, task.executorId, task.milestoneId, task.priority, task.status, dbTime(task.completedAt), task.actualDays ?? null, task.aiContribution ?? null, dbTime(task.deletedAt), task.version, dbTime(task.updatedAt), task.id]);
     await this.event(task, actorId, action, previous.status);
   }
 
   /** 事件快照保留当前业务字段而不保存认证或旧说明内容。 */
-  async event(task: V2Task, actorId: string, action: V2TaskEvent['action'], beforeStatus: V2TaskEvent['beforeStatus']): Promise<void> {
+  async event(task: V2Task, actorId: string | null, action: V2TaskEvent['action'], beforeStatus: V2TaskEvent['beforeStatus']): Promise<void> {
     const names = z.array(z.object({ id: z.string(), name: z.string() })).parse(await this.manager.query('SELECT id,display_name AS name FROM accounts WHERE id IN (?,?)', [task.executorId, actorId]));
     const projects = task.projectId ? z.array(z.object({ name: z.string() })).parse(await this.manager.query('SELECT name FROM projects WHERE id=?', [task.projectId])) : [];
     const snapshot = { task, projectName: projects[0]?.name ?? null, executorName: names.find((row) => row.id === task.executorId)?.name ?? null, actorName: names.find((row) => row.id === actorId)?.name ?? null };
@@ -42,7 +42,7 @@ export class V2TaskRepository {
   /** 读取已授权任务的不可变事件；排序在相同毫秒下仍以版本稳定。 */
   async history(taskIds: string[]): Promise<V2TaskEvent[]> {
     if (!taskIds.length) return [];
-    const rows = z.array(z.object({ snapshot_json: z.unknown(), id: z.string(), taskId: z.string(), sequence: z.number(), actorId: z.string(), action: z.string(), beforeStatus: z.string().nullable(), occurredAt: z.string() })).parse(await this.manager.query(`SELECT id,task_id AS taskId,sequence,actor_id AS actorId,action,before_status AS beforeStatus,snapshot_json,${instantColumn('occurred_at','occurredAt')} FROM v2_task_events WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY occurred_at,sequence`, taskIds));
+    const rows = z.array(z.object({ snapshot_json: z.unknown(), id: z.string(), taskId: z.string(), sequence: z.number(), actorId: z.string().nullable(), action: z.string(), beforeStatus: z.string().nullable(), occurredAt: z.string() })).parse(await this.manager.query(`SELECT id,task_id AS taskId,sequence,actor_id AS actorId,action,before_status AS beforeStatus,snapshot_json,${instantColumn('occurred_at','occurredAt')} FROM v2_task_events WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY occurred_at,sequence`, taskIds));
     const converted = z.array(z.object({ taskId: z.string() })).parse(await this.manager.query(`SELECT converted_task_id AS taskId FROM v2_backlog WHERE converted_task_id IN (${taskIds.map(() => '?').join(',')})`, taskIds));
     return rows.map(({ snapshot_json, ...row }) => {
       const decoded = decodeJson(snapshot_json);
@@ -67,25 +67,34 @@ export class V2TaskRepository {
   /** 当前安排供编辑使用，历史总结不能用此查询替代有效时间片。 */
   async arrangements(taskIds: string[]) {
     if (!taskIds.length) return [];
-    return z.array(v2ArrangementSchema.extend({ plannedDays: z.coerce.number().nullable() })).parse(await this.manager.query(`SELECT task_id AS taskId,period_id AS periodId,planned_days AS plannedDays,position,version FROM v2_arrangements WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY position,task_id`, taskIds));
+    return z.array(v2ArrangementSchema.extend({ plannedDays: z.coerce.number().nullable() })).parse(await this.manager.query(`SELECT task_id AS taskId,period_id AS periodId,planned_days AS plannedDays,work_note AS workNote,carried_from_period_id AS carriedFromPeriodId,position,version FROM v2_arrangements WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY position,task_id`, taskIds));
   }
 
-  /** 加入区间创建真实安排历史，预计天数不会从其他区间自动复制。 */
-  async addArrangement(task: V2Task, periodId: string, plannedDays: number | null, actorId: string, now: string): Promise<void> {
-    await this.manager.query('INSERT INTO v2_arrangements(task_id,period_id,team_id,planned_days,position) SELECT ?,?,?,?,COALESCE(MAX(position),-1)+1 FROM v2_arrangements WHERE period_id=?', [task.id, periodId, task.teamId, plannedDays, periodId]);
-    await this.manager.query("INSERT INTO v2_arrangement_history(id,task_id,period_id,actor_id,planned_days,provenance,valid_from) VALUES (?,?,?,?,?,'scheduled',?)", [randomUUID(), task.id, periodId, actorId, plannedDays, dbTime(now)]);
+  /** 新安排保留内容和来源；系统顺延复制预计值，但不复制人工工作文本。 */
+  async addArrangement(task: V2Task, periodId: string, plannedDays: number | null, actorId: string | null, now: string, workNote = '', carriedFromPeriodId: string | null = null): Promise<void> {
+    await this.manager.query('INSERT INTO v2_arrangements(task_id,period_id,team_id,planned_days,work_note,carried_from_period_id,position) SELECT ?,?,?,?,?,?,COALESCE(MAX(position),-1)+1 FROM v2_arrangements WHERE period_id=?', [task.id, periodId, task.teamId, plannedDays, workNote, carriedFromPeriodId, periodId]);
+    await this.arrangementEvent(task.id, periodId, plannedDays, actorId, now, workNote, carriedFromPeriodId);
   }
 
-  /** 关闭片段后删除当前关系；历史仍保留，末区间保护在上层执行。 */
-  async removeArrangement(taskId: string, periodId: string, now: string): Promise<void> {
+  /** 关闭片段后删除当前关系；补录完成只作废未经人工修改的系统顺延。 */
+  async removeArrangement(taskId: string, periodId: string, now: string, voided = false): Promise<void> {
     await this.manager.query('UPDATE v2_arrangement_history SET valid_until=? WHERE task_id=? AND period_id=? AND valid_until IS NULL', [dbTime(now), taskId, periodId]);
+    if (voided) await this.manager.query('UPDATE v2_arrangement_history SET voided=1 WHERE task_id=? AND period_id=?', [taskId, periodId]);
     await this.manager.query('DELETE FROM v2_arrangements WHERE task_id=? AND period_id=?', [taskId, periodId]);
   }
 
-  /** 原区间估算更新保留旧片段及位置，不丢失安排开始前已存在的证据。 */
-  async estimate(task: V2Task, periodId: string, plannedDays: number | null, actorId: string, now: string): Promise<void> {
-    await this.manager.query('UPDATE v2_arrangements SET planned_days=?,version=version+1 WHERE task_id=? AND period_id=?', [plannedDays, task.id, periodId]);
+  /** 内容或估算变更保留历史及顺延来源；省略工作内容时不清空旧值。 */
+  async estimate(task: V2Task, periodId: string, plannedDays: number | null, actorId: string, now: string, workNote?: string): Promise<void> {
+    const old = (await this.arrangements([task.id])).find((row) => row.periodId === periodId);
+    if (!old) throw new Error('周期安排已不存在');
+    const note = workNote ?? old.workNote ?? '';
+    await this.manager.query('UPDATE v2_arrangements SET planned_days=?,work_note=?,version=version+1 WHERE task_id=? AND period_id=?', [plannedDays, note, task.id, periodId]);
     await this.manager.query('UPDATE v2_arrangement_history SET valid_until=? WHERE task_id=? AND period_id=? AND valid_until IS NULL', [dbTime(now), task.id, periodId]);
-    await this.manager.query("INSERT INTO v2_arrangement_history(id,task_id,period_id,actor_id,planned_days,provenance,valid_from) VALUES (?,?,?,?,?,'scheduled',?)", [randomUUID(), task.id, periodId, actorId, plannedDays, dbTime(now)]);
+    await this.arrangementEvent(task.id, periodId, plannedDays, actorId, now, note, old.carriedFromPeriodId ?? null);
+  }
+
+  /** 同一来源的实际写入时刻用于审计；自动操作以空操作者明确标识。 */
+  private async arrangementEvent(taskId: string, periodId: string, plannedDays: number | null, actorId: string | null, now: string, workNote: string, carriedFromPeriodId: string | null): Promise<void> {
+    await this.manager.query('INSERT INTO v2_arrangement_history(id,task_id,period_id,actor_id,planned_days,work_note,carried_from_period_id,provenance,valid_from) VALUES (?,?,?,?,?,?,?,?,?)', [randomUUID(), taskId, periodId, actorId, plannedDays, workNote, carriedFromPeriodId, actorId === null ? 'carried' : 'scheduled', dbTime(now)]);
   }
 }

@@ -37,8 +37,9 @@ export async function buildWeeklyState(manager: EntityManager, context: V2Contex
   const groups = (side: 'summary' | 'plan'): V2ReportGroup[] => projectOrder.ids.map((projectId) => {
     const order = taskOrders.find((row) => row.projectId === projectId && row.periodId === (side === 'summary' ? summaryPeriod.id : planPeriod.id));
     return { projectId, projectName: context.organization.projects.find((project) => project.id === projectId)?.name ?? '项目', tasks: (order?.ids ?? []).flatMap((taskId) => {
-      if (side === 'summary') { const row = summary.find((entry) => entry.taskId === taskId); return row ? [{ taskId, title: row.title ?? '历史内容不可还原', executorName: row.executorName ?? '历史姓名不可还原' }] : []; }
-      const row = current.find((entry) => entry.id === taskId); return row ? [{ taskId, title: row.title, executorName: person(row.executorId) }] : [];
+      if (side === 'summary') { const row = summary.find((entry) => entry.taskId === taskId); return row ? [{ taskId, title: row.title ?? '历史内容不可还原', executorName: row.executorName ?? '历史姓名不可还原', workNote: row.workNote ?? '' }] : []; }
+      const row = current.find((entry) => entry.id === taskId);
+      return row ? [{ taskId, title: row.title, executorName: person(row.executorId), workNote: arrangements.find((entry) => entry.taskId === taskId && entry.periodId === planPeriod.id)?.workNote ?? '' }] : [];
     }) };
   });
   const relatedIds = new Set([...summary.map((row) => row.taskId), ...arrangements.filter((row) => row.periodId === planPeriod.id).map((row) => row.taskId)]);

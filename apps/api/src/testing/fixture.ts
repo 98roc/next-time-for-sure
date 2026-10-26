@@ -10,6 +10,7 @@ import { SafeExceptionFilter } from '../safe-exception.filter.js';
 import { loadEnvironment } from '../config/environment.js';
 import { createDataSource } from '../database/data-source.js';
 import { digest } from '../identity/password.js';
+import { TaskRolloverService } from '../v2/task-rollover.service.js';
 
 export type Session = { id: string; cookie: string; csrf: string; bearer?: string };
 export type Fixture = { source: DataSource; base: string; prefix: string; teamId: string; projectId: string; otherProjectId: string; admin: Session; leader: Session; developer: Session; outsider: Session; call: (path: string, actor?: Session, body?: unknown) => Promise<Response> };
@@ -33,7 +34,10 @@ export async function withFixture(verify: (fixture: Fixture) => Promise<void>): 
     for (const member of [leader, developer, outsider]) await source.query('UPDATE accounts SET team_id=? WHERE id=?', [teamId, member.id]);
     for (const id of [projectId, otherProjectId]) await source.query('INSERT INTO projects(id,team_id,name) VALUES (?,?,?)', [id, teamId, id === projectId ? '测试可见项目' : '测试隔离项目']);
     await source.query('INSERT INTO project_members(project_id,account_id,roles_json) VALUES (?,?,?),(?,?,?),(?,?,?)', [projectId, leader.id, JSON.stringify(['project_manager', 'project_lead']), projectId, developer.id, JSON.stringify(['developer']), otherProjectId, outsider.id, JSON.stringify(['project_manager', 'project_lead', 'developer'])]);
-    app = await NestFactory.create(AppModule, { logger: false }); app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new SafeExceptionFilter()); await app.listen(0, '127.0.0.1');
+    app = await NestFactory.create(AppModule, { logger: false });
+    // 随机夹具只通过自己的工作区触发顺延，后台轮询不得修改本机其他团队。
+    app.get(TaskRolloverService).onModuleDestroy();
+    app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new SafeExceptionFilter()); await app.listen(0, '127.0.0.1');
     const base = await app.getUrl();
     const call: Fixture['call'] = (path, auth, body) => fetch(`${base}/api/v1/${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { ...(auth?.bearer ? { Authorization: `Bearer ${auth.bearer}` } : { Origin: base }), 'Content-Type': 'application/json', Cookie: auth?.cookie ?? '', 'X-CSRF-Token': auth?.csrf ?? '' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(15000) });
     await verify({ source, base, prefix, teamId, projectId, otherProjectId, admin, leader, developer, outsider, call });

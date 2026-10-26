@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { V2Period } from '@ntfs/contracts';
 
-export type V2ReportGroup = { projectId: string; projectName: string; tasks: { taskId: string; title: string; executorName: string }[] };
+export type V2ReportGroup = { projectId: string; projectName: string; tasks: { taskId: string; title: string; executorName: string; workNote?: string }[] };
 export type V2ReportSource = { teamId: string; summaryPeriod: V2Period; planPeriod: V2Period; summary: V2ReportGroup[]; plan: V2ReportGroup[]; revision: string };
 export type V2ReportText = { body: string; manual: boolean; sourceHash: string; version: number };
 
@@ -10,7 +10,11 @@ export function generateReportText(source: V2ReportSource): string {
   if (source.summaryPeriod.teamId !== source.teamId || source.planPeriod.teamId !== source.teamId) throw new Error('文字版区间必须属于当前团队');
   const block = (period: V2Period, groups: V2ReportGroup[]) => [
     `${period.startOn}—${period.endOn}`,
-    ...groups.filter((group) => group.tasks.length).flatMap((group) => [group.projectName, ...group.tasks.map((task, index) => `${index + 1}.${task.title} ${task.executorName}`)]),
+    ...groups.filter((group) => group.tasks.length).flatMap((group) => [group.projectName, ...group.tasks.map((task, index) => {
+      // 按本侧周期取工作内容，空值不显示括号，跨入口提交的换行收为同一任务行。
+      const note = task.workNote?.trim().replace(/\s+/gu, ' ');
+      return `${index + 1}.${task.title}${note ? `（${note}）` : ''} ${task.executorName}`;
+    })]),
   ].join('\n');
   return `${block(source.summaryPeriod, source.summary)}\n\n${block(source.planPeriod, source.plan)}`;
 }

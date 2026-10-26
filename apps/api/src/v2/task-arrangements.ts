@@ -28,8 +28,8 @@ export async function saveArrangements(manager: EntityManager, context: V2Contex
   // 原周期未变仅追加估算历史；变更关系先验证完整目标集合，事务内保留至少一条安排。
   for (const row of rows) {
     const old = previous.find((item) => item.periodId === row.periodId);
-    if (!old) await repository.addArrangement(task, row.periodId, row.plannedDays, context.actor.id, now);
-    else if (old.plannedDays !== row.plannedDays) await repository.estimate(task, row.periodId, row.plannedDays, context.actor.id, now);
+    if (!old) await repository.addArrangement(task, row.periodId, row.plannedDays, context.actor.id, now, row.workNote);
+    else if (old.plannedDays !== row.plannedDays || (row.workNote !== undefined && (old.workNote ?? '') !== row.workNote)) await repository.estimate(task, row.periodId, row.plannedDays, context.actor.id, now, row.workNote);
   }
   for (const row of previous) if (!rows.some((item) => item.periodId === row.periodId)) await repository.removeArrangement(task.id, row.periodId, now);
 }

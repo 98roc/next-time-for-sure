@@ -1,3 +1,4 @@
+import { taskEventAt } from './completion-history.js';
 import type { EntityManager } from 'typeorm';
 import type { V2DailyReport, V2TaskEvent } from '@ntfs/contracts';
 import type { V2Context } from './context.js';
@@ -11,7 +12,8 @@ type DailyRow = { taskId: string; title: string; projectId: string | null; proje
 /** 按日末事实合并主任务与子任务，主任务未完成时只带出当天已完成步骤。 */
 export function dailyRows(events: V2TaskEvent[], snapshots: SubtaskSnapshot[], start: string, endExclusive: string): DailyRow[] {
   const latest = new Map<string, V2TaskEvent>();
-  for (const event of events) if (event.occurredAt < endExclusive && event.sequence > (latest.get(event.taskId)?.sequence ?? -1)) latest.set(event.taskId, event);
+  const ids = new Set(events.map((event) => event.taskId));
+  for (const id of ids) { const event = taskEventAt(events.filter((row) => row.taskId === id), endExclusive); if (event) latest.set(id, event); }
   const rows = new Map<string, DailyRow>();
   for (const event of latest.values()) {
     const task = event.snapshot;

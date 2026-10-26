@@ -45,8 +45,8 @@ export class PersonalWorkRepository {
 
   /** 仅定位曾由本人执行且在当天完成的任务，再用历史状态核实，兼容旧快照封装。 */
   async completedTaskHistory(ownerId: string, start: string, endExclusive: string, additionalIds: string[] = []) {
-    const rows = z.array(z.object({ id: z.string() })).parse(await this.manager.query(`SELECT DISTINCT task_id AS id FROM v2_task_events WHERE occurred_at<? AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.task.executorId')),JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.executorId')))=? AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.task.completedAt')),JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.completedAt')))>=? AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.task.completedAt')),JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.completedAt')))<?`, [dbTime(endExclusive), ownerId, start, endExclusive]));
-    return (await new V2TaskRepository(this.manager).history([...new Set([...rows.map((row) => row.id), ...additionalIds])])).filter((event) => event.snapshot.executorId === ownerId && event.occurredAt < endExclusive);
+    const rows = z.array(z.object({ id: z.string() })).parse(await this.manager.query(`SELECT DISTINCT task_id AS id FROM v2_task_events WHERE COALESCE(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.task.executorId')),JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.executorId')))=? AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.task.completedAt')),JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.completedAt')))>=? AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.task.completedAt')),JSON_UNQUOTE(JSON_EXTRACT(snapshot_json,'$.completedAt')))<?`, [ownerId, start, endExclusive]));
+    return (await new V2TaskRepository(this.manager).history([...new Set([...rows.map((row) => row.id), ...additionalIds])])).filter((event) => event.snapshot.executorId === ownerId);
   }
 
   /** 账号及日期共同定位文字，不存在跨账号共享稿。 */

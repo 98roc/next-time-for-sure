@@ -8,8 +8,9 @@ description: 在下次一定 V2.0 中查询、创建和维护单执行人项目�
 正式任务必须有名称、一个有效项目执行人和至少一个团队日期区间。优先级 1—5，默认 3；里程碑可选。没有明确安排时使用待建事项，不创建无执行人任务。创建经 `v2/tasks` 的 create_project 或 create_batch，稳定 operationId 用于重试；本人普通研发创建时只能指定本人。
 
 - 编辑使用 `v2/edit` 的 save_task，共用网页原子保存契约。团队负责人和项目研发负责人可维护范围内核心字段；普通执行人可维护状态、个人分类、已有周期预计投入和完成结果。状态仅未开始、进行中、已完成；不维护进度百分比、分工、进展、拆分、阻塞、归档或取消任务。
-- 完成项目任务传 `completion: { actualDays, aiContribution }`；实际人天必填，允许0，最多两位小数，8小时为1人天。AI档位为 none/low/medium/high，分别为0%、大于0小于30%、30%至60%、大于60%；首次未填默认high。不得猜测实际人天；重开保留结果，再完成记录累计总数。私人任务不接受这两个字段。
-- 全量周期安排使用 `save_task.arrangements`，至少一行，日期不得重复、预计投入人天必填（允许0，最多两位小数）；普通执行人仅改现有周期的预计值。增删或改排先预览 `save_arrangements`，提交对应 `arrangementConfirmation`，与任务修改原子保存。创建可通过 `additionalArrangements` 带入其他周期。
+- 完成项目任务传 `completion: { actualDays, aiContribution, completedAt? }`；实际人天必填，允许0，最多两位小数，8小时为1人天。AI档位为 none/low/medium/high，分别为0%、大于0小于30%、30%至60%、大于60%；首次未填默认high。不得猜测实际人天或完成时间；未传completedAt使用服务器提交时刻，明确补录时将北京时间转换为带毫秒的UTC ISO字符串。完成时间不得早于创建、最近开始/重开或改派，不得晚于当前时间；会纠正周报和日报归属，审计保留提交时刻。重开保留结果，再完成记录累计总数。私人任务可传完成时间，但actualDays和aiContribution必须为null。
+- 全量周期安排使用 `save_task.arrangements`，至少一行，日期不得重复、预计投入人天必填（允许0，最多两位小数），可选workNote为本期工作、最多500字。普通执行人可改已有周期的预计值和本期工作；省略workNote保留旧值，空串清空。增删或改排先预览 `save_arrangements`，提交对应 `arrangementConfirmation`，与任务修改原子保存。创建首期及additionalArrangements均可携带workNote；自动周报输出“任务名称（本期工作）”，手工稿不自动覆盖。
+- 未开始或进行中且仅有过去安排的任务自动追加当前周期，复制最近预计投入、本期工作留空，carriedFromPeriodId表示系统来源。已有当前/未来安排或人工撤销本期时不重复追加。显式补录完成时间只撤销未经人工修改的多余自动追加；存在人工修改则409，先核对并按授权取消安排，不能绕过冲突删除人工内容。
 - 日期及排序使用 `v2/planning`；已有任务通过任务编辑追加安排，填写预计投入，不复制任务。`v2/add-existing` 已移除。不能取消最后一个安排，可原子改排。不得将历史空预计值自动补为 0。
 - 私人一层子任务查询 `v2/subtasks`（query.taskId），完整保存用同路径 `save_subtasks`：taskId、version、items（id/title/completed）、removedIds、operationId。只允许本人当前执行的项目或个人任务；主子状态独立，不转交私人内容。先读取完整清单，保留未修改项及顺序；删除须展示具体子项并取得授权，明确列入 removedIds，不能靠漏传实现隐式删除。完成时间由服务端记录，不填日期、人员或工时。
 - 里程碑通过 `v2/projects` 维护，不填写负责人或 ownerId。仅项目研发负责人手动确认完成；空节点或关联任务全部完成才允许。完成后任务回退保留节点完成状态及核验提醒，不自动重开。

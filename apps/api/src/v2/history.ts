@@ -1,3 +1,4 @@
+import { completionTimeline, taskEventAt } from './completion-history.js';
 import { classifyPlanning } from './planning-classification.js';
 import type { V2ArrangementHistory, V2Period, V2TaskEvent, V2Status } from '@ntfs/contracts';
 import { periodWindow } from './calendar.js';
@@ -6,6 +7,7 @@ import { periodWindow } from './calendar.js';
 export type V2SummaryRow = {
   taskId: string; createdAt: string | null; title: string | null; executorId: string | null; executorName: string | null; projectId: string | null;
   status: V2Status | null; priority: number | null; arranged: boolean; executed: boolean;
+  workNote?: string; carriedFromPeriodId?: string | null;
   planning: 'planned' | 'unplanned' | 'unknown'; historyIncomplete: boolean;
 };
 
@@ -47,28 +49,30 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
   const rows: V2SummaryRow[] = [];
   for (const [taskId, group] of grouped) {
     const history = orderedHistory(group);
+    const availableHistory = history.filter((event) => event.occurredAt <= now);
     const known = history.filter((event) => event.occurredAt < end);
-    const snapshot = known.at(-1)?.snapshot;
+    const snapshot = taskEventAt(availableHistory, end)?.snapshot;
     // 截止回看时已删除的任务不再进入总结；区间结束后的删除不改写该区间历史。
     if (snapshot?.deletedAt) continue;
     const relevant = arrangements.filter((arrangement) => {
-      if (arrangement.taskId !== taskId || arrangement.periodId !== period.id || (arrangement.validUntil !== null && arrangement.validUntil <= window.start)) return false;
+      if (arrangement.voided || arrangement.taskId !== taskId || arrangement.periodId !== period.id || (arrangement.validUntil !== null && arrangement.validUntil <= window.start)) return false;
       // 迁移可在区间结束后承接旧安排；展示该关联但不把补录时刻倒填为提前计划。
-      const lateMigration = arrangement.provenance !== 'scheduled' && arrangement.validFrom >= window.endExclusive && arrangement.validFrom <= now;
+      const lateMigration = ['migration_supplement', 'migration_unknown'].includes(arrangement.provenance) && arrangement.validFrom >= window.endExclusive && arrangement.validFrom <= now;
       return arrangement.validFrom < end || lateMigration;
     });
     const arranged = relevant.length > 0;
-    const executed = end > window.start && executedDuring(known, window.start, end);
-    if (!arranged && !executed) continue;
+    const executed = end > window.start && executedDuring(completionTimeline(availableHistory), window.start, end);
+    if (!arranged) continue;
 
-    // 未开始且已移出该区间时，不因曾进行中或曾有安排继续占据总结。
+    // 总结严格按截止时有效排期展示，移出后不因曾执行继续占据本期。
     // 以回看截止时刻判断，区间结束后的改期、回退不能改写历史；午夜取消归下一区间。
     const arrangedAtEnd = relevant.some((row) => row.validUntil === null || row.validUntil >= end);
-    if (snapshot?.status === 'not_started' && !arrangedAtEnd) continue;
+    if (!arrangedAtEnd) continue;
 
+    const periodDetails = [...relevant].sort((a, b) => a.validFrom.localeCompare(b.validFrom)).at(-1);
     const first = history[0];
     const historyIncomplete = known.length === 0 || (first?.action === 'migrated' && first.occurredAt > window.start);
-    rows.push({ taskId, createdAt: snapshot?.createdAt ?? first?.snapshot.createdAt ?? null, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: classifyPlanning(period, history, arrangements), historyIncomplete });
+    rows.push({ workNote: periodDetails?.workNote ?? '', carriedFromPeriodId: periodDetails?.carriedFromPeriodId ?? null, taskId, createdAt: snapshot?.createdAt ?? first?.snapshot.createdAt ?? null, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: classifyPlanning(period, history, arrangements), historyIncomplete });
   }
   return rows;
 }

@@ -23,9 +23,9 @@ export function usePersonalBoard() {
     const current = data.placements.find((row) => row.taskId === drop.id);
     const siblings = data.placements.filter((row) => row.categoryId === current?.categoryId).sort((a, b) => a.position - b.position);
     if (drop.kind === 'task' && current?.categoryId === drop.scope && (siblings[siblings.findIndex((row) => row.taskId === drop.id) + 1]?.taskId ?? null) === drop.beforeId) return;
-    const completing = drop.kind === 'task' && task?.kind === 'project' && task.status !== 'completed' && data.categories.find((row) => row.id === drop.scope)?.status === 'completed';
+    const completing = drop.kind === 'task' && task && task.status !== 'completed' && data.categories.find((row) => row.id === drop.scope)?.status === 'completed';
     if (completing && task) {
-      modal.open(createElement(TaskCompletion, { title: task.title, initial: taskCompletion(task), arrangements: data.arrangements.filter((row) => row.taskId === task.id), onConfirm: (completion: V2Completion) => persistDrop(drop, completion) }));
+      modal.open(createElement(TaskCompletion, { privateTask: task.kind === 'private', title: task.title, initial: taskCompletion(task), arrangements: data.arrangements.filter((row) => row.taskId === task.id), onConfirm: (completion: V2Completion) => persistDrop(drop, completion) }));
     } else void persistDrop(drop).catch(() => undefined);
   }
   async function persistDrop(drop: BoardDrop, completion?: V2Completion) {

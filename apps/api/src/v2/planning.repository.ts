@@ -47,7 +47,7 @@ export class V2PlanningRepository {
   /** 仅加载已授权任务历史，不能借共享区间读取私人或无权项目。 */
   async arrangementHistory(taskIds: string[]) {
     if (!taskIds.length) return [];
-    return z.array(z.object({ plannedDays: z.coerce.number().nullable() }).passthrough().pipe(v2ArrangementHistorySchema)).parse(await this.manager.query(`SELECT id,task_id AS taskId,period_id AS periodId,provenance,planned_days AS plannedDays,${instantColumn('valid_from','validFrom')},${instantColumn('valid_until','validUntil')} FROM v2_arrangement_history WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY valid_from,id`, taskIds));
+    return z.array(z.object({ plannedDays: z.coerce.number().nullable(), voided: z.coerce.boolean().optional() }).passthrough().pipe(v2ArrangementHistorySchema)).parse(await this.manager.query(`SELECT id,task_id AS taskId,period_id AS periodId,provenance,planned_days AS plannedDays,work_note AS workNote,carried_from_period_id AS carriedFromPeriodId,voided,${instantColumn('valid_from','validFrom')},${instantColumn('valid_until','validUntil')} FROM v2_arrangement_history WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY valid_from,id`, taskIds));
   }
   /** 完整作用域在组织锁内合并新增项并保存，避免下一次新增挤乱已置顶对象。 */
   async order(teamId: string, scope: string, ids: string[], newestIds = ids) {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { v2PersonalPreferencesSchema } from './v2-personal-work.js';
-import { v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
+import { v2WorkNoteSchema, v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
 import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2RequiredPlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
 import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organization.js';
 
@@ -13,7 +13,7 @@ export const v2TeamMessagesSchema = z.array(z.string().trim().max(v2TeamMessageL
 export const v2ProjectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })), canManage: z.boolean(), canCreate: z.boolean(), canConfirmMilestone: z.boolean() });
 export const v2BacklogSchema = z.object({ id, createdAt: v2InstantSchema, projectId: id, creatorId: id, title: z.string(), priority: v2PrioritySchema, version, convertedTaskId: id.nullable(), deletedAt: v2InstantSchema.nullable() });
 export type V2Backlog = z.infer<typeof v2BacklogSchema>;
-export const v2ArrangementSchema = z.object({ taskId: id, periodId: id, plannedDays: z.number().nullable(), position: z.number().int(), version });
+export const v2ArrangementSchema = z.object({ taskId: id, periodId: id, plannedDays: z.number().nullable(), position: z.number().int(), version, workNote: v2WorkNoteSchema.optional(), carriedFromPeriodId: id.nullable().optional() });
 export type V2Arrangement = z.infer<typeof v2ArrangementSchema>;
 export const v2PlacementSchema = z.object({ taskId: id, categoryId: id, position: z.number().int() });
 export const v2OrderSchema = z.object({ ids: z.array(id), version, manual: z.boolean().default(false) });
@@ -82,7 +82,7 @@ export const v2ImpactSchema = z.object({ confirmation, title: z.string(), detail
 export type V2Impact = z.infer<typeof v2ImpactSchema>;
 export const v2TaskHistorySchema = z.array(v2TaskEventSchema);
 
-export const v2SummaryRowSchema = z.object({ taskId: id, createdAt: v2InstantSchema.nullable().default(null), title: z.string().nullable(), executorId: id.nullable(), executorName: z.string().nullable(), projectId: id.nullable(), status: v2StatusSchema.nullable(), priority: v2PrioritySchema.nullable(), arranged: z.boolean(), executed: z.boolean(), planning: z.enum(['planned', 'unplanned', 'unknown']), historyIncomplete: z.boolean() });
+export const v2SummaryRowSchema = z.object({ taskId: id, createdAt: v2InstantSchema.nullable().default(null), title: z.string().nullable(), executorId: id.nullable(), executorName: z.string().nullable(), projectId: id.nullable(), status: v2StatusSchema.nullable(), priority: v2PrioritySchema.nullable(), workNote: v2WorkNoteSchema.optional(), carriedFromPeriodId: id.nullable().optional(), arranged: z.boolean(), executed: z.boolean(), planning: z.enum(['planned', 'unplanned', 'unknown']), historyIncomplete: z.boolean() });
 export type V2SummaryRow = z.infer<typeof v2SummaryRowSchema>;
 export const v2WeeklyStateSchema = z.object({
   summaryPeriod: v2PeriodSchema, planPeriod: v2PeriodSchema, summary: z.array(v2SummaryRowSchema),
@@ -113,7 +113,7 @@ export const v2TaskEditSchema = z.object({
     z.object({ kind: z.literal('private'), title: z.string().trim().min(1).max(200), priority: v2PrioritySchema }).strict(),
   ]).optional(),
   status: v2StatusSchema.optional(), categoryId: id.optional(), milestoneConfirmation: confirmation.optional(),
-  arrangement: z.object({ periodId: id, targetPeriodId: id, plannedDays: v2RequiredPlannedDaysSchema, confirmation }).strict().optional(),
+  arrangement: z.object({ periodId: id, targetPeriodId: id, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional(), confirmation }).strict().optional(),
   arrangements: v2ArrangementsInputSchema.optional(), arrangementConfirmation: confirmation.optional(), completion: v2CompletionSchema.optional(),
 }).strict();
 export type V2TaskEdit = z.infer<typeof v2TaskEditSchema>;

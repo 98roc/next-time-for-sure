@@ -35,7 +35,7 @@ await page.route('**/api/v1/**', async (route) => {
 });
 const active = page.locator('dialog [data-active="true"]');
 const values = () => active.locator('.v2-task-arrangement select').evaluateAll((fields) => fields.map((field) => field.value));
-const estimates = () => active.locator('.v2-task-arrangement input').evaluateAll((fields) => fields.map((field) => field.value));
+const estimates = () => active.locator('.v2-task-arrangement input[type="number"]').evaluateAll((fields) => fields.map((field) => field.value));
 const close = () => active.getByRole('button', { name: '关闭', exact: true }).last().click();
 async function save() {
   await active.getByRole('button', { name: '保存', exact: true }).click();

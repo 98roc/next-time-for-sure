@@ -1,3 +1,4 @@
+import { rolloverTeam } from './task-rollover.js';
 import { readMessages } from './notifications.js';
 import { PersonalWorkRepository } from './personal-work.repository.js';
 import { readProjectOrders } from './project-orders.js';
@@ -40,7 +41,7 @@ export class V2WorkspaceService {
       const context = await loadV2Context(manager, this.identity, token), today = shanghaiDate(new Date().toISOString());
       const personal = new V2PersonalRepository(manager), planning = new V2PlanningRepository(manager), projects = new V2ProjectRepository(manager), tasks = new V2TaskRepository(manager);
       await personal.ensure(context.actor.id);
-      if (context.teamId) await planning.ensure(context.teamId, today);
+      if (context.teamId) await rolloverTeam(manager, context.teamId);
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { messages: [], version: 0 };
       return {

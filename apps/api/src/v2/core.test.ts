@@ -133,7 +133,7 @@ test('任意项目研发负责人可确认里程碑，团队负责人不自动�
   assert.equal(changed.status, 'completed'); assert.equal(changed.needsReview, true);
 });
 
-test('历史总结涵盖跨区间持续进行，之后完成与重开不回写历史', () => {
+test('历史总结严格按排期展示，之后完成与重开不回写历史', () => {
   const started = transitionTask(initial, 'in_progress', '2026-10-13T01:00:00.000Z');
   const done = transitionTask(started, 'completed', '2026-10-28T01:00:00.000Z');
   const reopened = transitionTask(done, 'in_progress', '2026-11-03T01:00:00.000Z');
@@ -142,9 +142,10 @@ test('历史总结涵盖跨区间持续进行，之后完成与重开不回写�
   const now = '2026-11-04T01:00:00.000Z';
   const first = summarizePeriod(period, history, arrangements, now)[0];
   assert.equal(first?.status, 'in_progress'); assert.equal(first?.planning, 'planned');
-  const ongoing = summarizePeriod(second, history, arrangements, now)[0];
-  assert.equal(ongoing?.status, 'in_progress'); assert.equal(ongoing?.executed, true); assert.equal(ongoing?.arranged, false); assert.equal(ongoing?.planning, 'planned');
-  assert.equal(summarizePeriod(third, history, arrangements, now)[0]?.status, 'completed');
+  assert.equal(summarizePeriod(second, history, arrangements, now).length, 0);
+  const scheduled = [...arrangements, arrangement(initial, second), arrangement(initial, third)];
+  assert.equal(summarizePeriod(second, history, scheduled, now)[0]?.status, 'in_progress');
+  assert.equal(summarizePeriod(third, history, scheduled, now)[0]?.status, 'completed');
   assert.equal(history[1]?.actorId, lead);
 });
 
@@ -153,7 +154,7 @@ test('区间末午夜变化归入下一区间，相同毫秒按版本回看', ()
   const reopened = transitionTask(done, 'in_progress', done.updatedAt);
   const history = [event(reopened, reopened.updatedAt, 'status_changed', 'completed'), event(initial, initial.createdAt, 'created', null), event(done, done.updatedAt, 'status_changed', 'not_started')];
   assert.equal(summarizePeriod(period, history, [arrangement(initial, period)], '2026-10-20T01:00:00.000Z')[0]?.status, 'not_started');
-  assert.equal(summarizePeriod(second, history, [], '2026-10-20T01:00:00.000Z')[0]?.status, 'in_progress');
+  assert.equal(summarizePeriod(second, history, [arrangement(initial, second)], '2026-10-20T01:00:00.000Z')[0]?.status, 'in_progress');
 });
 
 test('撤销安排不伪造计划内，迁移补录不补造历史状态，私人任务不进入总结', () => {
@@ -205,10 +206,11 @@ test('突发新任务仅首次当前区间计划外，已有执行偏移、延�
   assert.equal(summarizePeriod(period, [{ ...created, fromBacklog: true }], rows, '2026-10-13T00:00:00.000Z')[0]?.planning, 'planned');
   const started = transitionTask(task, 'in_progress', '2026-10-13T01:00:00.000Z');
   const history = [created, event(started, started.updatedAt, 'status_changed', 'not_started')];
-  assert.equal(summarizePeriod(second, history, rows, '2026-10-21T00:00:00.000Z')[0]?.planning, 'planned');
+  assert.equal(summarizePeriod(second, history, rows, '2026-10-21T00:00:00.000Z').length, 0);
+  assert.equal(summarizePeriod(second, history, [...rows, arrangement(task, second)], '2026-10-21T00:00:00.000Z')[0]?.planning, 'planned');
   const futureRows = [arrangement(task, second, createdAt)];
-  assert.equal(summarizePeriod(period, history, futureRows, '2026-10-14T00:00:00.000Z')[0]?.planning, 'planned');
-  assert.equal(summarizePeriod(period, history, [...rows.map((row) => ({ ...row, validUntil: '2026-10-14T00:00:00.000Z' })), arrangement(task, second, '2026-10-14T00:00:00.000Z')], '2026-10-21T00:00:00.000Z')[0]?.planning, 'unplanned');
+  assert.equal(summarizePeriod(period, history, futureRows, '2026-10-14T00:00:00.000Z').length, 0);
+  assert.equal(summarizePeriod(period, history, [...rows.map((row) => ({ ...row, validUntil: '2026-10-14T00:00:00.000Z' })), arrangement(task, second, '2026-10-14T00:00:00.000Z')], '2026-10-21T00:00:00.000Z').length, 0);
 });
 
 test('未开始移出周期立即移除总结，曾进行中再退回也不保留，周期结束不重新出现', () => {
@@ -226,16 +228,16 @@ test('未开始移出周期立即移除总结，曾进行中再退回也不保�
   }
 });
 
-test('改期后回退未开始同样移除，仍进行中或已完成保留实际执行', () => {
+test('改期后所有状态均按排期移出本期总结', () => {
   const movedAt = '2026-10-14T00:00:00.000Z';
   const started = transitionTask(initial, 'in_progress', '2026-10-13T01:00:00.000Z');
   const history = [event(initial, initial.createdAt, 'created', null), event(started, started.updatedAt, 'status_changed', 'not_started')];
   const rows = [{ ...arrangement(initial, period), validUntil: movedAt }, arrangement(initial, second, movedAt)];
-  assert.equal(summarizePeriod(period, history, rows, movedAt)[0]?.status, 'in_progress');
+  assert.equal(summarizePeriod(period, history, rows, movedAt).length, 0);
   for (const status of ['not_started', 'completed'] as const) {
     const changed = transitionTask(started, status, '2026-10-15T00:00:00.000Z');
     const result = summarizePeriod(period, [...history, event(changed, changed.updatedAt, 'status_changed', 'in_progress')], rows, changed.updatedAt);
-    assert.equal(result.length, status === 'completed' ? 1 : 0);
+    assert.equal(result.length, 0);
   }
 });
 
@@ -250,5 +252,5 @@ test('区间结束后改期和回退不改写当时安排与状态，午夜取�
   const reset = transitionTask(started, 'not_started', boundary);
   const history = [created, event(started, started.updatedAt, 'status_changed', 'not_started'), event(reset, reset.updatedAt, 'status_changed', 'in_progress')];
   const rows = [{ ...arrangement(initial, period), validUntil: '2026-10-14T00:00:00.000Z' }, arrangement(initial, second)];
-  assert.equal(summarizePeriod(period, history, rows, '2026-10-21T00:00:00.000Z')[0]?.status, 'in_progress');
+  assert.equal(summarizePeriod(period, history, rows, '2026-10-21T00:00:00.000Z').length, 0);
 });
