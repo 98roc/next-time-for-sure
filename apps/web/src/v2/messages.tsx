@@ -73,8 +73,8 @@ function MessagesDialog() {
 
 /** 消息中的历史名称不授予任务权限；删除、移出项目或会话失效时不打开旧快照。 */
 function MessageTask({ taskId }: { taskId: string }) {
-  const { user } = useWorkspace();
-  const query = useQuery({ queryKey: ['message-target', user.id, taskId], queryFn: readWorkspace, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false });
+  const { user, data } = useWorkspace();
+  const query = useQuery({ queryKey: ['message-target', user.id, data.team?.id, taskId], queryFn: () => readWorkspace(data.team?.id), staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false });
   if (query.isFetching) return <ModalPage title="任务"><p role="status">正在核验任务…</p></ModalPage>;
   if (query.isError) return <ModalPage title="任务"><p role="alert">{query.error.message}</p><button onClick={() => { void query.refetch(); }}>重试</button></ModalPage>;
   const task = query.data?.tasks.find((row) => row.id === taskId);

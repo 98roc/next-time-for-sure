@@ -30,9 +30,9 @@ export function CommandForm({ action, targetId, data, pending, submit, cancel }:
     const value = (key: string) => String(form.get(key) ?? '');
     let input: unknown;
     switch (action) {
-      case 'create_account': input = { action, loginName: value('loginName'), displayName: value('displayName'), password: value('password') }; break;
+      case 'create_account': input = { action, loginName: value('loginName'), displayName: value('displayName'), password: value('password'), isSuperAdmin: value('role') === 'admin' }; break;
       case 'create_member': input = { action, teamId: team?.id, loginName: value('loginName'), displayName: value('displayName'), password: value('password') }; break;
-      case 'update_account': input = { action, accountId: account?.id, loginName: value('loginName'), displayName: value('displayName'), version: account?.version }; break;
+      case 'update_account': input = { action, accountId: account?.id, loginName: value('loginName'), displayName: value('displayName'), isSuperAdmin: value('role') === 'admin', version: account?.version }; break;
       case 'delete_account': input = { action, accountId: account?.id, version: account?.version }; break;
       case 'create_team': input = { action, name: value('name'), leaderId: value('leaderId') }; break;
       case 'update_team': input = { action, teamId: team?.id, name: value('name'), leaderId: value('leaderId'), version: team?.version }; break;
@@ -53,6 +53,7 @@ export function CommandForm({ action, targetId, data, pending, submit, cancel }:
     {action === 'set_disabled' && <p>{account?.disabled ? '启用后可以重新登录，原会话不会恢复。' : '停用后立即禁止登录和 Agent 调用，工作记录保留。'}</p>}
     {(creatingAccount || action === 'update_account' || action === 'link_member') && <label>登录账号<input name="loginName" required minLength={3} maxLength={64} autoComplete="off" defaultValue={action === 'update_account' ? account?.loginName : ''} /></label>}
     {(creatingAccount || action === 'update_account') && <label>姓名<input name="displayName" required maxLength={100} defaultValue={account?.displayName} /></label>}
+    {(action === 'create_account' || action === 'update_account') && <label>角色<select name="role" aria-label="角色" defaultValue={account?.isSuperAdmin ? 'admin' : 'member'}><option value="member">普通账号</option><option value="admin">系统管理员</option></select><small>系统管理员可管理账号、团队和所有项目，私人内容仍仅本人可见。</small></label>}
     {(creatingAccount || action === 'reset_password') && <label>临时密码<input type="password" name="password" required minLength={passwordMinLength} maxLength={passwordMaxLength} pattern={passwordPattern.source} title={passwordHint} autoComplete="new-password" /><small>{passwordHint}首次登录必须修改临时密码。</small></label>}
     {action === 'link_member' && <p className="subtitle">输入已有账号的登录名；该账号须已启用且未加入其他团队。</p>}
     {['create_team', 'update_team'].includes(action) && <label>名称<input name="name" required maxLength={100} defaultValue={action === 'update_team' ? team?.name : ''} /></label>}

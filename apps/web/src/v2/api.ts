@@ -7,6 +7,9 @@ import { IdentityApiError } from '../identity/api';
 export type Commands = { tasks: V2TaskCommand; projects: V2ProjectCommand; personal: V2PersonalCommand; planning: V2PlanningCommand; report: V2ReportCommand; team: V2TeamCommand; edit: V2TaskEdit; subtasks: V2SubtasksCommand; daily: V2DailyCommand; 'personal-settings': V2PersonalSettingsCommand };
 const resultSchema = z.object({ objectIds: z.array(z.string().uuid()) });
 
+/** 团队上下文显式随请求发送，后端重新鉴权，不从浏览器偏好推断写入范围。 */
+function scopedPath(path: string, teamId?: string): string { return teamId ? `${path}?${new URLSearchParams({ teamId })}` : path; }
+
 /** 同源 Cookie 认证；轮询标记为被动，业务写入不做自动重试。 */
 async function request<T>(path: string, schema: z.ZodType<T>, body?: unknown, csrf?: string, passive = false): Promise<T> {
   const response = await fetch(`/api/v1/v2/${path}`, {
@@ -20,19 +23,19 @@ async function request<T>(path: string, schema: z.ZodType<T>, body?: unknown, cs
 }
 
 /** 当前工作区由服务器按当前成员关系裁剪。 */
-export const readWorkspace = () => request('workspace', v2WorkspaceSchema, undefined, undefined, true);
+export const readWorkspace = (teamId?: string) => request(`workspace${teamId ? `?${new URLSearchParams({ teamId })}` : ''}`, v2WorkspaceSchema, undefined, undefined, true);
 /** 日期组合必须相邻，筛选不缩小共享文字范围。 */
-export const readWeekly = (summaryPeriodId: string, planPeriodId: string) => request(`weekly?${new URLSearchParams({ summaryPeriodId, planPeriodId })}`, v2WeeklyStateSchema, undefined, undefined, true);
+export const readWeekly = (summaryPeriodId: string, planPeriodId: string, teamId?: string) => request(`weekly?${new URLSearchParams({ summaryPeriodId, planPeriodId, ...(teamId ? { teamId } : {}) })}`, v2WeeklyStateSchema, undefined, undefined, true);
 /** 历史权限每次由服务重新校验。 */
 export const readHistory = (taskId: string) => request(`history?${new URLSearchParams({ taskId })}`, v2TaskHistorySchema);
 /** 独立项目区间汇总沿用服务端历史规则。 */
-export const readSummary = (periodId: string) => request(`summary?${new URLSearchParams({ periodId })}`, z.array(v2SummaryRowSchema), undefined, undefined, true);
+export const readSummary = (periodId: string, teamId?: string) => request(`summary?${new URLSearchParams({ periodId, ...(teamId ? { teamId } : {}) })}`, z.array(v2SummaryRowSchema), undefined, undefined, true);
 /** 影响确认必须使用服务器摘要，不能由客户端拼接。 */
-export const readImpact = (intent: V2ImpactIntent) => request('impact', v2ImpactSchema, intent);
+export const readImpact = (intent: V2ImpactIntent, teamId?: string) => request(scopedPath('impact', teamId), v2ImpactSchema, intent);
 /** 只读取当前项目成员移出阻塞项。 */
-export const readMemberImpact = (input: V2MemberImpactInput) => request('members-impact', v2MemberImpactSchema, input);
+export const readMemberImpact = (input: V2MemberImpactInput, teamId?: string) => request(scopedPath('members-impact', teamId), v2MemberImpactSchema, input);
 /** 命令和地址一一对应，防止不同入口生成不同语义。 */
-export const sendCommand = <K extends keyof Commands>(path: K, body: Commands[K], csrf: string) => request(path, resultSchema, body, csrf);
+export const sendCommand = <K extends keyof Commands>(path: K, body: Commands[K], csrf: string, teamId?: string) => request(scopedPath(path, teamId), resultSchema, body, csrf);
 
 /** 最近七天的本人消息，后台刷新不续期登录。 */
 export const readMessages = (page: number) => request(`notifications?page=${page}`, v2MessagesSchema, undefined, undefined, true);

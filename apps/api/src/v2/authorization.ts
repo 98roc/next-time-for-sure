@@ -2,7 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import type { V2ProjectCommand, V2Task, V2TaskCommand } from '@ntfs/contracts';
 import { requireProject, requireProjectMember, type V2Context } from './context.js';
-import { canChangeTaskStatus, canConfirmMilestone, canCreateProjectTask, canManageProject, canViewTask } from './permissions.js';
+import { canChangeTaskStatus, canConfirmMilestone, canCreateProjectTask, canManageProject, canParticipateProject, canViewTask } from './permissions.js';
 import { V2ProjectRepository } from './project.repository.js';
 import { V2TaskRepository } from './task.repository.js';
 
@@ -25,6 +25,7 @@ export function authorizeTaskCommand(context: V2Context, command: V2TaskCommand,
   }
   const existing = requireTask(context, task);
   const project = context.projects.find((row) => row.id === existing.projectId);
+  if (existing.kind === 'project' && (!project || !canParticipateProject(context.actor, project))) throw new ForbiddenException('当前项目仅有查看权限。');
   const manage = project !== undefined && canManageProject(context.actor, project);
   if (command.action === 'delete') {
     if (existing.kind === 'private' || manage || (existing.creatorId === context.actor.id && existing.status === 'not_started')) return;
@@ -45,6 +46,7 @@ export async function authorizeProjectCommand(manager: EntityManager, context: V
   const projectId = 'projectId' in command ? command.projectId : backlog?.projectId ?? milestone?.projectId ?? task?.projectId;
   if (!projectId) throw new NotFoundException('对象不存在或无权访问。');
   const project = requireProject(context, projectId);
+  if (!canParticipateProject(context.actor, project)) throw new ForbiddenException('当前项目仅有查看权限。');
   const manage = canManageProject(context.actor, project);
   if (command.action === 'create_backlog') return projectId;
   if (command.action === 'convert_backlog' && command.task.projectId === projectId && canCreateProjectTask(context.actor, project, command.task.executorId)) { requireProjectMember(context, project, command.task.executorId); return projectId; }

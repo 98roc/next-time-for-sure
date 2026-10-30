@@ -19,7 +19,8 @@ import './task-editor.css';
 export function TaskEditor({ task }: { task: V2Task }) {
   const { data, user, run, notify } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
   const project = data.projects.find((row) => row.id === task.projectId), manage = task.kind === 'private' || Boolean(project?.canManage), self = task.executorId === user.id;
-  const canStatus = manage || self, canDelete = manage || (task.creatorId === user.id && task.status === 'not_started');
+  const canContribute = task.kind === 'private' || project?.canContribute !== false;
+  const canStatus = canContribute && (manage || self), canDelete = canContribute && (manage || (task.creatorId === user.id && task.status === 'not_started'));
   const [originalArrangements] = useState(() => orderArrangements(data.arrangements.filter((row) => row.taskId === task.id).map(({ periodId, plannedDays, workNote, unplanned }) => ({ periodId, plannedDays, workNote: workNote ?? '', unplanned: unplanned ?? undefined })), data.periods));
   const [arrangements, setArrangements] = useState<V2ArrangementInput[]>(originalArrangements);
   const [draft, setDraft] = useState<V2ProjectTaskInput>({ projectId: task.projectId ?? '', title: task.title, remark: task.remark ?? '', priority: task.priority, executorId: task.executorId, milestoneId: task.milestoneId, periodId: originalArrangements[0]?.periodId ?? '', plannedDays: originalArrangements[0]?.plannedDays ?? null });
@@ -70,7 +71,7 @@ export function TaskEditor({ task }: { task: V2Task }) {
   function remove() { modal.push(<Confirmation intent={{ action: 'delete_task', taskId: task.id, version: task.version }} label="删除任务" danger onConfirm={(confirmation) => run('tasks', { action: 'delete', taskId: task.id, version: task.version, operationId: createOperationId(), confirmation })} onDone={modal.finish} />); }
   const statusFields = <><Field label="当前执行状态">{canStatus ? <select value={status} onChange={(event) => { const next = v2StatusSchema.parse(event.target.value); changeStatus(next); if (self && next !== status) setCategoryId(data.categories.find((row) => row.status === next && row.isDefault)?.id ?? ''); }}>{v2StatusSchema.options.map((value) => <option key={value} value={value}>{v2StatusLabels[value]}</option>)}</select> : <StatusBadge status={task.status} />}</Field>
     {self && draft.executorId === user.id && <Field label="个人分类"><select value={categoryId} onChange={(event) => { const row = data.categories.find((item) => item.id === event.target.value); if (row) { setCategoryId(row.id); changeStatus(row.status); } }}>{data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>}</>;
-  return <ModalPage title="编辑任务" className="v2-task-editor" wide={task.kind === 'project'} busy={action.busy} dirty={dirty} actions={<>
+  return <ModalPage title={canStatus ? '编辑任务' : '任务详情'} className="v2-task-editor" wide={task.kind === 'project'} busy={action.busy} dirty={dirty} actions={<>
     {canDelete && <button className="v2-danger" disabled={action.busy || stale} onClick={remove}>删除任务</button>}
     {canStatus && <button className="nt-primary" type="submit" form={formId} disabled={action.busy || stale || !dirty}>保存</button>}
   </>}>

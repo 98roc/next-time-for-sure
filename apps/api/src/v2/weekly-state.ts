@@ -49,6 +49,6 @@ export async function buildWeeklyState(manager: EntityManager, context: V2Contex
   });
   const relatedIds = new Set([...summary.map((row) => row.taskId), ...arrangements.filter((row) => row.periodId === planPeriod.id).map((row) => row.taskId)]);
   const source: V2ReportSource = { teamId: context.teamId, summaryPeriod, planPeriod, summary: groups('summary'), plan: groups('plan'), revision: hashValue({ tasks: current.filter((task) => relatedIds.has(task.id)).map((task) => [task.id, task.version]), summary, arrangements: arrangements.filter((row) => row.periodId === summaryPeriod.id || row.periodId === planPeriod.id), taskOrders, projectOrder }) };
-  const saved = context.teamLeader ? await planning.report(context.teamId, summaryPeriod.id, planPeriod.id) : null;
+  const saved = context.teamLeader || context.actor.isSuperAdmin ? await planning.report(context.teamId, summaryPeriod.id, planPeriod.id) : null;
   return { source, state: { summaryPeriod, planPeriod, summary, projectOrder, peopleOrder, taskOrders, text: presentReport(saved, source), generatedText: generateReportText(source), currentSourceHash: reportSourceHash(source), canEditText: context.teamLeader } };
 }

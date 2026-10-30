@@ -13,6 +13,7 @@ import { BacklogSummary, BacklogList } from './backlog';
 import { MilestonePanel } from './milestones';
 import { useMilestoneNavigation } from './milestone-navigation';
 import { ProjectHeading } from './project-heading';
+import { TeamFilter } from './team-filter';
 
 /** 项目汇总、项目内页和里程碑总览共用当前授权项目，不建立独立任务副本。 */
 export function ProjectsPageV2() {
@@ -23,13 +24,13 @@ export function ProjectsPageV2() {
   const [periodId, setPeriod] = useState(() => currentPeriod(data.periods, data.today)), [sorting, setSorting] = useState(false);
   const roles = (role: string) => project?.members.filter((row) => row.roles.some((value) => value === role)).map((row) => data.accounts.find((account) => account.id === row.accountId)?.displayName ?? '历史成员').join('、');
   if (project) return <><button className="nt-link" onClick={() => setParams({})}>← 项目汇总</button><div className="v2-page-heading"><h2>{project.name}</h2><p className="nt-muted">研发负责人 {roles('project_lead')} · 项目经理 {roles('project_manager')} · {project.members.length} 位成员</p></div><div className="nt-tabs">{[{ id: 'tasks', label: '任务' }, { id: 'milestones', label: '里程碑' }, { id: 'backlog', label: '待建任务' }].map((item) => <button key={item.id} aria-pressed={tab === item.id} onClick={() => setParams({ project: project.id, tab: item.id })}>{item.label}</button>)}</div>{tab === 'milestones' ? <MilestonePanel projectId={project.id} /> : tab === 'backlog' ? <BacklogList projectId={project.id} /> : <ProjectTasks projectId={project.id} />}</>;
-  return <><div className="nt-row nt-between"><div><h2>项目</h2><p className="nt-muted">{data.teamLeader ? '本团队项目' : '我参与的项目'} · {data.projects.length} 个</p></div><button onClick={() => openMilestones()}>里程碑总览</button></div><div className="nt-tools"><div className="nt-row"><span className="nt-muted">任务执行情况</span>{data.teamLeader && <button aria-pressed={sorting} className={sorting ? 'nt-primary' : undefined} onClick={() => setSorting(!sorting)}>{sorting ? '完成排序' : '项目排序'}</button>}{sorting && projectSort.reset}</div><PeriodSelect label="汇总日期区间" periods={data.periods} value={periodId} onChange={setPeriod} /></div><ProjectOverview periodId={periodId} sort={projectSort} sorting={sorting} /></>;
+  return <><div className="nt-row nt-between"><div><h2>项目</h2><p className="nt-muted">{data.team?.name ?? '未加入团队'} · {data.projects.length} 个项目</p></div><div className="nt-row"><TeamFilter /><button onClick={() => openMilestones()}>里程碑总览</button></div></div><div className="nt-tools"><div className="nt-row"><span className="nt-muted">任务执行情况</span>{data.teamLeader && <button aria-pressed={sorting} className={sorting ? 'nt-primary' : undefined} onClick={() => setSorting(!sorting)}>{sorting ? '完成排序' : '项目排序'}</button>}{sorting && projectSort.reset}</div><PeriodSelect label="汇总日期区间" periods={data.periods} value={periodId} onChange={setPeriod} /></div><ProjectOverview periodId={periodId} sort={projectSort} sorting={sorting} /></>;
 }
 
 /** 历史汇总的名称、执行人和状态来自区间末快照；点开后明确当前任务状态。 */
 function ProjectOverview({ periodId, sort, sorting }: { sorting: boolean; periodId: string; sort: ReturnType<typeof useProjectSort> }) {
-  const { data } = useWorkspace();
-  const query = useQuery({ queryKey: ['v2', 'summary', periodId], queryFn: () => readSummary(periodId), enabled: Boolean(periodId), refetchInterval: 10000 });
+  const { data, user } = useWorkspace();
+  const query = useQuery({ queryKey: ['v2', 'summary', user.id, user.isSuperAdmin, data.team?.id, periodId], queryFn: () => readSummary(periodId, data.team?.id), enabled: Boolean(periodId), refetchInterval: 10000 });
   if (query.isPending && periodId) return <p role="status">正在读取区间执行情况…</p>;
   if (query.error) return <Feedback error={query.error.message} />;
   return <div ref={sort.root}>{sort.feedback}<div {...sort.listProps}>{sort.ids.map((id) => {

@@ -18,7 +18,7 @@ export const v2PeriodWindowCountsSchema = z.object({
 export const v2PeriodWindowSchema = v2PeriodWindowCountsSchema.extend({ version });
 export type V2PeriodWindow = z.infer<typeof v2PeriodWindowSchema>;
 export const v2TeamMessagesSchema = z.array(z.string().trim().max(v2TeamMessageLimits.length)).max(v2TeamMessageLimits.count).transform((messages) => messages.filter(Boolean));
-export const v2ProjectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })), canManage: z.boolean(), canCreate: z.boolean(), canConfirmMilestone: z.boolean() });
+export const v2ProjectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })), canManage: z.boolean(), canCreate: z.boolean(), canConfirmMilestone: z.boolean(), canContribute: z.boolean().optional() });
 export const v2BacklogSchema = z.object({ id, createdAt: v2InstantSchema, projectId: id, creatorId: id, title: z.string(), priority: v2PrioritySchema, version, convertedTaskId: id.nullable(), deletedAt: v2InstantSchema.nullable() });
 export type V2Backlog = z.infer<typeof v2BacklogSchema>;
 export const v2ArrangementSchema = z.object({ taskId: id, periodId: id, plannedDays: z.number().nullable(), position: z.number().int(), version, workNote: v2WorkNoteSchema.optional(), carriedFromPeriodId: id.nullable().optional(), unplanned: z.boolean().nullable().optional() });
@@ -26,6 +26,8 @@ export type V2Arrangement = z.infer<typeof v2ArrangementSchema>;
 export const v2PlacementSchema = z.object({ taskId: id, categoryId: id, position: z.number().int() });
 export const v2OrderSchema = z.object({ ids: z.array(id), version, manual: z.boolean().default(false) });
 export const v2WorkspaceSchema = z.object({
+  /** 当前账号可查看的团队，按创建时间正序；普通账号仅含所属团队。 */
+  teams: z.array(teamSchema).optional(),
   personalPreferences: v2PersonalPreferencesSchema,
   periodWindow: v2PeriodWindowSchema.default({ before: v2PeriodWindowLimits.before, after: v2PeriodWindowLimits.after, version: 0 }),
   team: teamSchema.nullable(), teamMessages: v2TeamMessagesSchema, teamVersion: version, teamLeader: z.boolean(), today: v2DateSchema, naturalWeekStart: v2DateSchema,

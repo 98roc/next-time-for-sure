@@ -45,6 +45,14 @@
 .is-sidebar-collapsed :is(.v2-brand, .v2-nav-item, .v2-account) { justify-content: center; }
 .v2-main { flex: 1; min-height: 0; min-width: 0; padding: 24px; overflow: auto; scrollbar-gutter: stable; }
 
+/* 团队选择与页面筛选同排；管理目录沿用统一工作区留白。 */
+.v2-scope .v2-team-filter { display: inline-flex; align-items: center; flex-shrink: 0; gap: 8px; white-space: nowrap; color: var(--v2-muted); font-size: 12px; }
+.v2-scope .v2-team-filter select { min-width: 130px; max-width: 260px; }
+.v2-scope .organization-page { max-width: none; margin: 0; padding: 0; }
+.v2-scope .organization-page h1 { font-size: 26px; margin-bottom: 4px; }
+.v2-scope .organization-page .dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; }
+#nt-project .organization-page .dialog-header h2 { font-size: 18px; }
+
 /* 保留原型内容的字体和颜色变量，取消它们对外框高度、边界与滚动的控制。 */
 :is(#ntfs-my-work, #ntfs-weekly-demo, #nt-project) .v2-page { min-height: 0; border: 0; border-radius: 0; background: transparent; overflow: visible; }
 

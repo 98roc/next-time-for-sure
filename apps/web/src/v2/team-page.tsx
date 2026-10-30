@@ -45,7 +45,7 @@ function ProjectForm({ project, membersOnly = false }: { project?: Project; memb
   async function save() {
     const parsed = v2TeamCommandSchema.safeParse(project ? { action: 'update_project', operationId: createOperationId(), projectId: project.id, version: project.version, name, members } : { action: 'create_project', operationId: createOperationId(), name, members });
     if (!parsed.success) throw new Error('请填写项目名称并选择成员；每名成员至少具有一种角色。');
-    if (project) { const impact = await readMemberImpact({ projectId: project.id, version: project.version, members }); setBlockers(impact.blockers); if (impact.blockers.length) throw new Error('请先处理下方阻塞项，再保存成员配置。'); }
+    if (project) { const impact = await readMemberImpact({ projectId: project.id, version: project.version, members }, data.team?.id); setBlockers(impact.blockers); if (impact.blockers.length) throw new Error('请先处理下方阻塞项，再保存成员配置。'); }
     await run('team', parsed.data); modal.finish();
   }
   return <ModalPage title={project ? membersOnly ? '管理项目成员' : '编辑项目' : '新增项目'} dirty={dirty} busy={action.busy} wide actions={<button className="nt-primary" form={formId} type="submit" disabled={action.busy}>保存</button>}><form id={formId} onSubmit={(event) => { event.preventDefault(); void action.act(save); }}><fieldset disabled={action.busy}>

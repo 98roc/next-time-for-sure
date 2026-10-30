@@ -5,7 +5,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { IdentityRepository } from '../identity/identity.repository.js';
 import { hashPassword } from '../identity/password.js';
 import { OrganizationRepository } from './organization.repository.js';
-import { isTeamLeader, visibleOrganization } from './policy.js';
+import { hasOtherAdministrator, isTeamLeader, visibleOrganization } from './policy.js';
 import type { PolicyActor } from './policy.js';
 
 /** 组织操作共用身份、作用范围、版本及事务，不依赖前端按钮显隐。 */
@@ -45,7 +45,6 @@ export class OrganizationService {
 async function executeCommand(repository: OrganizationRepository, actor: PolicyActor, snapshot: OrganizationSnapshot, command: OrganizationCommand): Promise<string> {
   const requireSuper = () => { if (!actor.isSuperAdmin) throw new ForbiddenException('仅超管可执行此操作。'); };
   const requireTeamLeader = (teamId: string) => {
-    if (actor.isSuperAdmin) throw new ForbiddenException('团队内部管理由团队管理员操作。');
     if (!snapshot.teams.some((team) => team.id === teamId)) throw new NotFoundException('团队不存在。');
     if (!isTeamLeader(actor, snapshot, teamId)) throw new ForbiddenException('没有本团队的操作权限。');
   };
@@ -61,20 +60,28 @@ async function executeCommand(repository: OrganizationRepository, actor: PolicyA
     if (!account) throw new NotFoundException('账号不存在或不可操作。');
     return account;
   };
+  // 组织锁覆盖角色、停用和删除，防止并发操作移除最后一个可用管理员。
+  const preserveAdministrator = (account: OrganizationSnapshot['accounts'][number]) => {
+    if (account.isSuperAdmin && !account.disabled && !hasOtherAdministrator(snapshot, account.id)) throw new ConflictException('至少保留一个已启用的系统管理员。');
+  };
 
   switch (command.action) {
     case 'create_account':
       requireSuper(); await uniqueLogin(command.loginName);
-      return repository.createAccount(command.loginName, command.displayName, await hashPassword(command.password), null);
+      return repository.createAccount(command.loginName, command.displayName, await hashPassword(command.password), null, command.isSuperAdmin ?? false);
     case 'update_account': {
       requireSuper();
       const account = accountById(command.accountId);
       fresh(account.version, command.version); await uniqueLogin(command.loginName, account.id);
-      await repository.updateAccount(account.id, command.loginName, command.displayName); return account.id;
+      const isSuperAdmin = command.isSuperAdmin ?? account.isSuperAdmin ?? false;
+      if (!isSuperAdmin) preserveAdministrator(account);
+      await repository.updateAccount(account.id, command.loginName, command.displayName, isSuperAdmin); return account.id;
     }
     case 'delete_account': {
       requireSuper();
       const account = accountById(command.accountId); fresh(account.version, command.version);
+      if (account.id === actor.id) throw new BadRequestException('不能删除当前登录账号。');
+      preserveAdministrator(account);
       if (account.teamId || await repository.accountInUse(account.id)) throw new ConflictException('账号已有团队关联或工作记录，不能删除，请使用停用。');
       await repository.deleteAccount(account.id); return account.id;
     }
@@ -123,12 +130,14 @@ async function executeCommand(repository: OrganizationRepository, actor: PolicyA
     case 'reset_password':
     case 'set_disabled': {
       const account = snapshot.accounts.find((item) => item.id === command.accountId);
-      if (!account || account.id === actor.id) throw new BadRequestException('不能通过此入口操作本人或超管账号。');
+      if (!account || account.id === actor.id) throw new BadRequestException('账号不存在或不能通过此入口操作本人。');
       if (!actor.isSuperAdmin) {
+        if (account.isSuperAdmin) throw new ForbiddenException('仅系统管理员可管理系统管理员账号。');
         if (!account.teamId) throw new ForbiddenException('没有账号管理权限。');
         requireTeamLeader(account.teamId);
       }
       fresh(account.version, command.version);
+      if (command.action === 'set_disabled' && command.disabled) preserveAdministrator(account);
       if (command.action === 'reset_password') await repository.resetPassword(account.id, await hashPassword(command.password));
       else await repository.setDisabled(account.id, command.disabled);
       return account.id;

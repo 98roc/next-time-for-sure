@@ -9,7 +9,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { loadV2Context, requireVersion } from './context.js';
 import { naturalWeek, shanghaiDate } from './calendar.js';
-import { canCreateProjectTask, canManageProject } from './permissions.js';
+import { canCreateProjectTask, canManageProject, canParticipateProject, canConfirmMilestone } from './permissions.js';
 import { authorizeProjectCommand, authorizeTaskCommand, requireTask } from './authorization.js';
 import { V2TaskRepository } from './task.repository.js';
 import { V2PersonalRepository } from './personal.repository.js';
@@ -38,22 +38,23 @@ export class V2WorkspaceService {
   }
 
   /** 单次快照保证项目、个人与计划引用相同任务；其他人的私人分类不会返回。 */
-  async snapshot(token: string): Promise<V2Workspace> {
+  async snapshot(token: string, teamId?: string): Promise<V2Workspace> {
     return this.database.transaction(async (manager) => {
-      const context = await loadV2Context(manager, this.identity, token), today = shanghaiDate(new Date().toISOString());
+      const context = await loadV2Context(manager, this.identity, token, undefined, teamId ?? null), today = shanghaiDate(new Date().toISOString());
       const personal = new V2PersonalRepository(manager), planning = new V2PlanningRepository(manager), projects = new V2ProjectRepository(manager), tasks = new V2TaskRepository(manager);
       await personal.ensure(context.actor.id);
       if (context.teamId) await rolloverTeam(manager, context.teamId);
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { messages: [], version: 0 };
       return {
+        teams: context.organization.teams.filter((team) => context.actor.isSuperAdmin || team.id === context.actor.teamId),
         planningLabels: await new V2PlanningLabelsRepository(manager).read(visible.map((task) => task.id)),
         periodWindow: context.teamId ? await planning.periodWindow(context.teamId) : { before: v2PeriodWindowLimits.before, after: v2PeriodWindowLimits.after, version: 0 },
         personalPreferences: await new PersonalWorkRepository(manager).preferences(context.actor.id),
         orders: await readProjectOrders(manager, context),
         team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessages: settings.messages, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,
-        accounts: context.organization.accounts.filter((account) => account.teamId === context.teamId && context.teamId !== null),
-        projects: context.projects.map((project) => ({ id: project.id, teamId: project.teamId, name: context.organization.projects.find((entry) => entry.id === project.id)?.name ?? '', version: context.organization.projects.find((entry) => entry.id === project.id)?.version ?? 0, members: project.members, canManage: canManageProject(context.actor, project), canCreate: canCreateProjectTask(context.actor, project, context.actor.id) || canManageProject(context.actor, project), canConfirmMilestone: project.members.some((member) => member.accountId === context.actor.id && member.roles.includes('project_lead')) })),
+        accounts: context.organization.accounts.filter((account) => (account.teamId === context.teamId && context.teamId !== null) || (context.actor.isSuperAdmin && account.id === context.actor.id)),
+        projects: context.projects.map((project) => ({ id: project.id, teamId: project.teamId, name: context.organization.projects.find((entry) => entry.id === project.id)?.name ?? '', version: context.organization.projects.find((entry) => entry.id === project.id)?.version ?? 0, members: project.members, canContribute: canParticipateProject(context.actor, project), canManage: canManageProject(context.actor, project), canCreate: canCreateProjectTask(context.actor, project, context.actor.id) || canManageProject(context.actor, project), canConfirmMilestone: canConfirmMilestone(context.actor, { projectId: project.id }, project) })),
         periods: context.teamId ? await planning.periods(context.teamId) : [], tasks: visible, arrangements: await tasks.arrangements(visible.map((task) => task.id)), milestones: await projects.milestones(projectIds), backlog: await projects.backlog(projectIds),
         categories: await personal.categories(context.actor.id), placements: (await personal.placements(context.actor.id)).filter((row) => visible.some((task) => task.id === row.taskId && task.executorId === context.actor.id)), personalVersion: await personal.version(context.actor.id),
       };
@@ -61,7 +62,7 @@ export class V2WorkspaceService {
   }
 
   /** 影响预览无业务写入，数据更新后摘要失效。 */
-  async impact(token: string, intent: V2ImpactIntent) { return this.database.transaction(async (manager) => previewImpact(manager, await loadV2Context(manager, this.identity, token), intent, shanghaiDate(new Date().toISOString()))); }
+  async impact(token: string, intent: V2ImpactIntent, teamId?: string) { return this.database.transaction(async (manager) => previewImpact(manager, await loadV2Context(manager, this.identity, token, undefined, teamId), intent, shanghaiDate(new Date().toISOString()))); }
 
   /** 历史按当前项目权限重新裁剪，私人历史仅本人可查。 */
   async history(token: string, taskId: string) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token), repository = new V2TaskRepository(manager); requireTask(context, await repository.get(taskId)); return repository.history([taskId]); }); }
@@ -101,12 +102,12 @@ export class V2WorkspaceService {
   }
 
   /** 周报只读事实与安排，切换区间不会创建任务或自动结转。 */
-  async weekly(token: string, summaryPeriodId: string, planPeriodId: string) { return this.database.transaction(async (manager) => (await buildWeeklyState(manager, await loadV2Context(manager, this.identity, token), summaryPeriodId, planPeriodId)).state); }
+  async weekly(token: string, summaryPeriodId: string, planPeriodId: string, teamId?: string) { return this.database.transaction(async (manager) => (await buildWeeklyState(manager, await loadV2Context(manager, this.identity, token, undefined, teamId ?? null), summaryPeriodId, planPeriodId)).state); }
 
   /** 项目总览与周报使用同一历史计算，不以当前状态覆盖已结束区间。 */
-  async summary(token: string, periodId: string) {
+  async summary(token: string, periodId: string, teamId?: string) {
     return this.database.transaction(async (manager) => {
-      const context = await loadV2Context(manager, this.identity, token), tasks = new V2TaskRepository(manager), planning = new V2PlanningRepository(manager);
+      const context = await loadV2Context(manager, this.identity, token, undefined, teamId ?? null), tasks = new V2TaskRepository(manager), planning = new V2PlanningRepository(manager);
       const period = context.teamId ? (await planning.periods(context.teamId)).find((row) => row.id === periodId) : undefined;
       if (!period) throw new ConflictException('日期区间不存在。');
       const ids = await tasks.projectTaskIds(context.projects.map((row) => row.id));
@@ -115,16 +116,16 @@ export class V2WorkspaceService {
   }
 
   /** 共享排序及日期修改在同一事务检查作用域、影响与版本。 */
-  async planning(token: string, csrf: string, command: V2PlanningCommand) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf); authorizePlanning(context, command); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutatePlanning(manager, context, command, shanghaiDate(new Date().toISOString())) })); }); }
+  async planning(token: string, csrf: string, command: V2PlanningCommand, teamId?: string) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf, teamId ?? null); authorizePlanning(context, command); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutatePlanning(manager, context, command, shanghaiDate(new Date().toISOString())) })); }); }
 
   /** 不让受限成员通过已知幂等键读取或修改全团队共享稿。 */
-  async report(token: string, csrf: string, command: V2ReportCommand) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf); requireTeamLeader(context); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutateReport(manager, context, command) })); }); }
+  async report(token: string, csrf: string, command: V2ReportCommand, teamId?: string) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf, teamId ?? null); requireTeamLeader(context); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutateReport(manager, context, command) })); }); }
 
   /** 项目成员移出前列出本项目全部阻塞项。 */
-  async membersImpact(token: string, input: V2MemberImpactInput) { return this.database.transaction(async (manager) => memberImpact(manager, await loadV2Context(manager, this.identity, token), input)); }
+  async membersImpact(token: string, input: V2MemberImpactInput, teamId?: string) { return this.database.transaction(async (manager) => memberImpact(manager, await loadV2Context(manager, this.identity, token, undefined, teamId), input)); }
 
   /** 团队配置与任务分配共享事务锁，每次提交重算移出限制。 */
-  async team(token: string, csrf: string, command: V2TeamCommand) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf); requireTeamLeader(context); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutateTeam(manager, context, command) })); }); }
+  async team(token: string, csrf: string, command: V2TeamCommand, teamId?: string) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf, teamId ?? null); requireTeamLeader(context); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutateTeam(manager, context, command) })); }); }
 
   /** 共用弹窗的业务字段、状态和区间一次原子提交。 */
   async edit(token: string, csrf: string, command: V2TaskEdit) {

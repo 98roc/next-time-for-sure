@@ -4,6 +4,7 @@ import { readImpact } from './api';
 import { useModal } from './modal';
 import { ConfirmationPage } from './confirmation-page';
 import { Feedback, useAction } from './controls';
+import { useWorkspace } from './workspace';
 
 /** 真实影响与阻塞原因在同层展示，过期确认由服务端拒绝并保留当前草稿。 */
 export function Confirmation({ intent, label, onConfirm, onDone, danger = false }: { intent: V2ImpactIntent; label: string; onConfirm: (confirmation: string) => Promise<unknown>; onDone?: () => void; danger?: boolean }) {
@@ -12,7 +13,8 @@ export function Confirmation({ intent, label, onConfirm, onDone, danger = false 
 
 /** 合并保存的多项影响在同一视图确认，提交仍为一次事务，不逐条修改任务。 */
 export function Confirmations({ intents, label, onConfirm, onDone, danger = false }: { intents: V2ImpactIntent[]; label: string; onConfirm: (confirmations: string[]) => Promise<unknown>; onDone?: () => void; danger?: boolean }) {
-  const queries = useQueries({ queries: intents.map((intent) => ({ queryKey: ['v2', 'impact', intent], queryFn: () => readImpact(intent), retry: false, staleTime: 0 })) });
+  const { data, user } = useWorkspace();
+  const queries = useQueries({ queries: intents.map((intent) => ({ queryKey: ['v2', 'impact', user.id, data.team?.id, intent], queryFn: () => readImpact(intent, data.team?.id), retry: false, staleTime: 0 })) });
   const action = useAction(), modal = useModal();
   const ready = queries.every((query) => query.data && !query.data.blockers.length && !query.isFetching && !query.error);
   return <ConfirmationPage title={label} busy={action.busy} actions={<button className={danger ? 'v2-danger' : 'nt-primary'} disabled={!ready || action.busy} onClick={() => { if (ready) void action.act(async () => { await onConfirm(queries.flatMap((query) => query.data ? [query.data.confirmation] : [])); (onDone ?? modal.finish)(); }); }}>{label.startsWith('确认') ? label : `确认${label}`}</button>}>

@@ -7,7 +7,7 @@ import { OrganizationRepository } from '../organization/organization.repository.
 import { V2TaskRepository } from './task.repository.js';
 import { V2PlanningRepository } from './planning.repository.js';
 
-/** 团队内部配置仅团队负责人可维护，超管不代管业务。 */
+/** 当前团队配置由实际负责人或系统管理员维护，团队范围仍在事务中校验。 */
 export function requireTeamLeader(context: V2Context): string {
   if (!context.teamId || !context.teamLeader) throw new ForbiddenException('只有团队负责人可以维护团队配置。');
   return context.teamId;

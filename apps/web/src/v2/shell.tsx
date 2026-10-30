@@ -21,6 +21,7 @@ const navigation = [
   { to: '/weekly-plans', label: '周报与周计划' },
   { to: '/work', label: '项目' },
   { to: '/organization', label: '团队管理' },
+  { to: '/accounts', label: '账号管理' },
 ];
 
 const sidebarPreferenceKey = 'ntfs.sidebar-collapsed';
@@ -48,6 +49,7 @@ export function V2Shell({ user }: { user: Identity }) { return <WorkspaceProvide
 
 /** 根容器包住模态层以共享原型变量，业务数据由同一个工作区提供。 */
 function Frame() {
+  const { data, user } = useWorkspace();
   const { collapsed, toggle } = useSidebarPreference();
   const location = useLocation(), path = location.pathname;
   const variant = path === '/personal' ? 'personal' : path === '/weekly-plans' ? 'weekly' : 'project';
@@ -55,7 +57,7 @@ function Frame() {
   const pageClass = variant === 'weekly' ? 'w-app' : variant === 'project' ? 'nt-app' : '';
   const pageLabel = navigation.find((link) => link.to === path)?.label ?? '工作空间';
   // 业务区域切换重置外层弹窗；总览由页面切换器暂停来源弹窗，保留返回所需状态。
-  return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider key={path}>
+  return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider key={`${path}:${data.team?.id ?? ''}`}>
     <div className={`v2-frame${collapsed ? ' is-sidebar-collapsed' : ''}`}>
       <Sidebar />
       <div className="v2-body">
@@ -63,9 +65,9 @@ function Frame() {
           <button type="button" className="v2-sidebar-toggle" aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'} title={collapsed ? '展开侧边栏' : '收起侧边栏'} aria-expanded={!collapsed} aria-controls="v2-sidebar" onClick={toggle}>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /><path d={collapsed ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'} /></svg>
           </button>
-          <span>工作空间 / {pageLabel}</span><MessagesButton />
+          <span>{user.isSuperAdmin && ['/accounts', '/organization'].includes(path) ? '系统管理' : '工作空间'} / {pageLabel}</span><MessagesButton />
         </div>
-        <main key={path} className="v2-main" aria-label={pageLabel}>
+        <main key={`${path}:${data.team?.id ?? ''}`} className="v2-main" aria-label={pageLabel}>
           <div className={`v2-page ${pageClass}`}><MilestonePageSwitch><Outlet /></MilestonePageSwitch></div>
         </main>
       </div>
@@ -78,12 +80,13 @@ function Sidebar() {
   const { user, data } = useWorkspace();
   return <aside id="v2-sidebar" className="v2-sidebar">
     <div className="v2-brand" aria-label="下次一定" title="下次一定"><span className="v2-mark" aria-hidden="true" /><span className="v2-brand-text">下次一定<small>团队协作工作台</small></span></div>
-    <nav aria-label="主导航">{navigation.map((link, index) => {
+    <nav aria-label="主导航">{(user.isSuperAdmin ? [...navigation.slice(0, 3), navigation[4], navigation[3]].filter((link) => link !== undefined) : navigation.slice(0, 4)).map((link) => {
+      const index = navigation.findIndex((entry) => entry.to === link.to);
       const className = (active: boolean) => `v2-nav-item${active ? ' is-current' : ''}`;
       const content = <><NavigationIcon index={index} /><span className="v2-nav-label">{link.label}</span></>;
-      return link.to === '/organization' && !data.teamLeader ? <span key={link.to} className={className(false)} aria-label={`${link.label}：团队配置由团队负责人维护，请联系团队负责人`} aria-disabled="true" tabIndex={0} title="团队配置由团队负责人维护，请联系团队负责人">{content}</span> : <NavLink key={link.to} to={link.to} aria-label={link.label} title={link.label} className={({ isActive }) => className(isActive)}>{content}</NavLink>;
+      return link.to === '/organization' && !user.isSuperAdmin && !data.teamLeader ? <span key={link.to} className={className(false)} aria-label={`${link.label}：团队配置由团队负责人维护，请联系团队负责人`} aria-disabled="true" tabIndex={0} title="团队配置由团队负责人维护，请联系团队负责人">{content}</span> : <NavLink key={link.to} to={link.to} aria-label={link.label} title={link.label} className={({ isActive }) => className(isActive)}>{content}</NavLink>;
     })}</nav>
-    <NavLink to="/account" className="v2-account" title={`${user.displayName}，账号与安全`} aria-label={`${user.displayName}，账号与安全`}><span className="v2-avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span><span className="v2-account-info"><span title={user.displayName}>{user.displayName}</span><small>{data.teamLeader ? '团队负责人' : '账号与安全'}</small></span></NavLink>
+    <NavLink to="/account" className="v2-account" title={`${user.displayName}，账号与安全`} aria-label={`${user.displayName}，账号与安全`}><span className="v2-avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span><span className="v2-account-info"><span title={user.displayName}>{user.displayName}</span><small>{user.isSuperAdmin ? '系统管理员' : data.teamLeader ? '团队负责人' : '账号与安全'}</small></span></NavLink>
   </aside>;
 }
 

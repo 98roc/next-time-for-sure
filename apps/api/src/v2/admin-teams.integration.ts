@@ -1,0 +1,91 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { organizationSnapshotSchema, v2WorkspaceSchema, v2WeeklyStateSchema, v2ImpactSchema } from '@ntfs/contracts';
+import { withFixture, type Session } from '../testing/fixture.js';
+import { v2ResultSchema } from './repository-utils.js';
+
+/** 真实 HTTP 与本机数据库回读，覆盖管理员跨团队操作、角色即时生效及普通账号隔离。 */
+await withFixture(async ({ source, call, prefix, teamId, projectId, admin, leader, developer, outsider }) => {
+  const secondTeam = randomUUID(), secondProject = randomUUID();
+  // 仅为随机夹具设定稳定先后顺序；默认管理员读取也只触发夹具团队顺延。
+  await source.query("UPDATE teams SET created_at='1971-01-01 00:00:00' WHERE id=?", [teamId]);
+  await source.query("INSERT INTO teams(id,name,leader_id,created_at) VALUES (?,?,?,'1972-01-01 00:00:00')", [secondTeam, `${prefix}.second`, outsider.id]);
+  await source.query('UPDATE accounts SET team_id=? WHERE id=?', [secondTeam, outsider.id]);
+  await source.query('INSERT INTO projects(id,team_id,name) VALUES (?,?,?)', [secondProject, secondTeam, `${prefix}.second-project`]);
+  await source.query('INSERT INTO project_members(project_id,account_id,roles_json) VALUES (?,?,?)', [secondProject, outsider.id, JSON.stringify(['project_manager', 'project_lead', 'developer'])]);
+
+  async function request(path: string, actor: Session, body?: unknown, status = 200) {
+    const response = await call(path, actor, body);
+    const result: unknown = response.status === 204 ? null : await response.json();
+    assert.equal(response.status, status, `${path}: ${JSON.stringify(result)}`);
+    return result;
+  }
+  const workspace = async (actor: Session, selected?: string) => v2WorkspaceSchema.parse(await request(`v2/workspace${selected ? `?teamId=${selected}` : ''}`, actor));
+  const directory = async () => organizationSnapshotSchema.parse(await request('organization', admin));
+  const first = await workspace(admin), second = await workspace(admin, secondTeam);
+  assert.equal(first.team?.id, teamId);
+  assert.deepEqual(first.teams?.slice(0, 2).map((team) => team.id), [teamId, secondTeam]);
+  assert.equal(second.team?.id, secondTeam);
+  assert.deepEqual(second.projects.map((project) => project.id), [secondProject]);
+  assert.equal(second.projects[0]?.canManage, true);
+  assert.equal(second.projects[0]?.canCreate, true);
+  assert.equal(second.projects[0]?.canContribute, true);
+  assert.equal(second.projects[0]?.canConfirmMilestone, true);
+  assert.ok(second.accounts.some((account) => account.id === admin.id));
+  await request(`v2/workspace?teamId=${secondTeam}`, developer, undefined, 403);
+  await request(`v2/workspace?teamId=${randomUUID()}`, admin, undefined, 404);
+  const own = await workspace(developer);
+  assert.deepEqual(own.teams?.map((team) => team.id), [teamId]);
+  const period = second.periods.find((row) => row.startOn <= second.today && row.endOn >= second.today);
+  assert.ok(period);
+  const next = second.periods[second.periods.indexOf(period) + 1]; assert.ok(next);
+  const created = await request('v2/tasks', outsider, { action: 'create_project', operationId: randomUUID(), task: { projectId: secondProject, executorId: outsider.id, title: '管理员只读任务', priority: 3, periodId: period.id, plannedDays: 1, milestoneId: null } });
+  assert.ok(created && typeof created === 'object' && 'objectIds' in created && Array.isArray(created.objectIds));
+  const taskId: unknown = created.objectIds[0]; assert.equal(typeof taskId, 'string');
+  await request('v2/tasks', outsider, { action: 'create_private', operationId: randomUUID(), task: { title: '私人隔离', priority: 3 } });
+  const state = await workspace(admin, secondTeam);
+  assert.ok(state.tasks.some((task) => task.id === taskId));
+  assert.equal(state.tasks.some((task) => task.title === '私人隔离'), false);
+  await request('v2/edit', admin, { action: 'save_task', operationId: randomUUID(), taskId, version: 0, status: 'in_progress' });
+  const taskInput = { projectId: secondProject, executorId: admin.id, title: '管理员跨团队关联本人', priority: 3, periodId: period.id, plannedDays: 0, milestoneId: null };
+  const ownTask = v2ResultSchema.parse(await request('v2/tasks', admin, { action: 'create_project', operationId: randomUUID(), task: taskInput }));
+  const ownTaskId = ownTask.objectIds[0]; assert.ok(ownTaskId);
+  await request('v2/tasks', admin, { action: 'create_project', operationId: randomUUID(), task: { ...taskInput, executorId: developer.id } }, 403);
+  const backlog = v2ResultSchema.parse(await request('v2/projects', admin, { action: 'create_backlog', operationId: randomUUID(), projectId: secondProject, title: '管理员新增待建', priority: 3 }));
+  await request('v2/projects', admin, { action: 'convert_backlog', operationId: randomUUID(), backlogId: backlog.objectIds[0], version: 0, task: { ...taskInput, executorId: outsider.id, title: '管理员转换任务' } });
+  await request('v2/projects', admin, { action: 'create_milestone', operationId: randomUUID(), projectId: secondProject, title: '管理员跨团队里程碑', expectedOn: null });
+  const sortable = await workspace(admin, secondTeam), order = sortable.orders.find((row) => row.scope === `project-page:tasks:${secondProject}`); assert.ok(order);
+  const sortCommand = { action: 'reorder_project_items', operationId: randomUUID(), projectId: secondProject, target: 'tasks', ids: [...order.ids].reverse(), version: order.version };
+  await request(`v2/planning?teamId=${secondTeam}`, developer, sortCommand, 403);
+  await request(`v2/planning?teamId=${secondTeam}`, admin, sortCommand);
+  const deletion = v2ImpactSchema.parse(await request(`v2/impact?teamId=${secondTeam}`, admin, { action: 'delete_task', taskId: ownTaskId, version: 0 }));
+  await request('v2/tasks', admin, { action: 'delete', taskId: ownTaskId, version: 0, operationId: randomUUID(), confirmation: deletion.confirmation });
+  const weekly = v2WeeklyStateSchema.parse(await request(`v2/weekly?teamId=${secondTeam}&summaryPeriodId=${period.id}&planPeriodId=${next.id}`, admin));
+  assert.equal(weekly.canEditText, true);
+  assert.ok(weekly.summary.some((row) => row.taskId === taskId));
+  await request(`v2/weekly?teamId=${secondTeam}&summaryPeriodId=${period.id}&planPeriodId=${next.id}`, developer, undefined, 403);
+  await request(`v2/summary?teamId=${teamId}&periodId=${period.id}`, admin, undefined, 409);
+  await request(`v2/summary?teamId=${secondTeam}&periodId=${period.id}`, admin);
+  const rows: unknown = await source.query('SELECT status,version FROM v2_tasks WHERE id=?', [taskId]);
+  assert.deepEqual(rows, [{ status: 'in_progress', version: 1 }]);
+  await request(`v2/report?teamId=${secondTeam}`, admin, { action: 'save', operationId: randomUUID(), summaryPeriodId: period.id, planPeriodId: next.id, version: weekly.text.version, body: '管理员维护的团队周报', sourceHash: weekly.currentSourceHash });
+  const report = v2WeeklyStateSchema.parse(await request(`v2/weekly?teamId=${secondTeam}&summaryPeriodId=${period.id}&planPeriodId=${next.id}`, admin));
+  assert.equal(report.text.body, '管理员维护的团队周报');
+  const memberships: unknown = await source.query('SELECT project_id FROM project_members WHERE account_id=?', [admin.id]);
+  assert.deepEqual(memberships, []);
+
+  let account = (await directory()).accounts.find((row) => row.id === developer.id); assert.ok(account);
+  const promote = { action: 'update_account', accountId: account.id, loginName: account.loginName, displayName: account.displayName, version: account.version, isSuperAdmin: true };
+  await request('organization/commands', leader, promote, 403);
+  const races = await Promise.all([call('organization/commands', admin, promote), call('organization/commands', admin, promote)]);
+  assert.deepEqual(races.map((response) => response.status).sort(), [204, 409]);
+  assert.equal((await workspace(developer, secondTeam)).team?.id, secondTeam);
+  assert.equal((await workspace(developer, teamId)).projects.find((project) => project.id === projectId)?.canCreate, true);
+  account = (await directory()).accounts.find((row) => row.id === developer.id); assert.ok(account?.isSuperAdmin);
+  await request('organization/commands', leader, { action: 'set_disabled', accountId: account.id, version: account.version, disabled: true }, 403);
+  await request('organization/commands', admin, { ...promote, version: account.version, isSuperAdmin: false }, 204);
+  await request(`v2/workspace?teamId=${secondTeam}`, developer, undefined, 403);
+  const stored: unknown = await source.query('SELECT is_super_admin AS role, team_id AS teamId FROM accounts WHERE id=?', [developer.id]);
+  assert.deepEqual(stored, [{ role: 0, teamId }]);
+  console.log('PASS: administrator cross-team create/edit/delete/backlog conversion/milestone/sort/report, self association without fake membership, immediate role revocation, ordered default team, private isolation and database readback.');
+});

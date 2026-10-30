@@ -14,23 +14,23 @@ export class OrganizationRepository {
   /** 一次事务读取完整组织关系，服务层在返回前按当前身份裁剪。 */
   async snapshot(): Promise<OrganizationSnapshot> {
     // 账号与成员目录统一按创建时间倒序；同一毫秒创建时用ID稳定排序。
-    const accounts: unknown = await this.manager.query('SELECT id, login_name AS loginName, display_name AS displayName, team_id AS teamId, disabled, version FROM accounts WHERE is_super_admin = 0 ORDER BY created_at DESC, id ASC FOR UPDATE');
-    const teams: unknown = await this.manager.query('SELECT id, name, leader_id AS leaderId, version FROM teams');
+    const accounts: unknown = await this.manager.query('SELECT id, login_name AS loginName, display_name AS displayName, team_id AS teamId, disabled, is_super_admin AS isSuperAdmin, version FROM accounts ORDER BY created_at DESC, id ASC FOR UPDATE');
+    const teams: unknown = await this.manager.query('SELECT id, name, leader_id AS leaderId, version FROM teams ORDER BY created_at ASC, id ASC');
     const projects: unknown = await this.manager.query('SELECT id, team_id AS teamId, name, version FROM projects ORDER BY created_at DESC,id ASC');
     const projectMemberships: unknown = await this.manager.query('SELECT project_id AS projectId, account_id AS accountId, roles_json FROM project_members');
     const pm = z.array(z.object({ projectId: z.string(), accountId: z.string(), roles_json: z.unknown() })).parse(projectMemberships);
     const projectRows = z.array(z.object({ id: z.string(), teamId: z.string(), name: z.string(), version: z.number() })).parse(projects);
-    const accountRows = z.array(z.object({ id: z.string(), loginName: z.string(), displayName: z.string(), teamId: z.string().nullable(), disabled: z.number(), version: z.number() })).parse(accounts);
+    const accountRows = z.array(z.object({ id: z.string(), loginName: z.string(), displayName: z.string(), teamId: z.string().nullable(), disabled: z.number(), isSuperAdmin: z.number(), version: z.number() })).parse(accounts);
     return organizationSnapshotSchema.parse({
-      accounts: accountRows.map((row) => ({ ...row, disabled: Boolean(row.disabled) })), teams,
+      accounts: accountRows.map((row) => ({ ...row, disabled: Boolean(row.disabled), isSuperAdmin: Boolean(row.isSuperAdmin) })), teams,
       projects: projectRows.map((row) => ({ ...row, members: pm.filter((member) => member.projectId === row.id).map((member) => ({ accountId: member.accountId, roles: z.array(projectRoleSchema).parse(decodeJson(member.roles_json)) })) })),
     });
   }
 
   /** 超管创建独立账号，团队归属由后续关联操作维护。 */
-  async createAccount(login: string, display: string, hash: string, teamId: string | null): Promise<string> {
+  async createAccount(login: string, display: string, hash: string, teamId: string | null, isSuperAdmin = false): Promise<string> {
     const id = randomUUID();
-    await this.manager.query('INSERT INTO accounts (id, login_name, display_name, password_hash, team_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [id, login, display, hash, teamId]);
+    await this.manager.query('INSERT INTO accounts (id, login_name, display_name, password_hash, team_id, is_super_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))', [id, login, display, hash, teamId, isSuperAdmin ? 1 : 0]);
     return id;
   }
 
@@ -74,8 +74,8 @@ export class OrganizationRepository {
   }
 
   /** 修改身份资料并递增版本，不隐式调整团队归属。 */
-  async updateAccount(id: string, login: string, display: string): Promise<void> {
-    await this.manager.query('UPDATE accounts SET login_name = ?, display_name = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [login, display, id]);
+  async updateAccount(id: string, login: string, display: string, isSuperAdmin: boolean): Promise<void> {
+    await this.manager.query('UPDATE accounts SET login_name = ?, display_name = ?, is_super_admin = ?, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [login, display, isSuperAdmin ? 1 : 0, id]);
   }
 
   /** 一次保存团队名称与管理员，已有关联由服务校验。 */

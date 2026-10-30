@@ -78,7 +78,7 @@ test('日期调整保护已结束边界，拒绝缺口、重叠、删除和过�
   assert.throws(() => validatePeriodChanges(current, [period, { ...second, version: 1 }, third], '2026-10-16'), /已变化/);
 });
 
-test('成员可看项目全部工作，经理不能编排，管理权不外溢到私人、其他项目和超管', () => {
+test('管理员可操作所有项目并给本人关联任务，普通角色与私人范围不扩大', () => {
   assert.equal(canViewTask(actor(creator), initial, project), true);
   assert.equal(canManageProject(actor(manager), project), false);
   assert.equal(canCreateProjectTask(actor(manager), project, manager), false);
@@ -89,12 +89,22 @@ test('成员可看项目全部工作，经理不能编排，管理权不外溢�
   assert.equal(canChangeTaskStatus(actor(lead), initial, project), true);
   assert.equal(canChangeTaskStatus(actor(creator), initial, project), false);
   assert.equal(canChangeTaskStatus({ ...actor(executor), disabled: true }, initial, project), false);
-  assert.equal(canViewTask({ ...actor(leader), isSuperAdmin: true }, initial, project), false);
+  assert.equal(canViewTask({ ...actor(leader), isSuperAdmin: true }, initial, project), true);
+  const administrator = { ...actor(randomUUID()), teamId: null, isSuperAdmin: true };
+  assert.equal(canViewTask(administrator, initial, project), true);
+  assert.equal(canManageProject(administrator, project), true);
+  assert.equal(canCreateProjectTask(administrator, project, executor), true);
+  assert.equal(canCreateProjectTask(administrator, project, administrator.id), true);
+  assert.equal(canCreateProjectTask(administrator, project, randomUUID()), false);
+  assert.equal(canChangeTaskStatus(administrator, initial, project), true);
+  assert.equal(canDeleteTask(administrator, initial, project), true);
+  assert.equal(canManageProject({ ...administrator, disabled: true }, project), false);
   assert.equal(canViewTask({ ...actor(leader), teamId: randomUUID() }, initial, project), false);
   assert.equal(canViewTask(actor(leader), initial, { ...project, id: randomUUID() }), false);
   const privateTask: V2Task = { ...initial, kind: 'private', teamId: null, projectId: null, milestoneId: null, creatorId: executor };
   assert.equal(canViewTask(actor(leader), privateTask, project), false);
   assert.equal(canViewTask(actor(executor), privateTask), true);
+  assert.equal(canViewTask(administrator, privateTask), false);
 });
 
 test('完成再回退保留事件，创建人按当前未开始状态恢复删除权', () => {
