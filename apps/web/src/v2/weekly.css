@@ -63,6 +63,11 @@
 #ntfs-weekly-demo .w-batch-row button{padding:6px}
 #ntfs-weekly-demo .w-batch-row .w-field{font-size:11px}
 #ntfs-weekly-demo .w-period-editor{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--w-line)}
+#ntfs-weekly-demo .v2-period-window{padding-bottom:16px;border-bottom:1px solid var(--w-line);margin-bottom:16px}
+#ntfs-weekly-demo .v2-period-window-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:12px}
+#ntfs-weekly-demo .v2-period-window-controls output{min-width:74px;text-align:center}
+#ntfs-weekly-demo .v2-period-window .w-button{color:var(--w-text)}
+#ntfs-weekly-demo .v2-period-outside{grid-column:1/-1;margin:0}
 #ntfs-weekly-demo .w-error{color:var(--w-amber);font-size:12px;margin-top:12px!important}
 #ntfs-weekly-demo .w-danger{color:light-dark(#a63232,#f2a0a0)!important}
 #ntfs-weekly-demo .w-foot{font-size:11px;color:var(--w-muted);padding-top:8px}

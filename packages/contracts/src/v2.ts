@@ -29,6 +29,9 @@ export const v2CompletionSchema = z.object({ actualDays: v2ActualDaysSchema, aiC
 export type V2Completion = z.infer<typeof v2CompletionSchema>;
 /** 每个周期独立的工作内容；省略时兼容旧客户端，空串明确清空。 */
 export const v2WorkNoteSchema = z.string().trim().max(500);
+/** 整个任务共用的纯文本备注；空串清空，省略兼容旧客户端与历史快照。 */
+export const v2TaskRemarkMaxLength = 5000;
+export const v2TaskRemarkSchema = z.string().trim().max(v2TaskRemarkMaxLength);
 export const v2ArrangementInputSchema = z.object({ periodId: v2IdSchema, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional() }).strict();
 export const v2ArrangementsInputSchema = z.array(v2ArrangementInputSchema).min(1).max(100).refine((rows) => new Set(rows.map((row) => row.periodId)).size === rows.length, '日期区间不能重复');
 export type V2ArrangementInput = z.infer<typeof v2ArrangementInputSchema>;
@@ -44,6 +47,7 @@ export const v2ProjectTaskInputSchema = z.object({
   priority: v2PrioritySchema.default(3), milestoneId: v2IdSchema.nullable().default(null),
   plannedDays: v2RequiredPlannedDaysSchema,
   workNote: v2WorkNoteSchema.optional(),
+  remark: v2TaskRemarkSchema.optional(),
   additionalArrangements: z.array(v2ArrangementInputSchema).max(99).optional(),
   completion: v2CompletionSchema.optional(),
 }).strict().refine((value) => {
@@ -53,10 +57,11 @@ export const v2ProjectTaskInputSchema = z.object({
 export type V2ProjectTaskInput = z.infer<typeof v2ProjectTaskInputSchema>;
 
 /** 私人任务不接受项目、里程碑或团队排期字段，不通过接口猜测其归属。 */
-export const v2PrivateTaskInputSchema = z.object({ title, priority: v2PrioritySchema.default(3), categoryId: v2IdSchema.optional() }).strict();
+export const v2PrivateTaskInputSchema = z.object({ title, priority: v2PrioritySchema.default(3), categoryId: v2IdSchema.optional(), remark: v2TaskRemarkSchema.optional() }).strict();
 
 const taskFields = {
   id: v2IdSchema, title, priority: v2PrioritySchema, status: v2StatusSchema,
+  remark: v2TaskRemarkSchema.optional(),
   creatorId: v2IdSchema, executorId: v2IdSchema, version: v2VersionSchema,
   completedAt: v2InstantSchema.nullable(), createdAt: v2InstantSchema, updatedAt: v2InstantSchema,
   /** 本轮实际开始时间；null 为未知或清空，省略兼容旧历史快照。 */

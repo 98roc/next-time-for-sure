@@ -1,4 +1,5 @@
 import { rolloverTeam } from './task-rollover.js';
+import { v2PeriodWindowLimits } from '@ntfs/contracts';
 import { readMessages } from './notifications.js';
 import { PersonalWorkRepository } from './personal-work.repository.js';
 import { readProjectOrders } from './project-orders.js';
@@ -45,6 +46,7 @@ export class V2WorkspaceService {
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { messages: [], version: 0 };
       return {
+        periodWindow: context.teamId ? await planning.periodWindow(context.teamId) : { before: v2PeriodWindowLimits.before, after: v2PeriodWindowLimits.after, version: 0 },
         personalPreferences: await new PersonalWorkRepository(manager).preferences(context.actor.id),
         orders: await readProjectOrders(manager, context),
         team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessages: settings.messages, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,

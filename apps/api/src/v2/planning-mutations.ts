@@ -24,6 +24,13 @@ export function authorizePlanning(context: V2Context, command: V2PlanningCommand
 export async function mutatePlanning(manager: EntityManager, context: V2Context, command: V2PlanningCommand, today: string): Promise<string[]> {
   if (!context.teamId) throw new ForbiddenException('请先加入团队。');
   const repository = new V2PlanningRepository(manager), teamId = context.teamId;
+  if (command.action === 'set_period_window') {
+    await repository.ensure(teamId, today);
+    requireVersion((await repository.periodWindow(teamId)).version, command.version);
+    await repository.savePeriodWindow(teamId, { before: command.before, after: command.after });
+    await repository.ensurePeriodWindow(teamId, today);
+    return [teamId];
+  }
   if (command.action === 'extend_periods' || command.action === 'change_periods') {
     const periods = await repository.periods(teamId); requireVersion((await repository.settings(teamId)).version, command.version);
     if (command.action === 'extend_periods') {

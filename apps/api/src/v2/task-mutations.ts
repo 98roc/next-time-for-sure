@@ -34,7 +34,7 @@ export async function createProjectTask(manager: EntityManager, context: V2Conte
     checkRule(() => validateMilestoneLink({ projectId: project.id, status }, milestone));
   }
   const now = new Date().toISOString();
-  const task = checkRule(() => applyCompletion({ id: randomUUID(), kind: 'project', teamId: project.teamId, projectId: project.id, creatorId, executorId: input.executorId, milestoneId: input.milestoneId, title: input.title, priority: input.priority, status, version: 0, startedAt: status === 'in_progress' ? now : null, completedAt: status === 'completed' ? now : null, deletedAt: null, createdAt: now, updatedAt: now }, null, input.completion));
+  const task = checkRule(() => applyCompletion({ id: randomUUID(), kind: 'project', teamId: project.teamId, projectId: project.id, creatorId, executorId: input.executorId, milestoneId: input.milestoneId, title: input.title, remark: input.remark ?? '', priority: input.priority, status, version: 0, startedAt: status === 'in_progress' ? now : null, completedAt: status === 'completed' ? now : null, deletedAt: null, createdAt: now, updatedAt: now }, null, input.completion));
 
   // 任务、首个安排、状态事件和个人位置共同提交，任一失败回滚整条任务。
   const tasks = new V2TaskRepository(manager);
@@ -59,7 +59,7 @@ export async function mutateTask(manager: EntityManager, context: V2Context, com
     if (command.task.categoryId && !category) throw new ConflictException('个人分类不存在。');
     const now = new Date().toISOString();
     const status = category?.status ?? 'not_started';
-    const created: V2Task = { id: randomUUID(), kind: 'private', teamId: null, projectId: null, creatorId: context.actor.id, executorId: context.actor.id, milestoneId: null, title: command.task.title, priority: command.task.priority, status, startedAt: status === 'in_progress' ? now : null, completedAt: status === 'completed' ? now : null, deletedAt: null, createdAt: now, updatedAt: now, version: 0 };
+    const created: V2Task = { id: randomUUID(), kind: 'private', teamId: null, projectId: null, creatorId: context.actor.id, executorId: context.actor.id, milestoneId: null, title: command.task.title, remark: command.task.remark ?? '', priority: command.task.priority, status, startedAt: status === 'in_progress' ? now : null, completedAt: status === 'completed' ? now : null, deletedAt: null, createdAt: now, updatedAt: now, version: 0 };
     await tasks.insert(created, context.actor.id); await personal.place(created, undefined, command.task.categoryId); return [created.id];
   }
   if (!task || task.deletedAt) throw new NotFoundException('任务已删除或不存在。');

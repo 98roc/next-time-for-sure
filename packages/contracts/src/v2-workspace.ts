@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { v2PersonalPreferencesSchema } from './v2-personal-work.js';
-import { v2WorkNoteSchema, v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
+import { v2WorkNoteSchema, v2TaskRemarkSchema, v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
 import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2RequiredPlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
 import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organization.js';
 
@@ -9,6 +9,14 @@ const confirmation = z.string().regex(/^[a-f0-9]{64}$/u);
 const name = z.string().trim().min(1).max(100);
 /** 首页标语按团队维护；限制列表大小，去除空白项，空列表表示隐藏。 */
 export const v2TeamMessageLimits = { count: 50, length: 500 };
+/** 团队窗口按相邻业务区间计数；上限防止一次请求无限补建目录。 */
+export const v2PeriodWindowLimits = { max: 520, before: 1, after: 6 };
+export const v2PeriodWindowCountsSchema = z.object({
+  before: z.number().int().min(0).max(v2PeriodWindowLimits.max),
+  after: z.number().int().min(0).max(v2PeriodWindowLimits.max),
+}).strict();
+export const v2PeriodWindowSchema = v2PeriodWindowCountsSchema.extend({ version });
+export type V2PeriodWindow = z.infer<typeof v2PeriodWindowSchema>;
 export const v2TeamMessagesSchema = z.array(z.string().trim().max(v2TeamMessageLimits.length)).max(v2TeamMessageLimits.count).transform((messages) => messages.filter(Boolean));
 export const v2ProjectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })), canManage: z.boolean(), canCreate: z.boolean(), canConfirmMilestone: z.boolean() });
 export const v2BacklogSchema = z.object({ id, createdAt: v2InstantSchema, projectId: id, creatorId: id, title: z.string(), priority: v2PrioritySchema, version, convertedTaskId: id.nullable(), deletedAt: v2InstantSchema.nullable() });
@@ -19,6 +27,7 @@ export const v2PlacementSchema = z.object({ taskId: id, categoryId: id, position
 export const v2OrderSchema = z.object({ ids: z.array(id), version, manual: z.boolean().default(false) });
 export const v2WorkspaceSchema = z.object({
   personalPreferences: v2PersonalPreferencesSchema,
+  periodWindow: v2PeriodWindowSchema.default({ before: v2PeriodWindowLimits.before, after: v2PeriodWindowLimits.after, version: 0 }),
   team: teamSchema.nullable(), teamMessages: v2TeamMessagesSchema, teamVersion: version, teamLeader: z.boolean(), today: v2DateSchema, naturalWeekStart: v2DateSchema,
   accounts: z.array(directoryAccountSchema), projects: z.array(v2ProjectSchema), periods: z.array(v2PeriodSchema),
   tasks: z.array(v2TaskSchema), arrangements: z.array(v2ArrangementSchema), milestones: z.array(v2MilestoneSchema), backlog: z.array(v2BacklogSchema),
@@ -60,6 +69,7 @@ export type V2ProjectCommand = z.infer<typeof v2ProjectCommandSchema>;
 
 export const v2PeriodChangeSchema = z.object({ periodId: id, version, startOn: v2DateSchema, endOn: v2DateSchema }).strict();
 export const v2PlanningCommandSchema = z.discriminatedUnion('action', [
+  z.object({ ...operation, action: z.literal('set_period_window'), version, ...v2PeriodWindowCountsSchema.shape }).strict(),
   z.object({ ...operation, action: z.literal('extend_periods'), direction: z.enum(['before', 'after']), version }).strict(),
   z.object({ ...operation, action: z.literal('change_periods'), version, periods: z.array(v2PeriodChangeSchema).min(1).max(500), confirmation }).strict(),
   z.object({ ...operation, action: z.literal('reorder_projects'), periodId: id.optional(), page: z.enum(['projects', 'weekly']).default('weekly'), reset: z.boolean().default(false), version, projectIds: z.array(id).max(500) }).strict(),
@@ -115,6 +125,8 @@ export const v2MemberImpactSchema = z.object({ removedIds: z.array(id), blockers
 /** 共用编辑弹窗一次保存任务与当前安排，不能出现一半成功一半失败。 */
 export const v2TaskEditSchema = z.object({
   ...operation, action: z.literal('save_task'), taskId: id, version,
+  /** 与基本信息分开鉴权，允许当前执行人单独维护备注；省略保留、空串清空。 */
+  remark: v2TaskRemarkSchema.optional(),
   details: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('project'), title: z.string().trim().min(1).max(200), priority: v2PrioritySchema, executorId: id, milestoneId: id.nullable() }).strict(),
     z.object({ kind: z.literal('private'), title: z.string().trim().min(1).max(200), priority: v2PrioritySchema }).strict(),

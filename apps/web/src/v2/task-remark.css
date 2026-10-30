@@ -1,0 +1,9 @@
+.v2-scope .v2-task-remark { grid-column:1/-1;min-width:0; }
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-content .v2-task-remark-toggle { display:flex;align-items:center;gap:6px;width:max-content;max-width:100%;min-height:36px;padding:4px 0;border:0;border-radius:0;background:transparent;color:var(--v2-muted);font:inherit;font-size:12px; }
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-content .v2-task-remark-toggle:hover { color:var(--v2-text);background:transparent; }
+.v2-scope .v2-task-remark-chevron { flex-shrink:0; }
+.v2-scope .v2-task-remark-toggle[aria-expanded="true"] .v2-task-remark-chevron { transform:rotate(90deg); }
+.v2-scope .v2-task-remark-toggle small { margin-left:4px;font-size:12px;color:var(--v2-muted); }
+.v2-scope .v2-task-remark textarea { display:block;width:100%;min-height:116px;margin-top:8px;resize:vertical;line-height:1.6; }
+.v2-scope .v2-task-remark [hidden] { display:none; }
+@media(pointer:coarse) { :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-content .v2-task-remark-toggle { min-height:44px; } }

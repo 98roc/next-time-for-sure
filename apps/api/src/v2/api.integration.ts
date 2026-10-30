@@ -1,4 +1,6 @@
 import { verifyTaskPeriods } from './task-period.integration.js';
+import { verifyTaskRemarks } from './task-remark.integration.js';
+import { verifyPeriodWindow } from './period-window.integration.js';
 import { TaskRolloverService } from './task-rollover.service.js';
 import { verifySorting } from './sorting.integration.js';
 import { verifyEffort } from './effort.integration.js';
@@ -52,6 +54,14 @@ async function smoke(): Promise<void> {
     const state = async (actor = leader) => v2WorkspaceSchema.parse(await call('workspace', actor));
     const initial = await state(); const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
     const next = initial.periods[initial.periods.indexOf(period) + 1]; assert.ok(next);
+    if (process.argv.includes('--task-remark')) {
+      stage = 'task remarks';
+      await verifyTaskRemarks({ source, lead, developer, manager, outsider, projectId, periodId: period.id, nextPeriodId: next.id, call, state });
+      return;
+    }
+    stage = 'team period window';
+    await verifyPeriodWindow({ source, leader, lead, developer, teamId, projectId, call, state });
+    if (process.argv.includes('--period-window')) return;
     if (process.argv.includes('--milestone-editor')) {
       stage = 'atomic milestone editor';
       await verifyMilestoneEditor({ source, lead, leader, developer, outsider, projectId, periodId: period.id, call, state });

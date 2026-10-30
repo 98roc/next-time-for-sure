@@ -1,3 +1,4 @@
+import { TaskRemark } from './task-remark';
 import { useId, useState } from 'react';
 import { v2TaskCommandSchema, type V2Completion, type V2ProjectTaskInput } from '@ntfs/contracts';
 import { TaskCompletion } from './task-results';
@@ -24,7 +25,7 @@ export function TaskCreate({ projectId, periodId, personal = false, batch = fals
     if (backlog) {
       await run('projects', { action: 'convert_backlog', operationId: createOperationId(), backlogId: backlog.id, version: backlog.version, task: first });
     } else {
-      const candidate = source === 'private' ? { action: 'create_private', operationId: createOperationId(), task: { title: first.title, priority: first.priority, categoryId } } : batch ? { action: 'create_batch', operationId: createOperationId(), tasks: rows.map((row) => row.value) } : { action: 'create_project', operationId: createOperationId(), task: { ...first, ...(completion ? { completion } : {}) }, ...(personal ? { categoryId } : {}) };
+      const candidate = source === 'private' ? { action: 'create_private', operationId: createOperationId(), task: { title: first.title, priority: first.priority, remark: first.remark, categoryId } } : batch ? { action: 'create_batch', operationId: createOperationId(), tasks: rows.map((row) => row.value) } : { action: 'create_project', operationId: createOperationId(), task: { ...first, ...(completion ? { completion } : {}) }, ...(personal ? { categoryId } : {}) };
       const parsed = v2TaskCommandSchema.safeParse(candidate);
       if (!parsed.success) throw new Error('请检查任务名称、执行人、日期区间和预计天数。');
       await run('tasks', parsed.data);
@@ -44,6 +45,7 @@ export function TaskCreate({ projectId, periodId, personal = false, batch = fals
       <div className="v2-records">{rows.map((row, index) => <section className={batch ? 'v2-record' : ''} key={row.key}>
         {batch && <div className="v2-section-head"><h3>任务 {index + 1}</h3><button type="button" disabled={rows.length === 1} onClick={() => setRows((previous) => previous.filter((item) => item.key !== row.key))}>移除此行</button></div>}
         {source === 'private' ? <div className="v2-fields"><Field label="任务名称" full><input required maxLength={200} value={row.value.title} onChange={(event) => setRows([{ ...row, value: { ...row.value, title: event.target.value } }])} /></Field><PriorityField value={row.value.priority} onChange={(priority) => setRows([{ ...row, value: { ...row.value, priority } }])} /></div> : <TaskFields value={row.value} onChange={(value) => setRows((previous) => previous.map((item) => item.key === row.key ? { ...item, value } : item))} data={data} selfId={user.id} onlySelf={personal || !data.projects.find((project) => project.id === row.value.projectId)?.canManage} />}
+        {source === 'private' && <TaskRemark value={row.value.remark ?? ''} onChange={(remark) => setRows([{ ...row, value: { ...row.value, remark } }])} />}
       </section>)}</div>
       {personal && <Field label="个人分类"><select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>{data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>}
       <Feedback error={action.error} />

@@ -23,9 +23,9 @@ try {
   const workspace = async () => v2WorkspaceSchema.parse(await call('business_query', { request: { path: 'v2/workspace', query: {} } }));
   const initial = await workspace(); assert.equal(initial.projects.some((row) => row.id === environment.NTFS_TEST_FOREIGN_PROJECT), false);
   const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
-  const body = { action: 'create_project', operationId: randomUUID(), task: { projectId: environment.NTFS_TEST_PROJECT, title: 'MCP V2真实任务', executorId: identity.id, periodId: period.id, priority: 3, plannedDays: 1, milestoneId: null } };
+  const body = { action: 'create_project', operationId: randomUUID(), task: { projectId: environment.NTFS_TEST_PROJECT, title: 'MCP V2真实任务', remark: 'MCP创建备注', executorId: identity.id, periodId: period.id, priority: 3, plannedDays: 1, milestoneId: null } };
   await call('business_command', { request: { path: 'v2/tasks', body } }); await call('business_command', { request: { path: 'v2/tasks', body } });
-  const tasks = (await workspace()).tasks.filter((row) => row.title === body.task.title); assert.equal(tasks.length, 1); let task = tasks[0]; assert.ok(task);
+  const tasks = (await workspace()).tasks.filter((row) => row.title === body.task.title); assert.equal(tasks.length, 1); let task = tasks[0]; assert.ok(task); assert.equal(task.remark, 'MCP创建备注');
   // MCP 只访问 Token 所属人的私人清单与日报，同样使用版本及完整保存契约。
   const child = { id: randomUUID(), title: 'MCP 私人步骤', completed: true };
   const subtaskCommand = { action: 'save_subtasks', operationId: randomUUID(), taskId: task.id, version: 0, items: [child], removedIds: [] };
@@ -43,15 +43,15 @@ try {
   const missingResult = await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'completed' } } }, true);
   assert.equal(z.object({ status: z.number() }).parse(missingResult).status, 409);
   const completedAt = new Date().toISOString(), startedAt = new Date(Date.parse(task.createdAt) - 3_600_000).toISOString();
-  await call('business_command', { request: { path: 'v2/edit', body: { action: 'save_task', operationId: randomUUID(), taskId: task.id, version: task.version, arrangements: [{ periodId: period.id, plannedDays: 1.25, workNote: 'MCP本期验收' }], status: 'completed', completion: { actualDays: 0, aiContribution: null, startedAt, completedAt } } } });
+  await call('business_command', { request: { path: 'v2/edit', body: { action: 'save_task', operationId: randomUUID(), taskId: task.id, version: task.version, remark: 'MCP执行人补充备注', arrangements: [{ periodId: period.id, plannedDays: 1.25, workNote: 'MCP本期验收' }], status: 'completed', completion: { actualDays: 0, aiContribution: null, startedAt, completedAt } } } });
   let updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
-  assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high');
+  assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high'); assert.equal(task.remark, 'MCP执行人补充备注');
   assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.plannedDays, 1.25);
   assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.workNote, 'MCP本期验收');
   assert.equal(task.completedAt, completedAt); assert.equal(task.startedAt, startedAt);
   await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'not_started' } } });
   updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
-  assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high');
+  assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high'); assert.equal(task.remark, 'MCP执行人补充备注');
   const intent = { action: 'delete_task', taskId: task.id, version: task.version };
   const preview = v2ImpactSchema.parse(await call('business_preview', { request: { path: 'v2/impact', body: intent } })); assert.equal(preview.blockers.length, 0);
   const command = { action: 'delete', taskId: task.id, version: task.version };

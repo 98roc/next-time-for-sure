@@ -1,10 +1,9 @@
-import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import type { V2Arrangement, V2Period, V2Task } from '@ntfs/contracts';
 import { z } from 'zod';
 import { V2PlanningRepository } from './planning.repository.js';
 import { V2TaskRepository } from './task.repository.js';
-import { shanghaiDate, shiftDate } from './calendar.js';
+import { shanghaiDate } from './calendar.js';
 
 /** 未完成且无当前/未来安排才顺延；已有后续人工计划时不填充中间空档。 */
 export function rolloverSource(task: V2Task, rows: V2Arrangement[], periods: V2Period[], current: V2Period): V2Arrangement | undefined {
@@ -19,13 +18,7 @@ export function rolloverSource(task: V2Task, rows: V2Arrangement[], periods: V2P
 export async function rolloverTeam(manager: EntityManager, teamId: string, now = new Date().toISOString()): Promise<void> {
   const planning = new V2PlanningRepository(manager), tasks = new V2TaskRepository(manager), today = shanghaiDate(now);
   await planning.ensure(teamId, today);
-  const periods = await planning.periods(teamId);
-  let last = periods.at(-1), extended = false;
-  while (last && last.endOn < shiftDate(today, 7)) {
-    const next: V2Period = { id: randomUUID(), teamId, startOn: shiftDate(last.endOn, 1), endOn: shiftDate(last.endOn, 7), version: 0 };
-    await planning.insertPeriod(next); periods.push(next); last = next; extended = true;
-  }
-  if (extended) await planning.bump(teamId);
+  const periods = await planning.ensurePeriodWindow(teamId, today);
   const current = periods.find((period) => period.startOn <= today && period.endOn >= today);
   if (!current) return;
   const projects = z.array(z.object({ id: z.string() })).parse(await manager.query('SELECT id FROM projects WHERE team_id=?', [teamId]));

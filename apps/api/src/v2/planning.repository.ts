@@ -2,10 +2,11 @@ import { resolveOrder } from './sorting.js';
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
-import { v2ArrangementHistorySchema, v2PeriodSchema, v2TeamMessagesSchema, type V2Period } from '@ntfs/contracts';
+import { v2ArrangementHistorySchema, v2PeriodSchema, v2TeamMessagesSchema, v2PeriodWindowSchema, v2PeriodWindowCountsSchema, v2PeriodWindowLimits, type V2Period } from '@ntfs/contracts';
 import { naturalWeek, shiftDate } from './calendar.js';
 import { decodeJson, instantColumn } from './repository-utils.js';
 import type { V2ReportText } from './shared-report.js';
+import { missingWindowPeriods } from './period-window.js';
 
 const textSchema = z.object({ body: z.string(), manual: z.union([z.boolean(), z.number()]).transform(Boolean), sourceHash: z.string(), version: z.number() });
 
@@ -18,7 +19,7 @@ export class V2PlanningRepository {
     await this.manager.query('INSERT IGNORE INTO v2_team_settings(team_id,messages_json) VALUES (?,JSON_ARRAY())', [teamId]);
     if ((await this.periods(teamId)).length) return;
     const week = naturalWeek(today);
-    for (let offset = -2; offset <= 4; offset++) await this.insertPeriod({ id: randomUUID(), teamId, startOn: shiftDate(week.startOn, offset * 7), endOn: shiftDate(week.endOn, offset * 7), version: 0 });
+    for (let offset = -v2PeriodWindowLimits.before; offset <= v2PeriodWindowLimits.after; offset++) await this.insertPeriod({ id: randomUUID(), teamId, startOn: shiftDate(week.startOn, offset * 7), endOn: shiftDate(week.endOn, offset * 7), version: 0 });
   }
   /** 完整目录按起始日期排序，相邻联动不能固定加减七天。 */
   async periods(teamId: string): Promise<V2Period[]> { return z.array(v2PeriodSchema).parse(await this.manager.query("SELECT id,team_id AS teamId,DATE_FORMAT(start_on,'%Y-%m-%d') AS startOn,DATE_FORMAT(end_on,'%Y-%m-%d') AS endOn,version FROM v2_periods WHERE team_id=? ORDER BY start_on", [teamId])); }
@@ -26,6 +27,29 @@ export class V2PlanningRepository {
   async settings(teamId: string) {
     const row = z.array(z.object({ messages: z.unknown(), version: z.number() })).parse(await this.manager.query('SELECT messages_json AS messages,version FROM v2_team_settings WHERE team_id=?', [teamId]))[0];
     return { messages: row ? v2TeamMessagesSchema.parse(decodeJson(row.messages)) : [], version: row?.version ?? 0 };
+  }
+  /** 展示窗口不裁剪公共目录，与日期修改使用独立版本。 */
+  async periodWindow(teamId: string) {
+    const rows = await this.manager.query('SELECT period_window_before AS `before`,period_window_after AS `after`,period_window_version AS version FROM v2_team_settings WHERE team_id=?', [teamId]);
+    const window = z.array(v2PeriodWindowSchema).parse(rows)[0];
+    if (!window) throw new Error('团队日期目录尚未初始化');
+    return window;
+  }
+  /** 调用方已校验负责人和版本；仅更新窗口，不提交日期草稿。 */
+  async savePeriodWindow(teamId: string, counts: { before: number; after: number }): Promise<void> {
+    const window = v2PeriodWindowCountsSchema.parse(counts);
+    await this.manager.query('UPDATE v2_team_settings SET period_window_before=?,period_window_after=?,period_window_version=period_window_version+1 WHERE team_id=?', [window.before, window.after, teamId]);
+  }
+  /** 在组织锁内补足当前窗口；只补空目录，不产生或顺延任务。 */
+  async ensurePeriodWindow(teamId: string, today: string): Promise<V2Period[]> {
+    const periods = await this.periods(teamId), window = await this.periodWindow(teamId);
+    const added = missingWindowPeriods(periods, today, { before: window.before, after: window.after });
+    for (const dates of added) {
+      const period = { id: randomUUID(), teamId, ...dates, version: 0 };
+      await this.insertPeriod(period); periods.push(period);
+    }
+    if (added.length) await this.bump(teamId);
+    return periods.sort((a, b) => a.startOn.localeCompare(b.startOn));
   }
   /** 扩展目录只插入经过连续性验证的新区间。 */
   async insertPeriod(period: V2Period): Promise<void> { await this.manager.query('INSERT INTO v2_periods(id,team_id,start_on,end_on,version) VALUES (?,?,?,?,?)', [period.id, period.teamId, period.startOn, period.endOn, period.version]); }

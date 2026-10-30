@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { V2ProjectTaskInput, V2Workspace } from '@ntfs/contracts';
 import { Field, priorityLabels } from './controls';
 import { TaskArrangements } from './task-arrangements';
+import { TaskRemark } from './task-remark';
 import { milestoneOptions } from './milestone-options';
 
 /** 项目、计划和个人入口复用同一字段组，差异只由权限和默认值传入。 */
@@ -14,6 +15,7 @@ export function TaskFields({ value, onChange, data, selfId, disabled = false, on
     <PriorityField value={value.priority} disabled={disabled} onChange={(priority) => onChange({ ...value, priority })} />
     {children}
     <Field label="关联里程碑" full><select disabled={disabled} value={value.milestoneId ?? ''} onChange={(event) => onChange({ ...value, milestoneId: event.target.value || null })}><option value="">不关联里程碑</option>{milestoneOptions(data.milestones, value.projectId, originalMilestoneId).map((row) => <option key={row.id} value={row.id}>{row.title}{row.status === 'completed' ? '（已完成）' : ''}</option>)}</select></Field>
+    <TaskRemark value={value.remark ?? ''} disabled={disabled} onChange={(remark) => onChange({ ...value, remark })} />
   </div>{showArrangement && <TaskArrangements value={[{ periodId: value.periodId, plannedDays: value.plannedDays, workNote: value.workNote }, ...(value.additionalArrangements ?? [])]} periods={data.periods} canSchedule canEstimate disabled={disabled} onChange={(arrangements) => { const [first, ...additionalArrangements] = arrangements; if (first) onChange({ ...value, ...first, additionalArrangements }); }} />}</>;
 }
 

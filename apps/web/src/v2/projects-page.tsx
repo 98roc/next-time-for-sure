@@ -2,7 +2,7 @@ import { useProjectSort } from './project-sort';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { v2StatusLabels, type V2SummaryRow } from '@ntfs/contracts';
+import { type V2SummaryRow } from '@ntfs/contracts';
 import { useWorkspace } from './workspace';
 import { useModal } from './modal';
 import { currentPeriod, Feedback, PeriodSelect, periodLabel, PlanningBadge, StatusBadge } from './controls';
@@ -63,7 +63,7 @@ function ProjectSummaryCard({ projectId, rows, projectSort }: { projectId: strin
 function SummaryTable({ rows, sort }: { rows: V2SummaryRow[]; sort: ReturnType<typeof useProjectSort> }) {
   const { data } = useWorkspace(), modal = useModal();
   const ordered = sort.ids.flatMap((id) => rows.filter((row) => row.taskId === id));
-  return <div ref={sort.root}>{sort.feedback}<div {...sort.listProps}>{rows.length ? <div className="nt-scroll"><table className="nt-table"><thead><tr><th>任务</th><th>执行人</th><th>优先级</th><th>状态</th></tr></thead><tbody>{ordered.map((row) => <tr key={row.taskId} {...sort.rowProps(row.taskId)}><td>{sort.handle(row.taskId, row.title ?? '历史任务')}<button className="nt-link" onClick={() => { const task = data.tasks.find((item) => item.id === row.taskId); modal.open(task ? <TaskEditor task={task} historicalStatus={row.status ? v2StatusLabels[row.status] : '不可还原'} /> : <TaskHistory taskId={row.taskId} />); }}>{row.title ?? '历史内容不可还原'}</button>{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.historyIncomplete && <small className="v2-outside">早期历史不完整</small>}</td><td>{row.executorName ?? '历史姓名不可还原'}</td><td>{row.priority ?? '—'}</td><td><StatusBadge status={row.status} /></td></tr>)}</tbody></table></div> : <div className="nt-empty">该区间暂无安排或执行记录</div>}</div></div>;
+  return <div ref={sort.root}>{sort.feedback}<div {...sort.listProps}>{rows.length ? <div className="nt-scroll"><table className="nt-table"><thead><tr><th>任务</th><th>执行人</th><th>优先级</th><th>状态</th></tr></thead><tbody>{ordered.map((row) => <tr key={row.taskId} {...sort.rowProps(row.taskId)}><td>{sort.handle(row.taskId, row.title ?? '历史任务')}<button className="nt-link" onClick={() => { const task = data.tasks.find((item) => item.id === row.taskId); modal.open(task ? <TaskEditor task={task} /> : <TaskHistory taskId={row.taskId} />); }}>{row.title ?? '历史内容不可还原'}</button>{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.historyIncomplete && <small className="v2-outside">早期历史不完整</small>}</td><td>{row.executorName ?? '历史姓名不可还原'}</td><td>{row.priority ?? '—'}</td><td><StatusBadge status={row.status} /></td></tr>)}</tbody></table></div> : <div className="nt-empty">该区间暂无安排或执行记录</div>}</div></div>;
 }
 
 /** 任务页默认全部未完成，日期筛选不默认隐藏积压和未来安排。 */

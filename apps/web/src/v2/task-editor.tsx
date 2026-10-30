@@ -1,3 +1,4 @@
+import { TaskRemark } from './task-remark';
 import { CompletionTime } from './completion-time';
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -14,13 +15,13 @@ import { taskCompletion, TaskResultFields } from './task-results';
 import { orderArrangements } from './arrangement-order';
 
 /** 共用详情分离任务字段、周期安排及完成结果，权限按字段执行，整份草稿一次保存。 */
-export function TaskEditor({ task, historicalStatus }: { task: V2Task; historicalStatus?: string }) {
+export function TaskEditor({ task }: { task: V2Task }) {
   const { data, user, run, notify } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
   const project = data.projects.find((row) => row.id === task.projectId), manage = task.kind === 'private' || Boolean(project?.canManage), self = task.executorId === user.id;
   const canStatus = manage || self, canDelete = manage || (task.creatorId === user.id && task.status === 'not_started');
   const [originalArrangements] = useState(() => orderArrangements(data.arrangements.filter((row) => row.taskId === task.id).map(({ periodId, plannedDays, workNote }) => ({ periodId, plannedDays, workNote: workNote ?? '' })), data.periods));
   const [arrangements, setArrangements] = useState<V2ArrangementInput[]>(originalArrangements);
-  const [draft, setDraft] = useState<V2ProjectTaskInput>({ projectId: task.projectId ?? '', title: task.title, priority: task.priority, executorId: task.executorId, milestoneId: task.milestoneId, periodId: originalArrangements[0]?.periodId ?? '', plannedDays: originalArrangements[0]?.plannedDays ?? null });
+  const [draft, setDraft] = useState<V2ProjectTaskInput>({ projectId: task.projectId ?? '', title: task.title, remark: task.remark ?? '', priority: task.priority, executorId: task.executorId, milestoneId: task.milestoneId, periodId: originalArrangements[0]?.periodId ?? '', plannedDays: originalArrangements[0]?.plannedDays ?? null });
   const [status, setStatus] = useState(task.status), [completion, setCompletion] = useState(() => taskCompletion(task));
   const [initialCategory] = useState(() => data.placements.find((row) => row.taskId === task.id)?.categoryId ?? '');
   const [categoryId, setCategoryId] = useState(initialCategory);
@@ -28,7 +29,8 @@ export function TaskEditor({ task, historicalStatus }: { task: V2Task; historica
   const arrangementsChanged = task.kind === 'project' && JSON.stringify(arrangements) !== JSON.stringify(originalArrangements);
   const periodsChanged = arrangements.length !== originalArrangements.length || originalArrangements.some((row) => !arrangements.some((item) => item.periodId === row.periodId));
   const completionChanged = completion.startedAt !== (task.startedAt ?? null) || completion.completedAt !== (task.completedAt ?? undefined) || completion.actualDays !== (task.actualDays ?? null) || completion.aiContribution !== (task.aiContribution ?? null);
-  const dirty = detailsChanged || arrangementsChanged || completionChanged || status !== task.status || categoryId !== initialCategory;
+  const remarkChanged = (draft.remark ?? '').trim() !== (task.remark ?? '');
+  const dirty = remarkChanged || detailsChanged || arrangementsChanged || completionChanged || status !== task.status || categoryId !== initialCategory;
   const current = data.tasks.find((row) => row.id === task.id), stale = !current || current.version !== task.version;
   // 历史空结果只在本次完成或编辑结果时要求补齐，改名称不会触发历史补录。
   const requireResults = status === 'completed' && (task.status !== 'completed' || completionChanged);
@@ -40,6 +42,7 @@ export function TaskEditor({ task, historicalStatus }: { task: V2Task; historica
   }
   async function save(confirmations: { arrangement?: string; milestone?: string } = {}) {
     const command: V2TaskEdit = { action: 'save_task', operationId: createOperationId(), taskId: task.id, version: task.version,
+      ...(remarkChanged ? { remark: draft.remark ?? '' } : {}),
       ...(detailsChanged ? { details: task.kind === 'private' ? { kind: 'private', title: draft.title, priority: draft.priority } : { kind: 'project', title: draft.title, priority: draft.priority, executorId: draft.executorId, milestoneId: draft.milestoneId } } : {}),
       ...(status !== task.status ? { status } : {}), ...(draft.executorId === user.id && categoryId && categoryId !== initialCategory ? { categoryId } : {}),
       ...(confirmations.milestone ? { milestoneConfirmation: confirmations.milestone } : {}),
@@ -67,7 +70,7 @@ export function TaskEditor({ task, historicalStatus }: { task: V2Task; historica
     {stale && <p className="v2-error" role="alert">任务已更新或删除。已保留你的输入，请关闭后重新打开核对。</p>}
     <form id={formId} onSubmit={(event) => { event.preventDefault(); submit(); }}><fieldset disabled={action.busy || stale}>
       {task.kind === 'project' && manage ? <TaskFields value={draft} onChange={setDraft} data={data} selfId={user.id} showArrangement={false} originalMilestoneId={task.milestoneId}>{statusFields}</TaskFields> : task.kind === 'private' ? <div className="v2-fields"><Field label="任务名称" full><input required maxLength={200} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></Field><PriorityField value={draft.priority} onChange={(priority) => setDraft({ ...draft, priority })} />{statusFields}</div> : <><dl className="v2-facts"><dt>任务名称</dt><dd>{task.title}</dd><dt>执行人</dt><dd>{data.accounts.find((row) => row.id === task.executorId)?.displayName ?? '历史成员'}</dd><dt>优先级</dt><dd>{task.priority}</dd></dl><div className="v2-fields">{statusFields}<Field label="关联里程碑" full><input readOnly value={data.milestones.find((row) => row.id === task.milestoneId)?.title ?? '不关联里程碑'} /></Field></div></>}
-      {historicalStatus && <small className="nt-muted">区间结束时：{historicalStatus}</small>}
+      {(task.kind === 'private' || !manage) && <TaskRemark value={draft.remark ?? ''} readOnly={!canStatus} onChange={(remark) => setDraft({ ...draft, remark })} />}
       {task.kind === 'project' && <><TaskArrangements carriedPeriods={data.arrangements.filter((row) => row.taskId === task.id && row.carriedFromPeriodId).map((row) => row.periodId)} value={arrangements} onChange={setArrangements} periods={data.periods} canSchedule={manage} canEstimate={canStatus} />{status === 'completed' && <><CompletionTime value={completion} onChange={setCompletion} disabled={!canStatus} /><section className="v2-task-section"><div className="v2-section-head"><h3>完成结果</h3></div><TaskResultFields value={completion} onChange={setCompletion} required={requireResults} disabled={!canStatus} /></section></>}</>}
       {task.kind === 'private' && status === 'completed' && <CompletionTime value={completion} onChange={setCompletion} disabled={!canStatus} />}
       <Feedback error={action.error} />
