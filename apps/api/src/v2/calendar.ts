@@ -1,6 +1,6 @@
-import { v2DateSchema, type V2Period } from '@ntfs/contracts';
+import { v2DateSchema, shiftPeriodDate as shiftDate, type V2Period } from '@ntfs/contracts';
 
-const dayMilliseconds = 86_400_000;
+export { shiftPeriodDate as shiftDate, naturalPeriodWeek as naturalWeek } from '@ntfs/contracts';
 
 /** 团队当前固定上海时区，日期运算不依赖进程或浏览器所在时区。 */
 export function shanghaiDate(instant: string): string {
@@ -9,26 +9,11 @@ export function shanghaiDate(instant: string): string {
   return new Date(timestamp + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
-/** 对经过校验的纯日期加减天数，避免夏令时及本机时区影响。 */
-export function shiftDate(value: string, days: number): string {
-  v2DateSchema.parse(value);
-  if (!Number.isInteger(days)) throw new Error('天数必须为整数');
-  return v2DateSchema.parse(new Date(Date.parse(`${value}T00:00:00.000Z`) + days * dayMilliseconds).toISOString().slice(0, 10));
-}
-
 /** 包含起止日期的业务区间转换为半开 UTC 时间窗，毫秒边界不丢失事件。 */
 export function periodWindow(period: Pick<V2Period, 'startOn' | 'endOn'>): { start: string; endExclusive: string } {
   v2DateSchema.parse(period.startOn); v2DateSchema.parse(period.endOn);
   if (period.startOn > period.endOn) throw new Error('区间日期倒置');
   return { start: new Date(`${period.startOn}T00:00:00.000+08:00`).toISOString(), endExclusive: new Date(`${shiftDate(period.endOn, 1)}T00:00:00.000+08:00`).toISOString() };
-}
-
-/** 自然周仅是初始生成方式；现存区间的相邻关系由保存顺序决定。 */
-export function naturalWeek(on: string): { startOn: string; endOn: string } {
-  v2DateSchema.parse(on);
-  const weekday = new Date(`${on}T00:00:00.000Z`).getUTCDay();
-  const startOn = shiftDate(on, -((weekday + 6) % 7));
-  return { startOn, endOn: shiftDate(startOn, 6) };
 }
 
 /** 整批校验日期调整，历史锁定和连续性检查必须在写事务中针对最新记录执行。 */

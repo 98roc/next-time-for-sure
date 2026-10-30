@@ -28,7 +28,7 @@ try {
       if (fail) return route.fulfill({ status: 503, json: { message: '测试连接失败' } });
       const current = Number(url.searchParams.get('page') || 1);
       if (empty) return route.fulfill({ json: { accountId: fixture.identity.id, cursor: '0', page: 1, total: 0, messages: [] } });
-      return route.fulfill({ json: { accountId: fixture.identity.id, cursor: '11', page: current, total: 11, messages: Array.from({ length: current === 1 ? 10 : 1 }, (_, i) => ({ id: `${11 - (current - 1) * 10 - i}`, createdAt: '2026-10-20T01:00:00.000Z', items: [{ taskId: task.id, title: titles[(current - 1) * 10 + i], projectId: project.id, projectName: project.name, reasons: i % 4 === 0 ? ['张三为你安排了任务'] : i % 4 === 1 ? ['李四完成了任务'] : i % 4 === 2 ? ['张三新增了计划外任务', '张三为你安排了任务'] : ['张三代李四完成了任务'] }] })) } });
+      return route.fulfill({ json: { accountId: fixture.identity.id, cursor: '11', page: current, total: 11, messages: Array.from({ length: current === 1 ? 10 : 1 }, (_, i) => ({ id: `${11 - (current - 1) * 10 - i}`, createdAt: '2026-10-20T01:00:00.000Z', items: [{ taskId: task.id, title: titles[(current - 1) * 10 + i], projectId: project.id, projectName: project.name, reasons: i % 4 === 0 ? ['张三为你安排了任务'] : i % 4 === 1 ? ['李四完成了任务'] : i % 4 === 2 ? ['张三标记了计划外任务', '张三为你安排了任务'] : ['张三代李四完成了任务'] }] })) } });
     }
     const data = path.endsWith('/auth/me') ? fixture.identity : path.endsWith('/workspace') ? fixture.workspace : path.endsWith('/summary') ? fixture.summary : path.endsWith('/history') ? [] : path.endsWith('/weekly') ? fixture.weekly : null;
     return route.fulfill({ status: data ? 200 : 404, json: data ?? { message: '未模拟接口' } });

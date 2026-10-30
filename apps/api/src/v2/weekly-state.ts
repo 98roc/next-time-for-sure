@@ -8,6 +8,8 @@ import { V2PlanningRepository } from './planning.repository.js';
 import { summarizePeriod } from './history.js';
 import { generateReportText, presentReport, reportSourceHash, type V2ReportGroup, type V2ReportSource } from './shared-report.js';
 import { hashValue } from './repository-utils.js';
+import { weeklyPeopleIds } from './weekly-people.js';
+import { V2PlanningLabelsRepository } from './planning-labels.repository.js';
 
 /** 按当前项目权限读取历史与计划，团队整稿不会用于受限成员的自由文本输出。 */
 export async function buildWeeklyState(manager: EntityManager, context: V2Context, summaryPeriodId: string, planPeriodId: string): Promise<{ state: V2WeeklyState; source: V2ReportSource }> {
@@ -18,7 +20,7 @@ export async function buildWeeklyState(manager: EntityManager, context: V2Contex
   if (!summaryPeriod || !planPeriod || periods.indexOf(planPeriod) !== periods.indexOf(summaryPeriod) + 1) throw new ConflictException('请选择相邻的总结和计划区间。');
   const ids = await tasks.projectTaskIds(context.projects.map((project) => project.id));
   const histories = await tasks.history(ids), arrangementHistory = await planning.arrangementHistory(ids);
-  const summary = summarizePeriod(summaryPeriod, histories, arrangementHistory, new Date().toISOString());
+  const summary = summarizePeriod(summaryPeriod, histories, arrangementHistory, new Date().toISOString(), await new V2PlanningLabelsRepository(manager).read(ids));
   const current = (await tasks.visible(context.actor.id, context.projects.map((project) => project.id))).filter((task) => task.kind === 'project');
   const arrangements = await tasks.arrangements(current.map((task) => task.id));
 
@@ -26,6 +28,9 @@ export async function buildWeeklyState(manager: EntityManager, context: V2Contex
   const allProjectIds = context.organization.projects.filter((project) => project.teamId === context.teamId).map((project) => project.id);
   const fullOrder = await planning.order(context.teamId, 'weekly:projects', allProjectIds);
   const projectOrder = { ids: fullOrder.ids.filter((id) => context.projects.some((project) => project.id === id)), version: fullOrder.version, manual: fullOrder.manual };
+  const fullPeopleOrder = await planning.order(context.teamId, 'weekly:people', await weeklyPeopleIds(manager, context));
+  const visiblePeople = new Set([...summary.map((row) => row.executorId), ...current.filter((task) => arrangements.some((row) => row.taskId === task.id && row.periodId === planPeriod.id)).map((task) => task.executorId)]);
+  const peopleOrder = { ...fullPeopleOrder, ids: fullPeopleOrder.ids.filter((id) => visiblePeople.has(id)) };
   const taskOrders: V2WeeklyState['taskOrders'] = [];
   for (const project of context.projects) for (const period of [summaryPeriod, planPeriod]) {
     const source = await periodOrderSource(manager, project.id, period);
@@ -45,5 +50,5 @@ export async function buildWeeklyState(manager: EntityManager, context: V2Contex
   const relatedIds = new Set([...summary.map((row) => row.taskId), ...arrangements.filter((row) => row.periodId === planPeriod.id).map((row) => row.taskId)]);
   const source: V2ReportSource = { teamId: context.teamId, summaryPeriod, planPeriod, summary: groups('summary'), plan: groups('plan'), revision: hashValue({ tasks: current.filter((task) => relatedIds.has(task.id)).map((task) => [task.id, task.version]), summary, arrangements: arrangements.filter((row) => row.periodId === summaryPeriod.id || row.periodId === planPeriod.id), taskOrders, projectOrder }) };
   const saved = context.teamLeader ? await planning.report(context.teamId, summaryPeriod.id, planPeriod.id) : null;
-  return { source, state: { summaryPeriod, planPeriod, summary, projectOrder, taskOrders, text: presentReport(saved, source), generatedText: generateReportText(source), currentSourceHash: reportSourceHash(source), canEditText: context.teamLeader } };
+  return { source, state: { summaryPeriod, planPeriod, summary, projectOrder, peopleOrder, taskOrders, text: presentReport(saved, source), generatedText: generateReportText(source), currentSourceHash: reportSourceHash(source), canEditText: context.teamLeader } };
 }

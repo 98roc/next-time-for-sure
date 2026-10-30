@@ -43,15 +43,17 @@ try {
   const missingResult = await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'completed' } } }, true);
   assert.equal(z.object({ status: z.number() }).parse(missingResult).status, 409);
   const completedAt = new Date().toISOString(), startedAt = new Date(Date.parse(task.createdAt) - 3_600_000).toISOString();
-  await call('business_command', { request: { path: 'v2/edit', body: { action: 'save_task', operationId: randomUUID(), taskId: task.id, version: task.version, remark: 'MCP执行人补充备注', arrangements: [{ periodId: period.id, plannedDays: 1.25, workNote: 'MCP本期验收' }], status: 'completed', completion: { actualDays: 0, aiContribution: null, startedAt, completedAt } } } });
+  await call('business_command', { request: { path: 'v2/edit', body: { action: 'save_task', operationId: randomUUID(), taskId: task.id, version: task.version, remark: 'MCP执行人补充备注', planningLabels: [{ periodId: period.id, unplanned: false }], arrangements: [{ periodId: period.id, plannedDays: 1.25, workNote: 'MCP本期验收' }], status: 'completed', completion: { actualDays: 0, aiContribution: null, startedAt, completedAt } } } });
   let updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
   assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high'); assert.equal(task.remark, 'MCP执行人补充备注');
   assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.plannedDays, 1.25);
   assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.workNote, 'MCP本期验收');
+  assert.equal(updated.arrangements.find((row) => row.taskId === task?.id)?.unplanned, false);
   assert.equal(task.completedAt, completedAt); assert.equal(task.startedAt, startedAt);
   await call('business_command', { request: { path: 'v2/tasks', body: { action: 'set_status', operationId: randomUUID(), taskId: task.id, version: task.version, status: 'not_started' } } });
   updated = await workspace(); task = updated.tasks.find((row) => row.id === task?.id); assert.ok(task);
   assert.equal(task.actualDays, 0); assert.equal(task.aiContribution, 'high'); assert.equal(task.remark, 'MCP执行人补充备注');
+  assert.equal(updated.planningLabels.find((row) => row.taskId === task?.id && row.periodId === period.id)?.unplanned, false);
   const intent = { action: 'delete_task', taskId: task.id, version: task.version };
   const preview = v2ImpactSchema.parse(await call('business_preview', { request: { path: 'v2/impact', body: intent } })); assert.equal(preview.blockers.length, 0);
   const command = { action: 'delete', taskId: task.id, version: task.version };

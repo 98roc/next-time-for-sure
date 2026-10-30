@@ -71,6 +71,22 @@ export async function verifyPersonalWork(h: Harness): Promise<void> {
   await call('personal-settings', developer, { action: 'set_completed_mode', operationId: randomUUID(), version: prefs.version, mode: 'period' });
   assert.equal((await state(developer)).personalPreferences.completedMode, 'period'); assert.equal((await state(lead)).personalPreferences.completedMode, 'day');
   await call('personal-settings', developer, { action: 'set_daily_project_order', operationId: randomUUID(), version: prefs.version + 1, projectIds: [hiddenProjectId, projectId] }, 403);
+
+  // 里程碑偏好按账号持久化；重复提交幂等，旧版本不能覆盖其他入口刚保存的偏好。
+  assert.equal(prefs.milestoneMode, 'wrap');
+  const milestoneMode = { action: 'set_milestone_mode', operationId: randomUUID(), version: prefs.version + 1, mode: 'horizontal' };
+  await call('personal-settings', developer, { ...milestoneMode, mode: 'unsupported' }, 400);
+  await call('personal-settings', developer, { ...milestoneMode, ownerId: lead.id }, 400);
+  await call('personal-settings', developer, milestoneMode); await call('personal-settings', developer, milestoneMode);
+  const afterMode = (await state(developer)).personalPreferences;
+  assert.equal(afterMode.version, prefs.version + 2); assert.equal(afterMode.milestoneMode, 'horizontal');
+  assert.equal(afterMode.completedMode, 'period'); assert.equal(afterMode.projectOrder, null);
+  assert.equal((await state(lead)).personalPreferences.milestoneMode, 'wrap');
+  await call('personal-settings', developer, { ...milestoneMode, operationId: randomUUID(), mode: 'wrap' }, 409);
+  await call('personal-settings', developer, { action: 'set_completed_mode', operationId: randomUUID(), version: afterMode.version, mode: 'period' });
+  assert.equal((await state(developer)).personalPreferences.milestoneMode, 'horizontal');
+  const storedMode = z.array(z.object({ mode: z.string(), comment: z.string() })).parse(await source.query("SELECT p.milestone_mode AS mode,c.COLUMN_COMMENT AS comment FROM v2_personal_preferences p JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME='v2_personal_preferences' AND c.COLUMN_NAME='milestone_mode' WHERE p.owner_id=?", [developer.id]));
+  assert.equal(storedMode[0]?.mode, 'horizontal'); assert.match(storedMode[0]?.comment ?? '', /里程碑展示模式/u);
   const shared = (await state()).orders.find((row) => row.scope === 'project-page:projects'); assert.ok(shared);
   await call('planning', leader, { action: 'reorder_projects', page: 'projects', operationId: randomUUID(), version: shared.version, projectIds: [hiddenProjectId, projectId] });
   assert.deepEqual((await daily(today, leader)).projects.map((row) => row.id), [hiddenProjectId, projectId]);

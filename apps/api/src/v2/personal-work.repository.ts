@@ -12,16 +12,16 @@ export type SubtaskSnapshot = z.infer<typeof subtaskSnapshotSchema>;
 export class PersonalWorkRepository {
   constructor(private readonly manager: EntityManager) {}
 
-  /** 未保存偏好的账号默认按天，并跟随共享项目顺序。 */
+  /** 未保存偏好的账号默认按天、里程碑换行，并跟随共享项目顺序。 */
   async preferences(ownerId: string): Promise<V2PersonalPreferences> {
-    const rows = z.array(z.object({ completedMode: z.string(), projectOrder: z.unknown(), version: z.number() })).parse(await this.manager.query('SELECT completed_mode AS completedMode,project_order_json AS projectOrder,version FROM v2_personal_preferences WHERE owner_id=?', [ownerId]));
+    const rows = z.array(z.object({ completedMode: z.string(), milestoneMode: z.string(), projectOrder: z.unknown(), version: z.number() })).parse(await this.manager.query('SELECT completed_mode AS completedMode,milestone_mode AS milestoneMode,project_order_json AS projectOrder,version FROM v2_personal_preferences WHERE owner_id=?', [ownerId]));
     const row = rows[0];
-    return row ? v2PersonalPreferencesSchema.parse({ ...row, projectOrder: decodeJson(row.projectOrder) }) : { completedMode: 'day', projectOrder: null, version: 0 };
+    return row ? v2PersonalPreferencesSchema.parse({ ...row, projectOrder: decodeJson(row.projectOrder) }) : { completedMode: 'day', milestoneMode: 'wrap', projectOrder: null, version: 0 };
   }
 
   /** 调用方核对版本后整体保存，查看模式与个人项目顺序互不重置。 */
   async savePreferences(ownerId: string, value: V2PersonalPreferences): Promise<void> {
-    await this.manager.query('INSERT INTO v2_personal_preferences(owner_id,completed_mode,project_order_json,version) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE completed_mode=VALUES(completed_mode),project_order_json=VALUES(project_order_json),version=VALUES(version)', [ownerId, value.completedMode, value.projectOrder === null ? null : JSON.stringify(value.projectOrder), value.version]);
+    await this.manager.query('INSERT INTO v2_personal_preferences(owner_id,completed_mode,milestone_mode,project_order_json,version) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE completed_mode=VALUES(completed_mode),milestone_mode=VALUES(milestone_mode),project_order_json=VALUES(project_order_json),version=VALUES(version)', [ownerId, value.completedMode, value.milestoneMode, value.projectOrder === null ? null : JSON.stringify(value.projectOrder), value.version]);
   }
 
   /** 清单版本独立于主任务；新执行人只能读到自己的空清单。 */

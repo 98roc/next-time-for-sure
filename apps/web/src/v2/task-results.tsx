@@ -19,7 +19,7 @@ export function TaskResultFields({ value, onChange, required = false, disabled =
 }
 
 /** 完成确认先填结果再一次性提交；取消返回原表单，不提前写状态或创建任务。 */
-export function TaskCompletion({ title, initial, arrangements, onConfirm, onDone, privateTask = false }: { title: string; initial?: V2Completion; arrangements: V2ArrangementInput[]; onConfirm: (value: V2Completion) => Promise<unknown>; onDone?: () => void; privateTask?: boolean }) {
+export function TaskCompletion({ title, initial, arrangements, onConfirm, onDone, privateTask = false }: { title: string; initial?: V2Completion; arrangements: Pick<V2ArrangementInput, 'periodId' | 'plannedDays'>[]; onConfirm: (value: V2Completion) => Promise<unknown>; onDone?: () => void; privateTask?: boolean }) {
   const { data } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
   const [value, setValue] = useState<V2Completion>({ actualDays: initial?.actualDays ?? null, aiContribution: privateTask ? null : initial?.aiContribution ?? 'high', startedAt: initial?.startedAt ?? null, ...(initial?.completedAt ? { completedAt: initial.completedAt } : {}) });
   const estimates = orderArrangements(arrangements.filter((row) => row.plannedDays !== null), data.periods);

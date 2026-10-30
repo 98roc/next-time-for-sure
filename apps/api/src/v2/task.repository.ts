@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
-import { v2ArrangementSchema, v2TaskEventSchema, v2TaskSchema, type V2Task, type V2TaskEvent } from '@ntfs/contracts';
+import { v2ArrangementSchema, v2PlanningChangeSchema, v2TaskEventSchema, v2TaskSchema, type V2PlanningChange, type V2Task, type V2TaskEvent } from '@ntfs/contracts';
 import { dbTime, decodeJson, instantColumn } from './repository-utils.js';
 
 const taskSelect = `SELECT id,kind,team_id AS teamId,project_id AS projectId,creator_id AS creatorId,executor_id AS executorId,milestone_id AS milestoneId,title,COALESCE(remark,'') AS remark,priority,status,version,actual_days + 0e0 AS actualDays,ai_contribution AS aiContribution,${instantColumn('started_at','startedAt')},${instantColumn('completed_at','completedAt')},${instantColumn('deleted_at','deletedAt')},${instantColumn('created_at','createdAt')},${instantColumn('updated_at','updatedAt')} FROM v2_tasks`;
@@ -20,22 +20,22 @@ export class V2TaskRepository {
   async get(id: string): Promise<V2Task | undefined> { return z.array(v2TaskSchema).parse(await this.manager.query(`${taskSelect} WHERE id=?`, [id]))[0]; }
 
   /** 创建任务和其事件，首个区间及个人位置由上层在同事务建立。 */
-  async insert(task: V2Task, actorId: string): Promise<void> {
+  async insert(task: V2Task, actorId: string, planningChanges: V2PlanningChange[] = []): Promise<void> {
     await this.manager.query(`INSERT INTO v2_tasks(id,kind,team_id,project_id,creator_id,executor_id,milestone_id,title,remark,priority,status,actual_days,ai_contribution,started_at,completed_at,history_known_from,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [task.id, task.kind, task.teamId, task.projectId, task.creatorId, task.executorId, task.milestoneId, task.title, task.remark ?? '', task.priority, task.status, task.actualDays ?? null, task.aiContribution ?? null, dbTime(task.startedAt ?? null), dbTime(task.completedAt), dbTime(task.createdAt), task.version, dbTime(task.createdAt), dbTime(task.updatedAt)]);
-    await this.event(task, actorId, 'created', null);
+    await this.event(task, actorId, 'created', null, planningChanges);
   }
 
   /** 每次聚合更新只追加一个对应版本事件，执行人代改由实际 actorId 留痕。 */
-  async update(previous: V2Task, task: V2Task, actorId: string | null, action: V2TaskEvent['action'] = 'updated'): Promise<void> {
+  async update(previous: V2Task, task: V2Task, actorId: string | null, action: V2TaskEvent['action'] = 'updated', planningChanges: V2PlanningChange[] = []): Promise<void> {
     await this.manager.query('UPDATE v2_tasks SET title=?,remark=?,executor_id=?,milestone_id=?,priority=?,status=?,started_at=?,completed_at=?,actual_days=?,ai_contribution=?,deleted_at=?,version=?,updated_at=? WHERE id=?', [task.title, task.remark ?? '', task.executorId, task.milestoneId, task.priority, task.status, dbTime(task.startedAt ?? null), dbTime(task.completedAt), task.actualDays ?? null, task.aiContribution ?? null, dbTime(task.deletedAt), task.version, dbTime(task.updatedAt), task.id]);
-    await this.event(task, actorId, action, previous.status);
+    await this.event(task, actorId, action, previous.status, planningChanges);
   }
 
   /** 事件快照保留当前业务字段及备注，不保存认证或旧版说明内容。 */
-  async event(task: V2Task, actorId: string | null, action: V2TaskEvent['action'], beforeStatus: V2TaskEvent['beforeStatus']): Promise<void> {
+  async event(task: V2Task, actorId: string | null, action: V2TaskEvent['action'], beforeStatus: V2TaskEvent['beforeStatus'], planningChanges: V2PlanningChange[] = []): Promise<void> {
     const names = z.array(z.object({ id: z.string(), name: z.string() })).parse(await this.manager.query('SELECT id,display_name AS name FROM accounts WHERE id IN (?,?)', [task.executorId, actorId]));
     const projects = task.projectId ? z.array(z.object({ name: z.string() })).parse(await this.manager.query('SELECT name FROM projects WHERE id=?', [task.projectId])) : [];
-    const snapshot = { task, projectName: projects[0]?.name ?? null, executorName: names.find((row) => row.id === task.executorId)?.name ?? null, actorName: names.find((row) => row.id === actorId)?.name ?? null };
+    const snapshot = { task, planningChanges, projectName: projects[0]?.name ?? null, executorName: names.find((row) => row.id === task.executorId)?.name ?? null, actorName: names.find((row) => row.id === actorId)?.name ?? null };
     await this.manager.query('INSERT INTO v2_task_events(id,task_id,sequence,actor_id,action,before_status,snapshot_json,occurred_at) VALUES (?,?,?,?,?,?,?,?)', [randomUUID(), task.id, task.version, actorId, action, beforeStatus, JSON.stringify(snapshot), dbTime(task.updatedAt)]);
   }
 
@@ -46,9 +46,9 @@ export class V2TaskRepository {
     const converted = z.array(z.object({ taskId: z.string() })).parse(await this.manager.query(`SELECT converted_task_id AS taskId FROM v2_backlog WHERE converted_task_id IN (${taskIds.map(() => '?').join(',')})`, taskIds));
     return rows.map(({ snapshot_json, ...row }) => {
       const decoded = decodeJson(snapshot_json);
-      const envelope = z.object({ task: v2TaskSchema, projectName: z.string().nullable().optional(), executorName: z.string().nullable(), actorName: z.string().nullable() }).safeParse(decoded);
+      const envelope = z.object({ task: v2TaskSchema, planningChanges: z.array(v2PlanningChangeSchema).optional(), projectName: z.string().nullable().optional(), executorName: z.string().nullable(), actorName: z.string().nullable() }).safeParse(decoded);
       // 早期或迁移缺证据的快照明确保留空姓名，不拿现有账号姓名伪造历史。
-      return v2TaskEventSchema.parse({ ...row, fromBacklog: converted.some((item) => item.taskId === row.taskId), snapshot: envelope.success ? envelope.data.task : decoded, projectName: envelope.success ? envelope.data.projectName ?? null : null, executorName: envelope.success ? envelope.data.executorName : null, actorName: envelope.success ? envelope.data.actorName : null });
+      return v2TaskEventSchema.parse({ ...row, planningChanges: envelope.success ? envelope.data.planningChanges : undefined, fromBacklog: converted.some((item) => item.taskId === row.taskId), snapshot: envelope.success ? envelope.data.task : decoded, projectName: envelope.success ? envelope.data.projectName ?? null : null, executorName: envelope.success ? envelope.data.executorName : null, actorName: envelope.success ? envelope.data.actorName : null });
     });
   }
 
@@ -56,6 +56,19 @@ export class V2TaskRepository {
   async projectTaskIds(projectIds: string[]): Promise<string[]> {
     if (!projectIds.length) return [];
     return z.array(z.object({ id: z.string() })).parse(await this.manager.query(`SELECT id FROM v2_tasks WHERE kind='project' AND project_id IN (${projectIds.map(() => '?').join(',')})`, projectIds)).map((row) => row.id);
+  }
+
+  /** 人员共享顺序保留已删除任务和改派前的执行人；调用方只传当前团队的项目。 */
+  async projectExecutorIds(projectIds: string[]): Promise<string[]> {
+    if (!projectIds.length) return [];
+    const placeholders = projectIds.map(() => '?').join(',');
+    const rows = z.array(z.object({ executorId: z.string().nullable() })).parse(await this.manager.query(`
+      SELECT executor_id AS executorId FROM v2_tasks WHERE kind='project' AND project_id IN (${placeholders})
+      UNION
+      SELECT NULLIF(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(e.snapshot_json,'$.task.executorId')),JSON_UNQUOTE(JSON_EXTRACT(e.snapshot_json,'$.executorId'))),'null') AS executorId
+      FROM v2_task_events e JOIN v2_tasks t ON t.id=e.task_id WHERE t.kind='project' AND t.project_id IN (${placeholders})
+    `, [...projectIds, ...projectIds]));
+    return rows.flatMap((row) => row.executorId ? [row.executorId] : []);
   }
 
   /** 项目排序保留历史任务位置，不向该项目权限之外暴露任何对象。 */
@@ -67,12 +80,14 @@ export class V2TaskRepository {
   /** 当前安排供编辑使用，历史总结不能用此查询替代有效时间片。 */
   async arrangements(taskIds: string[]) {
     if (!taskIds.length) return [];
-    return z.array(v2ArrangementSchema.extend({ plannedDays: z.coerce.number().nullable() })).parse(await this.manager.query(`SELECT task_id AS taskId,period_id AS periodId,planned_days AS plannedDays,work_note AS workNote,carried_from_period_id AS carriedFromPeriodId,position,version FROM v2_arrangements WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY position,task_id`, taskIds));
+    return z.array(v2ArrangementSchema.extend({ plannedDays: z.coerce.number().nullable(), unplanned: z.coerce.boolean().nullable() })).parse(await this.manager.query(`SELECT a.task_id AS taskId,a.period_id AS periodId,a.planned_days AS plannedDays,a.work_note AS workNote,a.carried_from_period_id AS carriedFromPeriodId,a.position,a.version,l.unplanned FROM v2_arrangements a LEFT JOIN v2_task_planning_labels l ON l.task_id=a.task_id AND l.period_id=a.period_id WHERE a.task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY a.position,a.task_id`, taskIds));
   }
 
   /** 新安排保留内容和来源；系统顺延复制预计值，但不复制人工工作文本。 */
   async addArrangement(task: V2Task, periodId: string, plannedDays: number | null, actorId: string | null, now: string, workNote = '', carriedFromPeriodId: string | null = null): Promise<void> {
     await this.manager.query('INSERT INTO v2_arrangements(task_id,period_id,team_id,planned_days,work_note,carried_from_period_id,position) SELECT ?,?,?,?,?,?,COALESCE(MAX(position),-1)+1 FROM v2_arrangements WHERE period_id=?', [task.id, periodId, task.teamId, plannedDays, workNote, carriedFromPeriodId, periodId]);
+    // 首次追加默认不勾选；取消后重加保留原值，系统顺延也不复制来源周期标签。
+    await this.manager.query('INSERT IGNORE INTO v2_task_planning_labels(task_id,period_id,team_id,unplanned,updated_by,updated_at) VALUES (?,?,?,0,?,?)', [task.id, periodId, task.teamId, actorId, dbTime(now)]);
     await this.arrangementEvent(task.id, periodId, plannedDays, actorId, now, workNote, carriedFromPeriodId);
   }
 

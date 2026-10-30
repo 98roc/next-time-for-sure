@@ -1,0 +1,27 @@
+/* 仅收紧任务编辑页；批量新增、完成确认及其他弹窗保持各自布局。 */
+.v2-scope .v2-task-editor .v2-dialog-header{padding:12px 20px}
+.v2-scope .v2-task-editor .v2-content{padding:12px 20px 16px}
+.v2-scope .v2-task-editor .v2-dialog-footer{padding:12px 20px}
+.v2-scope .v2-task-editor .v2-task-meta{margin:0 0 10px;gap:8px}
+.v2-scope .v2-task-editor .v2-fields{gap:12px;margin:10px 0}
+.v2-scope .v2-task-editor .v2-field{gap:5px}
+.v2-scope .v2-task-editor .v2-editor-basics>.v2-fields{margin-top:0;grid-template-columns:repeat(4,minmax(0,1fr))}
+.v2-scope .v2-task-editor .v2-facts{gap:8px;margin:0 0 10px}
+.v2-scope .v2-task-editor .v2-task-section,.v2-scope .v2-task-editor .v2-execution-times{margin-top:14px;padding-top:12px}
+.v2-scope .v2-task-editor .v2-section-head{margin-bottom:8px}
+.v2-scope .v2-task-editor .v2-task-arrangement{margin:10px 0}
+.v2-scope .v2-task-editor .v2-task-arrangement:last-child{margin-bottom:0}
+/* 两组各两个字段，共用一个标题；宽屏结果与时间同排，日期输入保留足够宽度。 */
+@media(min-width:1000px){
+ .v2-scope .v2-task-editor .v2-execution-times:has(>.v2-fields:not(.v2-execution-inputs)){display:grid;grid-template-columns:minmax(260px,.8fr) minmax(430px,1.2fr);column-gap:16px}
+ .v2-scope .v2-task-editor .v2-execution-times>.v2-section-head{grid-column:1/-1}
+ .v2-scope .v2-task-editor .v2-execution-times>.v2-fields{margin:0}
+}
+@media(max-width:800px){
+ .v2-scope .v2-task-editor .v2-editor-basics>.v2-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+ .v2-scope .v2-task-editor .v2-dialog-header,.v2-scope .v2-task-editor .v2-dialog-footer{padding:12px}
+ .v2-scope .v2-task-editor .v2-content{padding:12px}
+ .v2-scope .v2-task-editor .v2-fields{grid-template-columns:minmax(0,1fr)}
+}

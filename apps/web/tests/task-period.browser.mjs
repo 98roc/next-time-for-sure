@@ -103,7 +103,7 @@ try {
   await active.getByRole('heading', { name: '编辑任务', exact: true }).waitFor();
   assert.equal(await active.getByLabel('实际开始时间（北京时间）').inputValue(), '2026-10-19T09:15');
   assert.equal(await active.getByLabel('实际完成时间（北京时间）').inputValue(), '2026-10-20T18:30');
-  assert.equal(await active.getByRole('heading', { name: '开始完成时间', exact: true }).count(), 1);
+  assert.equal(await active.getByRole('heading', { name: '完成结果与时间', exact: true }).count(), 1);
   await page.screenshot({ path: evidence + '/editor-completed.png', fullPage: true });
   await active.getByLabel('实际开始时间（北京时间）').fill('');
   await active.getByRole('button', { name: '保存', exact: true }).click();
@@ -116,7 +116,7 @@ try {
   await active.getByLabel('任务名称', { exact: true }).fill('智能体相关代码合并审计分支并测试');
   await active.getByLabel('本周期预计投入（人天）1', { exact: true }).fill('1');
   await active.getByLabel('本期工作 1', { exact: true }).fill('完成审计分支合并，验证主要功能');
-  const boxes = await active.locator('.v2-task-arrangement input, .v2-task-arrangement select').evaluateAll(els => els.map(el => ({ top: el.getBoundingClientRect().top, tag: el.tagName })));
+  const boxes = await active.locator('.v2-task-arrangement input:not([type="checkbox"]), .v2-task-arrangement select').evaluateAll(els => els.map(el => ({ top: el.getBoundingClientRect().top, tag: el.tagName })));
   assert.equal(boxes.length, 3); assert.ok(boxes.every(box => Math.abs(box.top - boxes[0].top) < 2), '周期、预计投入和本期工作必须同一行');
   await page.screenshot({ path: evidence + '/planning-dark.png', fullPage: true });
   await page.emulateMedia({ colorScheme: 'light' });

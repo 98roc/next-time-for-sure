@@ -25,6 +25,7 @@ import { buildWeeklyState } from './weekly-state.js';
 import { memberImpact, mutateTeam, requireTeamLeader } from './team-management.js';
 import { authorizeEdit, saveTask } from './task-edit.js';
 import { summarizePeriod } from './history.js';
+import { V2PlanningLabelsRepository } from './planning-labels.repository.js';
 
 /** V2 工作区统一事务边界，所有入口包含 Token 都重读当前身份与权限。 */
 @Injectable()
@@ -46,6 +47,7 @@ export class V2WorkspaceService {
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { messages: [], version: 0 };
       return {
+        planningLabels: await new V2PlanningLabelsRepository(manager).read(visible.map((task) => task.id)),
         periodWindow: context.teamId ? await planning.periodWindow(context.teamId) : { before: v2PeriodWindowLimits.before, after: v2PeriodWindowLimits.after, version: 0 },
         personalPreferences: await new PersonalWorkRepository(manager).preferences(context.actor.id),
         orders: await readProjectOrders(manager, context),
@@ -108,7 +110,7 @@ export class V2WorkspaceService {
       const period = context.teamId ? (await planning.periods(context.teamId)).find((row) => row.id === periodId) : undefined;
       if (!period) throw new ConflictException('日期区间不存在。');
       const ids = await tasks.projectTaskIds(context.projects.map((row) => row.id));
-      return summarizePeriod(period, await tasks.history(ids), await planning.arrangementHistory(ids), new Date().toISOString());
+      return summarizePeriod(period, await tasks.history(ids), await planning.arrangementHistory(ids), new Date().toISOString(), await new V2PlanningLabelsRepository(manager).read(ids));
     });
   }
 

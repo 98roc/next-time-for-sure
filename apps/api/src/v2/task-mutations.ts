@@ -5,7 +5,7 @@ import { applyCompletion } from './task-completion.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
-import type { V2ProjectTaskInput, V2Task, V2TaskCommand } from '@ntfs/contracts';
+import type { V2PlanningChange, V2ProjectTaskInput, V2Task, V2TaskCommand } from '@ntfs/contracts';
 import { checkRule, requireProject, requireProjectMember, type V2Context } from './context.js';
 import { canCreateProjectTask } from './permissions.js';
 import { V2TaskRepository } from './task.repository.js';
@@ -13,6 +13,8 @@ import { V2PersonalRepository } from './personal.repository.js';
 import { V2PlanningRepository } from './planning.repository.js';
 import { V2ProjectRepository } from './project.repository.js';
 import { milestoneAfterTaskChange, rearrangeTask, transitionTask, validateMilestoneLink } from './task-rules.js';
+import { V2PlanningLabelsRepository } from './planning-labels.repository.js';
+import { defaultUnplanned } from './planning-classification.js';
 
 /** 共用任务创建服务，供项目、我的工作、周计划批量和待建转换调用。 */
 export async function createProjectTask(manager: EntityManager, context: V2Context, input: V2ProjectTaskInput, creatorId = context.actor.id, categoryId?: string, fromBacklog = false): Promise<V2Task> {
@@ -20,7 +22,7 @@ export async function createProjectTask(manager: EntityManager, context: V2Conte
   if (!canCreateProjectTask(context.actor, project, input.executorId)) throw new ForbiddenException('没有安排该执行人的权限。');
   requireProjectMember(context, project, input.executorId);
   const periods = await new V2PlanningRepository(manager).periods(project.teamId);
-  const arrangements = v2ArrangementsInputSchema.parse([{ periodId: input.periodId, plannedDays: input.plannedDays, workNote: input.workNote }, ...(input.additionalArrangements ?? [])]);
+  const arrangements = v2ArrangementsInputSchema.parse([{ periodId: input.periodId, plannedDays: input.plannedDays, workNote: input.workNote, unplanned: input.unplanned }, ...(input.additionalArrangements ?? [])]);
   if (arrangements.some((row) => !periods.some((period) => period.id === row.periodId))) throw new ConflictException('日期区间不存在或不属于本团队。');
   if (categoryId && input.executorId !== context.actor.id) throw new ForbiddenException('不能指定他人的个人分类。');
   const personal = new V2PersonalRepository(manager);
@@ -38,11 +40,20 @@ export async function createProjectTask(manager: EntityManager, context: V2Conte
 
   // 任务、首个安排、状态事件和个人位置共同提交，任一失败回滚整条任务。
   const tasks = new V2TaskRepository(manager);
+  const labels = new V2PlanningLabelsRepository(manager);
+  const planningChanges: V2PlanningChange[] = arrangements.flatMap((row, index) => {
+    const period = periods.find((item) => item.id === row.periodId);
+    return period ? [{ periodId: period.id, startOn: period.startOn, endOn: period.endOn, before: null, after: row.unplanned ?? (index === 0 && defaultUnplanned(period, now, fromBacklog)) }] : [];
+  });
   await reconcileCompletion(manager, null, task, now);
-  await tasks.insert(task, context.actor.id);
-  for (const row of arrangements) await tasks.addArrangement(task, row.periodId, row.plannedDays, context.actor.id, now, row.workNote);
+  await tasks.insert(task, context.actor.id, planningChanges);
+  for (const row of arrangements) {
+    await tasks.addArrangement(task, row.periodId, row.plannedDays, context.actor.id, now, row.workNote);
+    const period = periods.find((item) => item.id === row.periodId), change = planningChanges.find((item) => item.periodId === row.periodId);
+    if (period && change) await labels.save(task, period, change.after, context.actor.id, now);
+  }
   await personal.place(task, undefined, categoryId);
-  await notifyTask(manager, context, task, 'created', fromBacklog);
+  await notifyTask(manager, context, task, 'created', planningChanges.filter((row) => row.after).map((row) => row.periodId));
   if (task.status === 'completed') await notifyTask(manager, context, task, 'completed');
   return task;
 }
@@ -65,6 +76,7 @@ export async function mutateTask(manager: EntityManager, context: V2Context, com
   if (!task || task.deletedAt) throw new NotFoundException('任务已删除或不存在。');
   const now = new Date().toISOString();
   let next: V2Task = { ...task, version: task.version + 1, updatedAt: now };
+  const planningChanges: V2PlanningChange[] = [];
   switch (command.action) {
     case 'set_status': {
       if (task.status === command.status && !command.categoryId && !command.completion) return [task.id];
@@ -114,11 +126,19 @@ export async function mutateTask(manager: EntityManager, context: V2Context, com
           if (command.action === 'change_arrangement') await tasks.addArrangement(task, target, command.plannedDays, context.actor.id, now, command.workNote);
         }
       }
+      if (command.action !== 'remove_arrangement') {
+        const period = periods.find((row) => row.id === target);
+        if (period) {
+          const change = await new V2PlanningLabelsRepository(manager).save(task, period, command.unplanned, context.actor.id, now);
+          if (change) planningChanges.push(change);
+        }
+      }
       break;
     }
   }
   await reconcileCompletion(manager, task, next, now);
-  await tasks.update(task, next, context.actor.id, command.action === 'set_status' && task.status !== next.status ? 'status_changed' : (task.completedAt !== next.completedAt || task.startedAt !== next.startedAt) ? 'completion_corrected' : command.action === 'delete' ? 'deleted' : 'updated');
+  await tasks.update(task, next, context.actor.id, command.action === 'set_status' && task.status !== next.status ? 'status_changed' : (task.completedAt !== next.completedAt || task.startedAt !== next.startedAt) ? 'completion_corrected' : command.action === 'delete' ? 'deleted' : 'updated', planningChanges);
+  if (planningChanges.some((row) => row.after)) await notifyTask(manager, context, next, 'planning', planningChanges.filter((row) => row.after).map((row) => row.periodId));
   if (task.status !== 'completed' && next.status === 'completed') await notifyTask(manager, context, next, 'completed');
   return [task.id];
 }

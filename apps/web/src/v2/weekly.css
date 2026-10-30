@@ -93,6 +93,9 @@
 #ntfs-weekly-demo .w-project-sort-handle span{flex:1;font-weight:600}
 #ntfs-weekly-demo .w-project-sort-handle small{color:var(--w-muted);font-size:12px}
 #ntfs-weekly-demo .w-project.is-sorting{margin:10px 0}
+/* 人员行占位与动画分层，固定间距，避免短列表的折叠外边距干扰换位。 */
+#ntfs-weekly-demo .w-people-groups.is-sorting{display:grid;gap:10px;padding:10px 0}
+#ntfs-weekly-demo .w-people-groups.is-sorting .w-person-slot>.w-project{margin:0}
 
 @media(max-width:580px){#ntfs-weekly-demo .w-project-sort-handle small{display:none}}
 

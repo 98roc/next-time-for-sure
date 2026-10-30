@@ -11,13 +11,14 @@ import { shiftDate } from './calendar.js';
 import { requireConfirmation } from './impact.js';
 import { confirmReport, editReport, reorderScoped } from './shared-report.js';
 import { buildWeeklyState } from './weekly-state.js';
+import { weeklyPeopleIds } from './weekly-people.js';
 
 /** 团队负责人管日期与跨项目排序，项目负责人只能管理本项目区间内顺序。 */
 export function authorizePlanning(context: V2Context, command: V2PlanningCommand): void {
   if (!context.teamId) throw new ForbiddenException('请先加入团队。');
   if (command.action === 'reorder_tasks' || command.action === 'reorder_project_items') {
     if (!canManageProject(context.actor, requireProject(context, command.projectId))) throw new ForbiddenException('没有本项目排序权限。');
-  } else if (command.action !== 'extend_periods' && !context.teamLeader) throw new ForbiddenException('仅团队负责人可以维护日期和跨项目排序。');
+  } else if (command.action !== 'extend_periods' && !context.teamLeader) throw new ForbiddenException('仅团队负责人可以维护日期、跨项目及人员排序。');
 }
 
 /** 日期扩展仅在范围边缘补自然周；任意边界调整必须预览并验证历史锁定。 */
@@ -54,6 +55,11 @@ export async function mutatePlanning(manager: EntityManager, context: V2Context,
     }
     ids = context.organization.projects.filter((project) => project.teamId === teamId).map((project) => project.id);
     allowed = ids; requested = command.projectIds;
+  } else if (command.action === 'reorder_people') {
+    scope = 'weekly:people';
+    ids = await weeklyPeopleIds(manager, context);
+    // 人员视图只展示有任务的成员；其余周期的人员位置必须保留。
+    allowed = command.executorIds; requested = command.executorIds;
   } else if (command.action === 'reorder_project_items') {
     scope = `project-page:${command.target}:${command.projectId}`;
     const source = await projectItemIds(manager, command.projectId, command.target);

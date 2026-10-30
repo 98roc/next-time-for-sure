@@ -5,6 +5,7 @@ import type { Identity } from '@ntfs/contracts';
 import { WorkspaceProvider, useWorkspace } from './workspace';
 import { ModalProvider } from './modal';
 import { NavigationGuard } from './navigation-guard';
+import { MilestonePageSwitch } from './milestone-navigation';
 import './base.css';
 import './my-work.css';
 import './project.css';
@@ -53,8 +54,8 @@ function Frame() {
   const id = variant === 'personal' ? 'ntfs-my-work' : variant === 'weekly' ? 'ntfs-weekly-demo' : 'nt-project';
   const pageClass = variant === 'weekly' ? 'w-app' : variant === 'project' ? 'nt-app' : '';
   const pageLabel = navigation.find((link) => link.to === path)?.label ?? '工作空间';
-  // 只有确认通过的路由切换才重置弹窗，避免旧页面草稿残留在新页面上。
-  return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider key={location.key}>
+  // 业务区域切换重置外层弹窗；总览由页面切换器暂停来源弹窗，保留返回所需状态。
+  return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider key={path}>
     <div className={`v2-frame${collapsed ? ' is-sidebar-collapsed' : ''}`}>
       <Sidebar />
       <div className="v2-body">
@@ -65,7 +66,7 @@ function Frame() {
           <span>工作空间 / {pageLabel}</span><MessagesButton />
         </div>
         <main key={path} className="v2-main" aria-label={pageLabel}>
-          <div className={`v2-page ${pageClass}`}><Outlet /></div>
+          <div className={`v2-page ${pageClass}`}><MilestonePageSwitch><Outlet /></MilestonePageSwitch></div>
         </main>
       </div>
     </div>

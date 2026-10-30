@@ -89,3 +89,9 @@ NTFS_TOKEN_FILE = 'G:\work\project\next-time-for-sure\.agent-token.local'
 ## 七天消息与系统通知（当前开发版本）
 
 右上角“消息”打开分页弹窗，每页10条，保留最近7天，不设已读未读。Windows 运行或托盘驻留且登录联网时接收新消息；退出、断网和休眠期间不补弹，历史在弹窗查看。系统禁用通知不影响消息保存。点击通知重新校验任务权限。完整业务范围见[消息通知设计](../design/V2.0消息通知设计.md)。2026-10-20 网页/API与迁移已部署；2.0.2安装包已发布至默认自动更新源，安装后系统通知生效。
+
+## 计划外周期标签
+
+新建项目任务时可提交 `task.unplanned`，只作用于首个周期；`additionalArrangements[].unplanned` 分别作用于对应周期。省略时首个周期按真实创建时刻和来源填默认值，后续周期默认不标记；明确 `false` 不能被系统覆盖。
+
+通过 `v2/edit` 的 `save_task` 提交 `planningLabels: [{ periodId, unplanned }]` 可单独纠正已有有效安排的标签，不要求重填历史未估算投入。请求仍携带 `taskId`、`version` 和 `operationId`，执行人、项目研发负责人及团队负责人复用任务权限；不能用于私人任务或其他团队周期。工作区返回 `planningLabels`（包括已取消周期）及当前安排的 `unplanned`；历史未知为 `null`。通知和审计规则与网页一致。

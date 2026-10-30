@@ -9,8 +9,8 @@ type Flow = { open: (content: ReactNode) => void; push: (content: ReactNode) => 
 const FlowContext = createContext<Flow | null>(null);
 const PageContext = createContext({ key: '', active: false });
 
-/** 业务视图共用返回栈与草稿；未保存退出通过独立短确认弹窗保护。 */
-export function ModalProvider({ children }: { children: ReactNode }) {
+/** 业务视图共用返回栈与草稿；suspended 暂停原生模态层但保留内容，恢复后重新建立焦点边界。 */
+export function ModalProvider({ children, suspended = false }: { children: ReactNode; suspended?: boolean }) {
   const [pages, setPages] = useState<Page[]>([]);
   const [pending, setPending] = useState<'close' | 'back' | null>(null);
   const dirty = useRef(new Map<string, boolean>());
@@ -21,13 +21,14 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const active = pages.at(-1)?.key;
   const opened = pages.length > 0;
   useEffect(() => {
-    if (!opened) return;
+    if (!opened || suspended) return;
     priorFocus.current = document.activeElement;
     const element = dialog.current, overflow = document.body.style.overflow;
     element?.showModal(); document.body.style.overflow = 'hidden';
     return () => { element?.close(); document.body.style.overflow = overflow; if (priorFocus.current instanceof HTMLElement && priorFocus.current.isConnected) priorFocus.current.focus(); };
-  }, [opened]);
+  }, [opened, suspended]);
   useEffect(() => {
+    if (suspended) return;
     const page = dialog.current?.querySelector('[data-active="true"]');
     // 排期入口明确指定日期焦点，优先于原生 dialog 打开时自动聚焦的返回按钮。
     const preferred = page?.querySelector('[data-v2-autofocus]:not(:disabled)');
@@ -36,7 +37,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     if (remembered?.isConnected && page?.contains(remembered) && !remembered.matches(':disabled')) { remembered.focus(); return; }
     const field = page?.querySelector('input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[data-v2-back],button');
     if (field instanceof HTMLElement) field.focus();
-  }, [active]);
+  }, [active, suspended]);
 
   function navigate(action: 'back' | 'close', force = false) {
     if (!force && pages.some((page) => locked.current.get(page.key))) return;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { v2PersonalPreferencesSchema } from './v2-personal-work.js';
-import { v2WorkNoteSchema, v2TaskRemarkSchema, v2CompletionSchema, v2ArrangementsInputSchema } from './v2.js';
+import { v2WorkNoteSchema, v2TaskRemarkSchema, v2CompletionSchema, v2ArrangementsInputSchema, v2PlanningLabelSchema } from './v2.js';
 import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2RequiredPlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
 import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organization.js';
 
@@ -21,7 +21,7 @@ export const v2TeamMessagesSchema = z.array(z.string().trim().max(v2TeamMessageL
 export const v2ProjectSchema = z.object({ id, teamId: id, name, version, members: z.array(z.object({ accountId: id, roles: z.array(projectRoleSchema) })), canManage: z.boolean(), canCreate: z.boolean(), canConfirmMilestone: z.boolean() });
 export const v2BacklogSchema = z.object({ id, createdAt: v2InstantSchema, projectId: id, creatorId: id, title: z.string(), priority: v2PrioritySchema, version, convertedTaskId: id.nullable(), deletedAt: v2InstantSchema.nullable() });
 export type V2Backlog = z.infer<typeof v2BacklogSchema>;
-export const v2ArrangementSchema = z.object({ taskId: id, periodId: id, plannedDays: z.number().nullable(), position: z.number().int(), version, workNote: v2WorkNoteSchema.optional(), carriedFromPeriodId: id.nullable().optional() });
+export const v2ArrangementSchema = z.object({ taskId: id, periodId: id, plannedDays: z.number().nullable(), position: z.number().int(), version, workNote: v2WorkNoteSchema.optional(), carriedFromPeriodId: id.nullable().optional(), unplanned: z.boolean().nullable().optional() });
 export type V2Arrangement = z.infer<typeof v2ArrangementSchema>;
 export const v2PlacementSchema = z.object({ taskId: id, categoryId: id, position: z.number().int() });
 export const v2OrderSchema = z.object({ ids: z.array(id), version, manual: z.boolean().default(false) });
@@ -31,6 +31,7 @@ export const v2WorkspaceSchema = z.object({
   team: teamSchema.nullable(), teamMessages: v2TeamMessagesSchema, teamVersion: version, teamLeader: z.boolean(), today: v2DateSchema, naturalWeekStart: v2DateSchema,
   accounts: z.array(directoryAccountSchema), projects: z.array(v2ProjectSchema), periods: z.array(v2PeriodSchema),
   tasks: z.array(v2TaskSchema), arrangements: z.array(v2ArrangementSchema), milestones: z.array(v2MilestoneSchema), backlog: z.array(v2BacklogSchema),
+  planningLabels: z.array(v2PlanningLabelSchema).default([]),
   categories: z.array(v2CategorySchema), placements: z.array(v2PlacementSchema), personalVersion: version, orders: z.array(v2OrderSchema.extend({ scope: z.string() })),
 });
 export type V2Workspace = z.infer<typeof v2WorkspaceSchema>;
@@ -73,6 +74,7 @@ export const v2PlanningCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('extend_periods'), direction: z.enum(['before', 'after']), version }).strict(),
   z.object({ ...operation, action: z.literal('change_periods'), version, periods: z.array(v2PeriodChangeSchema).min(1).max(500), confirmation }).strict(),
   z.object({ ...operation, action: z.literal('reorder_projects'), periodId: id.optional(), page: z.enum(['projects', 'weekly']).default('weekly'), reset: z.boolean().default(false), version, projectIds: z.array(id).max(500) }).strict(),
+  z.object({ ...operation, action: z.literal('reorder_people'), reset: z.boolean().default(false), version, executorIds: z.array(id).max(500) }).strict(),
   z.object({ ...operation, action: z.literal('reorder_project_items'), projectId: id, target: z.enum(['tasks', 'backlog']), reset: z.boolean().default(false), version, ids: z.array(id).max(500) }).strict(),
   z.object({ ...operation, action: z.literal('reorder_tasks'), projectId: id, periodId: id, view: z.enum(['summary', 'plan']), executorId: id.optional(), reset: z.boolean().default(false), version, taskIds: z.array(id).max(500) }).strict(),
 ]);
@@ -103,7 +105,7 @@ export const v2SummaryRowSchema = z.object({ taskId: id, createdAt: v2InstantSch
 export type V2SummaryRow = z.infer<typeof v2SummaryRowSchema>;
 export const v2WeeklyStateSchema = z.object({
   summaryPeriod: v2PeriodSchema, planPeriod: v2PeriodSchema, summary: z.array(v2SummaryRowSchema),
-  projectOrder: v2OrderSchema, taskOrders: z.array(v2OrderSchema.extend({ projectId: id, periodId: id })),
+  projectOrder: v2OrderSchema, peopleOrder: v2OrderSchema.default({ ids: [], version: 0, manual: false }), taskOrders: z.array(v2OrderSchema.extend({ projectId: id, periodId: id })),
   text: z.object({ body: z.string(), manual: z.boolean(), sourceHash: z.string(), version, stale: z.boolean() }),
   generatedText: z.string(), currentSourceHash: z.string(), canEditText: z.boolean(),
 });
@@ -127,12 +129,14 @@ export const v2TaskEditSchema = z.object({
   ...operation, action: z.literal('save_task'), taskId: id, version,
   /** 与基本信息分开鉴权，允许当前执行人单独维护备注；省略保留、空串清空。 */
   remark: v2TaskRemarkSchema.optional(),
+  /** 独立修改标签不要求重填历史未估算投入；仍使用任务聚合版本与权限。 */
+  planningLabels: z.array(z.object({ periodId: id, unplanned: z.boolean() }).strict()).min(1).max(100).refine((rows) => new Set(rows.map((row) => row.periodId)).size === rows.length, '标签周期不能重复').optional(),
   details: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('project'), title: z.string().trim().min(1).max(200), priority: v2PrioritySchema, executorId: id, milestoneId: id.nullable() }).strict(),
     z.object({ kind: z.literal('private'), title: z.string().trim().min(1).max(200), priority: v2PrioritySchema }).strict(),
   ]).optional(),
   status: v2StatusSchema.optional(), categoryId: id.optional(), milestoneConfirmation: confirmation.optional(),
-  arrangement: z.object({ periodId: id, targetPeriodId: id, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional(), confirmation }).strict().optional(),
+  arrangement: z.object({ periodId: id, targetPeriodId: id, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional(), unplanned: z.boolean().optional(), confirmation }).strict().optional(),
   arrangements: v2ArrangementsInputSchema.optional(), arrangementConfirmation: confirmation.optional(), completion: v2CompletionSchema.optional(),
 }).strict();
 export type V2TaskEdit = z.infer<typeof v2TaskEditSchema>;

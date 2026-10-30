@@ -121,6 +121,35 @@ export async function verifySorting(h: Harness): Promise<void> {
   const another = v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${nextId}&planPeriodId=${after.id}`, leader));
   assert.deepEqual(another.projectOrder.ids, [projectId, hiddenProjectId]);
   assert.deepEqual(another.projectOrder, (await weekly()).projectOrder);
+
+  // 人员顺序跨周期保存，局部重排不移动隐藏成员；读取不能裁剪落库目录。
+  await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId: nextId, executorId: lead.id, title: '人员排序验收', priority: 3, milestoneId: null, plannedDays: 1 } });
+  const beforePeople = await weekly();
+  const peopleCommand = { action: 'reorder_people', operationId: randomUUID(), version: beforePeople.peopleOrder.version, executorIds: [lead.id, developer.id] };
+  await call('planning', lead, peopleCommand, 403);
+  await call('planning', manager, peopleCommand, 403);
+  await call('planning', leader, { ...peopleCommand, executorIds: [randomUUID()] }, 409);
+  await call('planning', leader, { ...peopleCommand, executorIds: [lead.id, lead.id] }, 409);
+  await call('planning', leader, peopleCommand);
+  const peopleAfter = (await weekly()).peopleOrder;
+  assert.deepEqual(selected(peopleAfter.ids, [lead.id, developer.id]), [lead.id, developer.id]);
+  await call('planning', leader, peopleCommand);
+  assert.equal((await weekly()).peopleOrder.version, peopleAfter.version);
+  await call('planning', leader, { ...peopleCommand, operationId: randomUUID() }, 409);
+  const peopleElsewhere = v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${nextId}&planPeriodId=${after.id}`, leader)).peopleOrder;
+  assert.equal(peopleElsewhere.version, peopleAfter.version);
+  assert.equal(peopleElsewhere.manual, true);
+  const storedPeople = () => source.query('SELECT ordered_ids FROM v2_shared_orders WHERE team_id=? AND scope_key=?', [teamId, 'weekly:people']);
+  const persistedPeople = await storedPeople();
+  await weekly(lead);
+  assert.deepEqual(await storedPeople(), persistedPeople);
+  assert.deepEqual((await weekly()).projectOrder, another.projectOrder);
+  const textBeforePeople = (await weekly()).currentSourceHash;
+  await call('planning', leader, { ...peopleCommand, operationId: randomUUID(), version: peopleAfter.version, reset: true, executorIds: [] });
+  const resetPeople = await weekly();
+  assert.equal(resetPeople.peopleOrder.manual, false);
+  assert.equal(resetPeople.currentSourceHash, textBeforePeople, '按项目生成的文字不因人员展示顺序变化而失效');
+
   await call('planning', lead, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: another.projectOrder.version, projectIds: [hiddenProjectId, projectId] }, 403);
   await call('planning', leader, { action: 'reorder_projects', periodId: nextId, operationId: randomUUID(), version: week.projectOrder.version, projectIds: [hiddenProjectId, projectId] }, 409);
   await call('planning', leader, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: another.projectOrder.version, reset: true, projectIds: [] });

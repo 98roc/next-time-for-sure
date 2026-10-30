@@ -1,9 +1,18 @@
 /* 数值与已确认的日期路线原型一致；颜色仅为浅色主题补充对应值。 */
 .v2-scope { --ms-bg:light-dark(#fff,#1c2027);--ms-panel:light-dark(#f8faff,#232931);--ms-raised:light-dark(#eef1f7,#29313c);--ms-line:light-dark(#d6deea,#3a4452);--ms-soft-line:light-dark(#e3e8f1,#303946);--ms-text:light-dark(#242730,#edf0f5);--ms-muted:light-dark(#686e7c,#aab4c3);--ms-blue:light-dark(#5066a6,#b4cbed);--ms-blue-bg:light-dark(#eef1fa,#2c3b50);--ms-amber:light-dark(#916000,#e4c48e);--ms-red:light-dark(#a63232,#efa7a7);--ms-green:light-dark(#28643a,#a9d5bb);--ms-axis:light-dark(#aab8cc,#536276); }
 .v2-milestone-overview { display:grid;gap:20px;min-width:0; }
+.v2-route-source { display:contents; }
+.v2-route-source[hidden] { display:none; }
+.v2-ms-page { min-width:0; }
+.v2-ms-return { margin-bottom:10px; }
 .v2-scope .v2-ms-page-heading { display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:27px; }
-.v2-ms-page-heading time { display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:12px;color:var(--ms-muted);border:1px solid var(--ms-soft-line);padding:6px 9px;border-radius:6px; }
-.v2-ms-page-heading button { margin-bottom:10px; }
+.v2-ms-page-heading time { display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:12px;color:var(--ms-muted); }
+.v2-ms-page-actions { display:flex;align-items:center;gap:16px;flex-wrap:wrap; }
+.v2-ms-mode-control { max-width:100%; }
+.v2-ms-mode { display:inline-flex;padding:2px;border:1px solid var(--ms-line);border-radius:6px;background:var(--ms-bg); }
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-mode button { display:inline-flex;align-items:center;gap:5px;padding:4px 8px;min-height:0;border:0;border-radius:4px;background:transparent;color:var(--ms-muted);font-size:12px;line-height:1.55; }
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-mode button[aria-pressed=true] { background:var(--ms-blue-bg);color:var(--ms-blue); }
+.v2-ms-mode svg { width:14px;height:14px; }
 .nt-tabs + .v2-milestone-panel { margin-top:24px; }
 .v2-milestone-panel { container-type:inline-size;padding:19px 20px 18px;border:1px solid var(--ms-soft-line);border-radius:10px;background:var(--ms-bg);color:var(--ms-text);min-width:0;font:14px/1.55 'Segoe UI','Microsoft YaHei',sans-serif; }
 .v2-milestone-panel.is-empty { padding-top:14px;padding-bottom:12px; }
@@ -21,9 +30,15 @@
 .v2-ms-count { color:var(--ms-muted);font-size:11px; }
 .v2-milestone-panel > .v2-ms-count { margin:0 0 17px; }
 .v2-ms-count strong { font-size:13px;font-weight:500;color:var(--ms-text); }
-.v2-ms-roadmap { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px 0;margin:0 0 18px;align-items:start; }
-.v2-ms-stage { min-width:0;position:relative;padding-right:16px; }
-.v2-ms-stage:nth-child(3n),.v2-ms-stage:last-child { padding-right:0; }
+.v2-ms-scroll { min-width:0;margin:0 0 18px; }
+.v2-ms-roadmap { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:60px 16px;padding:0 20px;align-items:start;position:relative;isolation:isolate; }
+.v2-ms-route { position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;color:var(--ms-axis);z-index:-1; }
+.v2-ms-route path { fill:none;stroke:currentColor;stroke-width:1.2;stroke-linejoin:round;stroke-linecap:round; }
+.v2-ms-stage { min-width:0;position:relative; }
+.v2-ms-node { position:absolute;top:61px;left:18px;width:9px;height:9px;box-sizing:border-box;transform:rotate(45deg);background:var(--ms-muted);border:2px solid var(--ms-bg); }
+.v2-ms-stage.is-next .v2-ms-node { background:var(--ms-blue);box-shadow:0 0 0 3px var(--ms-blue-bg); }
+.v2-ms-scroll.is-horizontal { overflow-x:auto;padding-bottom:14px;scrollbar-color:var(--ms-axis) var(--ms-panel); }
+.v2-ms-roadmap-horizontal { grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:290px;width:max-content;min-width:100%;padding-bottom:1px; }
 .v2-ms-date { height:65px;padding:0 0 12px;box-sizing:border-box; }
 .v2-ms-deadline time { display:block;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ms-text);letter-spacing:.3px; }
 .v2-ms-deadline time span { font-size:13px;font-weight:400;color:var(--ms-muted); }
@@ -32,10 +47,6 @@
 .v2-ms-stage.is-next .v2-ms-deadline small { color:var(--ms-amber); }
 .v2-ms-stage .v2-ms-deadline.is-due small { color:var(--ms-red); }
 .v2-ms-branch { position:relative;display:grid;gap:12px;padding-top:24px; }
-.v2-ms-branch::before { content:'';position:absolute;top:0;left:0;right:-16px;height:1px;background:var(--ms-axis); }
-.v2-ms-stage:nth-child(3n) .v2-ms-branch::before,.v2-ms-stage:last-child .v2-ms-branch::before { right:0; }
-.v2-ms-branch::after { content:'';position:absolute;top:-4px;left:18px;width:9px;height:9px;box-sizing:border-box;transform:rotate(45deg);background:var(--ms-muted);border:2px solid var(--ms-bg); }
-.v2-ms-stage.is-next .v2-ms-branch::after { background:var(--ms-blue);box-shadow:0 0 0 3px var(--ms-blue-bg); }
 .v2-ms-card { position:relative;padding:14px 15px 12px;border:1px solid var(--ms-soft-line);border-radius:8px;background:var(--ms-panel);min-width:0; }
 .v2-ms-card::before { content:'';position:absolute;top:-20px;left:21px;height:19px;width:1px;background:var(--ms-axis); }
 .v2-ms-card + .v2-ms-card::before { top:-13px;height:12px; }
@@ -99,18 +110,17 @@
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-edit-tasks li > button { color:var(--ms-blue);border:0;background:transparent;padding:4px 0; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope button.v2-ms-history-row { width:100%;border:0;border-radius:0;border-bottom:1px solid var(--ms-soft-line);background:transparent;display:flex;align-items:center;gap:10px;padding:13px 0;text-align:left;font-size:13px; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog:has([data-active=true] .v2-ms-modal) { width:min(650px,calc(100% - 24px));background:var(--ms-panel);border-color:var(--ms-line); }
-:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog:has([data-active=true] .v2-ms-overview-modal) { width:min(1100px,calc(100% - 24px)); }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-modal .v2-dialog-header { padding:13px 22px;align-items:center; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-modal .v2-dialog-header h2 { font:inherit;font-size:12px;color:var(--ms-muted); }
-:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-modal .v2-close { border:0;background:transparent;font-size:12px;min-height:0;width:auto;padding:4px 0;color:var(--ms-muted); }
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-modal .v2-dialog-header .v2-close { border:0;background:transparent;font-size:12px;line-height:1.55;min-height:0;min-width:32px;width:auto;padding:4px 0;white-space:nowrap;flex-shrink:0;color:var(--ms-muted); }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-modal .v2-content { padding:22px 24px; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-modal .v2-dialog-footer { justify-content:flex-end;padding:15px 22px;gap:8px; }
 .v2-ms-modal .v2-footer-actions { justify-content:flex-end; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-form .v2-fields { margin:0;gap:0;display:block; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-form .v2-field { display:block;font-size:12px;margin:0 0 18px; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-form input { display:block;width:100%;font-size:16px;padding:10px 12px;margin-top:7px;background:var(--ms-bg);border:1px solid var(--ms-line);border-radius:7px; }
-@container (min-width:1450px) { .v2-ms-roadmap { grid-template-columns:repeat(4,minmax(0,1fr)); } .v2-ms-stage:nth-child(3n) { padding-right:16px; } .v2-ms-stage:nth-child(3n) .v2-ms-branch::before { right:-16px; } .v2-ms-stage:nth-child(4n),.v2-ms-stage:last-child { padding-right:0; } .v2-ms-stage:nth-child(4n) .v2-ms-branch::before,.v2-ms-stage:last-child .v2-ms-branch::before { right:0; } }
-@container (max-width:740px) { .v2-ms-roadmap { grid-template-columns:repeat(2,minmax(0,1fr)); } .v2-ms-stage:nth-child(3n) { padding-right:16px; } .v2-ms-stage:nth-child(3n) .v2-ms-branch::before { right:-16px; } .v2-ms-stage:nth-child(2n),.v2-ms-stage:last-child { padding-right:0; } .v2-ms-stage:nth-child(2n) .v2-ms-branch::before,.v2-ms-stage:last-child .v2-ms-branch::before { right:0; } }
-@container (max-width:480px) { .v2-ms-roadmap { display:block;padding-left:18px;border-left:1px solid var(--ms-axis);margin-left:4px; } .v2-ms-stage,.v2-ms-stage:nth-child(3n) { padding:0 0 24px; } .v2-ms-branch { padding:0; } .v2-ms-branch::before { display:none; } .v2-ms-branch::after { top:-44px;left:-23px; } .v2-ms-card:first-child::before { display:none; } .v2-ms-date { height:auto;padding-bottom:12px; } .v2-ms-rows li { grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:13px; } .v2-ms-rows li > :first-child { grid-column:1/-1; } }
+@container (min-width:1450px) { .v2-ms-roadmap-wrap { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+@container (max-width:740px) { .v2-ms-roadmap-wrap { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@container (max-width:480px) { .v2-ms-roadmap-wrap { grid-template-columns:minmax(0,1fr);padding-left:24px;padding-right:0;row-gap:24px; } .v2-ms-roadmap-wrap .v2-ms-branch { padding-top:12px; } .v2-ms-roadmap-wrap .v2-ms-node { top:8px;left:-22px; } .v2-ms-roadmap-wrap .v2-ms-card:first-child::before { display:none; } .v2-ms-roadmap-wrap .v2-ms-date { height:auto;padding-bottom:0; } .v2-ms-rows li { grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:13px; } .v2-ms-rows li > :first-child { grid-column:1/-1; } }
 @media(max-width:620px) { .v2-milestone-panel { padding:16px 13px; } .v2-scope .v2-ms-page-heading { flex-wrap:wrap;align-items:flex-start;gap:12px;margin-bottom:22px; } :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-modal .v2-content { padding:19px; } :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-title { font-size:19px; } .v2-ms-footer-note { flex-basis:100%; } }
-@media(pointer:coarse) { :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-milestone-panel,.v2-ms-modal) button { min-height:44px; } }
+@media(pointer:coarse) { :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope :is(.v2-milestone-panel,.v2-ms-modal,.v2-ms-mode) button { min-height:44px; } }

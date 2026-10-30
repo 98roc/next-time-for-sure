@@ -8,15 +8,16 @@ import { MilestoneForm } from './milestone-form';
 import { MilestoneDetail } from './milestone-detail';
 import { Deadline, MilestoneStatus, MilestoneIcon } from './milestone-parts';
 import './milestones.css';
+import { MilestoneRoadmap } from './milestone-roadmap';
+import { MilestoneModeControl } from './milestone-mode';
 
 export { MilestoneDetail } from './milestone-detail';
 
-/** 所有入口复用项目页共享顺序；弹窗返回时保留周报区间、筛选及文字草稿。 */
-export function MilestoneOverview({ dialog = false }: { dialog?: boolean }) {
+/** 所有总览入口复用项目页共享顺序，只在独立页面展示。 */
+export function MilestoneOverview() {
   const { data } = useWorkspace();
   const sort = useProjectSort(data.projects.map((row) => row.id), 'projects');
-  const content = <div className="v2-milestone-overview">{sort.ids.map((id) => <MilestonePanel key={id} projectId={id} overview />)}{!data.projects.length && <p className="v2-context">暂无可见项目</p>}</div>;
-  return dialog ? <ModalPage title="里程碑总览" wide className="v2-ms-modal v2-ms-overview-modal" closeLabel="关闭">{content}</ModalPage> : content;
+  return <div className="v2-milestone-overview">{sort.ids.map((id) => <MilestonePanel key={id} projectId={id} overview />)}{!data.projects.length && <p className="v2-context">暂无可见项目</p>}</div>;
 }
 
 /** 截止日期为主轴，同日目标纵向排列；未规划有数据才显示，首次进入默认折叠。 */
@@ -33,17 +34,19 @@ export function MilestonePanel({ projectId, overview = false }: { projectId: str
   const oldUnfinished = old.filter((row) => row.status === 'open').length;
   return <section className={`v2-milestone-panel${!rows.length ? ' is-empty' : ''}`} aria-label={`${project.name}里程碑`}>
     <header className="v2-ms-heading"><div className="v2-ms-project-label"><h3 className="v2-ms-project-title">{overview ? <Link to={`/work?${new URLSearchParams({ project: projectId, tab: 'milestones' })}`} onClick={() => modal.close()}>{project.name}<MilestoneIcon name="right" /></Link> : '阶段路线'}</h3>{!rows.length && <span className="v2-ms-count">暂无里程碑</span>}</div><div className="v2-actions">
+      {!overview && <MilestoneModeControl />}
       {old.length > 0 && <button className="v2-ms-history-button" onClick={() => modal.push(<MilestoneHistory projectId={projectId} cutoff={cutoff} />)}><MilestoneIcon name="history" />历史 {old.length}{oldUnfinished > 0 && ` · ${oldUnfinished} 项未完成`}</button>}
       {project.canManage && <button onClick={() => modal.push(<MilestoneForm projectId={projectId} />)}><MilestoneIcon name="plus" />新增目标</button>}
     </div></header>
     {rows.length > 0 && <><p className="v2-ms-count"><strong>已规划</strong> {planned.length} 项目标</p>
-    {dates.length ? <div className="v2-ms-roadmap">{dates.map((date) => {
+    {dates.length ? <MilestoneRoadmap mode={data.personalPreferences.milestoneMode}>{dates.map((date) => {
       const targets = planned.filter((row) => row.expectedOn === date);
-      return <section className={`v2-ms-stage${date === nearest?.expectedOn ? ' is-next' : ''}`} key={date} aria-label={`${date}截止`}>
+      return <section className={`v2-ms-stage${date === nearest?.expectedOn ? ' is-next' : ''}`} key={date} aria-label={`${date}截止`} data-milestone-stage>
         <div className="v2-ms-date"><Deadline date={date} today={data.today} completed={targets.every((row) => row.status === 'completed')} count={targets.length} /></div>
+        <span className="v2-ms-node" data-milestone-node aria-hidden="true" />
         <div className="v2-ms-branch">{targets.map((row) => <MilestoneCard key={row.id} milestone={row} nearest={row.id === nearest?.id} />)}</div>
       </section>;
-    })}</div> : <p className="v2-ms-empty">暂无已规划目标</p>}
+    })}</MilestoneRoadmap> : <p className="v2-ms-empty">暂无已规划目标</p>}
     {unplanned.length > 0 && <section className="v2-ms-unplanned" aria-label="未规划里程碑">
       <button className="v2-ms-toggle" aria-expanded={expanded} aria-controls={unplannedId} onClick={() => setExpanded(!expanded)}><span><MilestoneIcon name="calendar" />未规划 <span className="v2-ms-count">{unplanned.length}</span></span><span>{expanded ? '收起' : '展开'}<MilestoneIcon name={expanded ? 'up' : 'down'} /></span></button>
       <div id={unplannedId} hidden={!expanded}><ul className="v2-ms-rows">{unplanned.map((row) => <li key={row.id}><button className="v2-ms-link" onClick={() => modal.push(<MilestoneDetail milestoneId={row.id} />)}>{row.title}</button><MilestoneStatus milestone={row} />{project.canManage && <button className="v2-ms-set-date" onClick={() => modal.push(<MilestoneForm projectId={projectId} milestone={row} focusDate />)}><MilestoneIcon name="calendar-plus" />设置日期</button>}</li>)}</ul></div>

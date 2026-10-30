@@ -12,19 +12,22 @@ import { useSortFeedback } from './sort-feedback';
 import { buildWeeklyRows, estimates } from './weekly-rows';
 import { ProjectHeading, ProjectLink } from './project-heading';
 
-/** 项目和人员视角共享排序，人员筛选重排只替换该人的可见位置。 */
+/** 两种视角各自维护组顺序；项目内任务顺序共享，人员筛选只替换可见位置。 */
 export function WeeklyGroups({ state, filter, view, sorting }: { state: V2WeeklyState; filter: string; view: 'project' | 'people'; sorting: boolean }) {
   const { data, run } = useWorkspace(), modal = useModal(), action = useSortFeedback(), root = useRef<HTMLDivElement>(null);
   const [expandedEmpty, setExpandedEmpty] = useState<Set<string>>(() => new Set());
   const rows = buildWeeklyRows(data, state), projectIds = action.ordered('projects', state.projectOrder.ids, (id) => id).filter((id) => filter === 'all' || id === filter);
+  const visiblePeople = [...new Set([...rows.summary, ...rows.plan].filter((row) => projectIds.includes(row.projectId)).map((row) => row.executorId ?? 'unknown'))];
+  const people = action.ordered('people', [...state.peopleOrder.ids.filter((id) => visiblePeople.includes(id)), ...visiblePeople.filter((id) => !state.peopleOrder.ids.includes(id))], (id) => id);
   function scope(side: 'summary' | 'plan', projectId: string, person?: string) { return `${side}|${projectId}|${person ?? ''}`; }
   function ordered(side: 'summary' | 'plan', projectId: string, person?: string) { return action.ordered(scope(side, projectId, person), rows.ordered(side, projectId, person), (row) => row.id); }
-  function orderIds(key: string): string[] { if (key === 'projects') return projectIds; const [side, projectId, person] = key.split('|'); return (side === 'summary' || side === 'plan') && projectId ? ordered(side, projectId, person || undefined).map((row) => row.id) : []; }
+  function orderIds(key: string): string[] { if (key === 'projects') return projectIds; if (key === 'people') return people.filter((id) => id !== 'unknown'); const [side, projectId, person] = key.split('|'); return (side === 'summary' || side === 'plan') && projectId ? ordered(side, projectId, person || undefined).map((row) => row.id) : []; }
   function move(id: string, key: string, beforeId: string | null) {
     const original = orderIds(key), ids = original.filter((value) => value !== id), index = beforeId === null ? ids.length : ids.indexOf(beforeId); if (index < 0 || !original.includes(id)) return;
     ids.splice(index, 0, id); if (ids.join() === original.join()) return;
     action.save(key, ids, async () => {
       if (key === 'projects') await run('planning', { action: 'reorder_projects', page: 'weekly', operationId: createOperationId(), version: state.projectOrder.version, projectIds: ids });
+      else if (key === 'people') await run('planning', { action: 'reorder_people', operationId: createOperationId(), version: state.peopleOrder.version, executorIds: ids });
       else {
         const [side, projectId, executorId] = key.split('|'); if ((side !== 'summary' && side !== 'plan') || !projectId || executorId === 'unknown') return;
         const periodId = side === 'summary' ? state.summaryPeriod.id : state.planPeriod.id;
@@ -55,7 +58,7 @@ export function WeeklyGroups({ state, filter, view, sorting }: { state: V2Weekly
   }
   function taskList(side: 'summary' | 'plan', projectId: string, person?: string) {
     const selected = ordered(side, projectId, person), key = scope(side, projectId, person), allowed = Boolean(data.projects.find((row) => row.id === projectId)?.canManage) && person !== 'unknown';
-    return <><div className="w-task-list" data-sort-scope={key}>{selected.map((row) => <div key={row.id}><div className="w-task-row" data-sort-id={row.id}>{handle(row.id, key, row.title, allowed)}<div className="w-task-info"><button className="w-task-title" onClick={() => { const task = data.tasks.find((item) => item.id === row.id); modal.open(task ? <TaskEditor task={task} /> : <TaskHistory taskId={row.id} />); }}>{row.title}</button><div className="w-task-meta"><StatusBadge status={row.status} />{row.carriedFromPeriodId && <span>上期未完成</span>}{side === 'summary' ? <>{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.planning === 'unknown' && <PlanningBadge>计划性不可还原</PlanningBadge>}{row.incomplete && <span>早期历史不完整</span>}</> : <span title={`优先级 ${row.priority ?? 3}`}>{priorityLabels[(row.priority ?? 3) - 1]}</span>}</div>{row.workNote && <p className="v2-period-work-note">{row.workNote}</p>}</div>{person === undefined && <span className="w-task-person">{row.executorName}</span>}{side === 'plan' && <span className="w-task-days">{row.days === null ? '未估算' : `${row.days} 天`}</span>}</div></div>)}{!selected.length && <div className="w-empty">{side === 'summary' ? '该区间暂无任务记录' : '暂无安排，可批量新增任务'}</div>}</div></>;
+    return <><div className="w-task-list" data-sort-scope={key}>{selected.map((row) => <div key={row.id}><div className="w-task-row" data-sort-id={row.id}>{handle(row.id, key, row.title, allowed)}<div className="w-task-info"><button className="w-task-title" onClick={() => { const task = data.tasks.find((item) => item.id === row.id); modal.open(task ? <TaskEditor task={task} /> : <TaskHistory taskId={row.id} />); }}>{row.title}</button><div className="w-task-meta"><StatusBadge status={row.status} />{row.carriedFromPeriodId && <span>上期未完成</span>}{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.planning === 'unknown' && <PlanningBadge>计划性不可还原</PlanningBadge>}{side === 'summary' ? row.incomplete && <span>早期历史不完整</span> : <span title={`优先级 ${row.priority ?? 3}`}>{priorityLabels[(row.priority ?? 3) - 1]}</span>}</div>{row.workNote && <p className="v2-period-work-note">{row.workNote}</p>}</div>{person === undefined && <span className="w-task-person">{row.executorName}</span>}{side === 'plan' && <span className="w-task-days">{row.days === null ? '未估算' : `${row.days} 天`}</span>}</div></div>)}{!selected.length && <div className="w-empty">{side === 'summary' ? '该区间暂无任务记录' : '暂无安排，可批量新增任务'}</div>}</div></>;
   }
   /** 空项目行和展开后的计划栏共用入口，权限提示保持一致。 */
   function planActions(projectId: string) {
@@ -92,6 +95,25 @@ export function WeeklyGroups({ state, filter, view, sorting }: { state: V2Weekly
       </section>
     </div>;
   }
-  const people = [...new Set([...rows.summary, ...rows.plan].filter((row) => projectIds.includes(row.projectId)).map((row) => row.executorId ?? 'unknown'))];
-  return <div ref={root}><Feedback error={action.error} />{view === 'project' ? <div data-sort-scope="projects">{projectIds.map(projectGroup)}</div> : people.map((person) => <section className="w-project" key={person}><header className="w-person-head"><div className="w-row"><span className="w-avatar">{(data.accounts.find((row) => row.id === person)?.displayName ?? '历').slice(0, 1)}</span><h2>{data.accounts.find((row) => row.id === person)?.displayName ?? rows.summary.find((row) => row.executorId === person)?.executorName ?? '历史成员'}</h2></div></header><div className="w-columns">{(['summary', 'plan'] satisfies Array<'summary' | 'plan'>).map((side) => { const selected = projectIds.flatMap((id) => ordered(side, id, person)); return <div className="w-column" key={side}><span className="w-column-date">{periodLabel(side === 'summary' ? state.summaryPeriod : state.planPeriod)}</span><h3>{side === 'summary' ? '任务完成情况' : '任务安排'}</h3><p className="w-person-totals">{side === 'plan' ? estimates(selected) : `已完成 ${selected.filter((row) => row.status === 'completed').length} 项 · 进行中 ${selected.filter((row) => row.status === 'in_progress').length} 项`}</p>{projectIds.filter((id) => selected.some((row) => row.projectId === id)).map((id) => <div key={id}><div className="v2-section-heading"><h3 className="w-person-project"><ProjectLink projectId={id} /></h3>{resetMenu(side, id, person)}</div>{taskList(side, id, person)}</div>)}{!selected.length && <div className="w-empty">该区间暂无任务</div>}</div>; })}</div></section>)}{(view === 'project' ? projectIds.length : people.length) === 0 && <div className="w-empty">所选区间暂无可见安排</div>}</div>;
+  /** 排序时收起任务，两栏共用人员整组位置；未知历史执行人固定保留在末尾。 */
+  function personGroup(person: string) {
+    const name = data.accounts.find((row) => row.id === person)?.displayName ?? rows.summary.find((row) => row.executorId === person)?.executorName ?? '历史成员';
+    const allowed = data.teamLeader && person !== 'unknown';
+    return <div key={person} className="w-person-slot"><section className={`w-project ${sorting ? 'is-sorting' : ''}`} data-sort-id={person === 'unknown' ? undefined : person}>
+      {sorting ? handle(person, 'people', name, allowed, true) : <>
+        <header className="w-person-head"><div className="w-row">{handle(person, 'people', name, allowed)}<span className="w-avatar">{name.slice(0, 1)}</span><h2>{name}</h2></div></header>
+        <div className="w-columns">{(['summary', 'plan'] satisfies Array<'summary' | 'plan'>).map((side) => {
+          const selected = projectIds.flatMap((id) => ordered(side, id, person));
+          return <div className="w-column" key={side}>
+            <span className="w-column-date">{periodLabel(side === 'summary' ? state.summaryPeriod : state.planPeriod)}</span>
+            <h3>{side === 'summary' ? '任务完成情况' : '任务安排'}</h3>
+            <p className="w-person-totals">{side === 'plan' ? estimates(selected) : `已完成 ${selected.filter((row) => row.status === 'completed').length} 项 · 进行中 ${selected.filter((row) => row.status === 'in_progress').length} 项`}</p>
+            {projectIds.filter((id) => selected.some((row) => row.projectId === id)).map((id) => <div key={id}><div className="v2-section-heading"><h3 className="w-person-project"><ProjectLink projectId={id} /></h3>{resetMenu(side, id, person)}</div>{taskList(side, id, person)}</div>)}
+            {!selected.length && <div className="w-empty">该区间暂无任务</div>}
+          </div>;
+        })}</div>
+      </>}
+    </section></div>;
+  }
+  return <div ref={root}><Feedback error={action.error} />{view === 'project' ? <div data-sort-scope="projects">{projectIds.map(projectGroup)}</div> : <div className={`w-people-groups ${sorting ? 'is-sorting' : ''}`} data-sort-scope="people">{people.map(personGroup)}</div>}{(view === 'project' ? projectIds.length : people.length) === 0 && <div className="w-empty">所选区间暂无可见安排</div>}</div>;
 }

@@ -5,6 +5,7 @@ import { v2DateSchema, v2ProjectTaskInputSchema, v2PrivateTaskInputSchema, v2Tas
 import { naturalWeek, periodWindow, shanghaiDate, validatePeriodChanges } from './calendar.js';
 import { canChangeTaskStatus, canConfirmMilestone, canCreateProjectTask, canDeleteTask, canManageProject, canViewTask, type V2Actor, type V2ProjectAccess } from './permissions.js';
 import { summarizePeriod } from './history.js';
+import { defaultUnplanned } from './planning-classification.js';
 import { milestoneAfterTaskChange, rearrangeTask, transitionTask, validateMilestoneCompletion, validateMilestoneLink } from './task-rules.js';
 import { destinationCategory, removeCategory, validateCategories } from './personal-view.js';
 
@@ -140,7 +141,7 @@ test('历史总结严格按排期展示，之后完成与重开不回写历史',
   const history = [event(initial, initial.createdAt, 'created', null), event(started, started.updatedAt, 'status_changed', 'not_started'), event(done, done.updatedAt, 'status_changed', 'in_progress'), event(reopened, reopened.updatedAt, 'status_changed', 'completed')];
   const arrangements = [arrangement(initial, period)];
   const now = '2026-11-04T01:00:00.000Z';
-  const first = summarizePeriod(period, history, arrangements, now)[0];
+  const first = summarizePeriod(period, history, arrangements, now, [{ taskId: initial.id, periodId: period.id, unplanned: false }])[0];
   assert.equal(first?.status, 'in_progress'); assert.equal(first?.planning, 'planned');
   assert.equal(summarizePeriod(second, history, arrangements, now).length, 0);
   const scheduled = [...arrangements, arrangement(initial, second), arrangement(initial, third)];
@@ -197,20 +198,29 @@ test('默认分类唯一、手动分类优先、同状态字段编辑保持位�
 });
 
 
-test('突发新任务仅首次当前区间计划外，已有执行偏移、延续和待建转换不算', () => {
+test('计划外只读取已保存的周期标签；来源、执行时间和后续排期不覆盖人工选择', () => {
   const createdAt = '2026-10-12T01:00:00.000Z';
   const task = { ...initial, createdAt, updatedAt: createdAt };
   const created = event(task, createdAt, 'created', null);
   const rows = [arrangement(task, period, createdAt)];
-  assert.equal(summarizePeriod(period, [created], rows, '2026-10-13T00:00:00.000Z')[0]?.planning, 'unplanned');
-  assert.equal(summarizePeriod(period, [{ ...created, fromBacklog: true }], rows, '2026-10-13T00:00:00.000Z')[0]?.planning, 'planned');
+  const labels = [{ taskId: task.id, periodId: period.id, unplanned: false }, { taskId: task.id, periodId: second.id, unplanned: true }];
+  assert.equal(summarizePeriod(period, [created], rows, '2026-10-13T00:00:00.000Z', labels)[0]?.planning, 'planned');
+  assert.equal(summarizePeriod(period, [{ ...created, fromBacklog: true }], rows, '2026-10-13T00:00:00.000Z', [{ ...labels[0], taskId: task.id, periodId: period.id, unplanned: true }])[0]?.planning, 'unplanned');
   const started = transitionTask(task, 'in_progress', '2026-10-13T01:00:00.000Z');
   const history = [created, event(started, started.updatedAt, 'status_changed', 'not_started')];
   assert.equal(summarizePeriod(second, history, rows, '2026-10-21T00:00:00.000Z').length, 0);
-  assert.equal(summarizePeriod(second, history, [...rows, arrangement(task, second)], '2026-10-21T00:00:00.000Z')[0]?.planning, 'planned');
+  assert.equal(summarizePeriod(second, history, [...rows, arrangement(task, second)], '2026-10-21T00:00:00.000Z', labels)[0]?.planning, 'unplanned');
   const futureRows = [arrangement(task, second, createdAt)];
   assert.equal(summarizePeriod(period, history, futureRows, '2026-10-14T00:00:00.000Z').length, 0);
   assert.equal(summarizePeriod(period, history, [...rows.map((row) => ({ ...row, validUntil: '2026-10-14T00:00:00.000Z' })), arrangement(task, second, '2026-10-14T00:00:00.000Z')], '2026-10-21T00:00:00.000Z').length, 0);
+});
+
+test('新建默认值按上海周期边界判断；待建转换默认不勾选', () => {
+  const window = periodWindow(period);
+  assert.equal(defaultUnplanned(period, window.start, false), true);
+  assert.equal(defaultUnplanned(period, '2026-10-12T01:00:00.000Z', true), false);
+  assert.equal(defaultUnplanned(period, '2026-10-11T15:59:59.999Z', false), false);
+  assert.equal(defaultUnplanned(period, window.endExclusive, false), false);
 });
 
 test('未开始移出周期立即移除总结，曾进行中再退回也不保留，周期结束不重新出现', () => {

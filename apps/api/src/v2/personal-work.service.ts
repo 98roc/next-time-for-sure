@@ -86,7 +86,9 @@ export class PersonalWorkService {
       return executeOnce(manager, context.actor.id, command, async () => {
         const previous = await repository.preferences(context.actor.id);
         requireVersion(previous.version, command.version);
-        await repository.savePreferences(context.actor.id, { ...previous, version: previous.version + 1, ...(command.action === 'set_completed_mode' ? { completedMode: command.mode } : { projectOrder: command.projectIds }) });
+        const change = command.action === 'set_completed_mode' ? { completedMode: command.mode }
+          : command.action === 'set_milestone_mode' ? { milestoneMode: command.mode } : { projectOrder: command.projectIds };
+        await repository.savePreferences(context.actor.id, { ...previous, ...change, version: previous.version + 1 });
         return { objectIds: [context.actor.id] };
       });
     });

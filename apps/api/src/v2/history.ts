@@ -1,6 +1,5 @@
 import { completionTimeline, taskEventAt } from './completion-history.js';
-import { classifyPlanning } from './planning-classification.js';
-import type { V2ArrangementHistory, V2Period, V2TaskEvent, V2Status } from '@ntfs/contracts';
+import type { V2ArrangementHistory, V2Period, V2TaskEvent, V2Status, V2PlanningLabel } from '@ntfs/contracts';
 import { periodWindow } from './calendar.js';
 
 /** 历史结果不会以当前任务状态补全缺失历史；调用者先按当前项目权限裁剪来源。 */
@@ -35,7 +34,7 @@ function executedDuring(events: V2TaskEvent[], start: string, end: string): bool
 }
 
 /** 按上海区间末快照回看；未来变更、任务删除和状态再次完成均不覆盖先前结果。 */
-export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrangements: V2ArrangementHistory[], now: string): V2SummaryRow[] {
+export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrangements: V2ArrangementHistory[], now: string, labels: V2PlanningLabel[] = []): V2SummaryRow[] {
   const window = periodWindow(period);
   const currentExclusive = new Date(new Date(now).getTime() + 1).toISOString();
   const end = window.endExclusive < currentExclusive ? window.endExclusive : currentExclusive;
@@ -72,7 +71,8 @@ export function summarizePeriod(period: V2Period, events: V2TaskEvent[], arrange
     const periodDetails = [...relevant].sort((a, b) => a.validFrom.localeCompare(b.validFrom)).at(-1);
     const first = history[0];
     const historyIncomplete = known.length === 0 || (first?.action === 'migrated' && first.occurredAt > window.start);
-    rows.push({ workNote: periodDetails?.workNote ?? '', carriedFromPeriodId: periodDetails?.carriedFromPeriodId ?? null, taskId, createdAt: snapshot?.createdAt ?? first?.snapshot.createdAt ?? null, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: classifyPlanning(period, history, arrangements), historyIncomplete });
+    const label = labels.find((row) => row.taskId === taskId && row.periodId === period.id)?.unplanned;
+    rows.push({ workNote: periodDetails?.workNote ?? '', carriedFromPeriodId: periodDetails?.carriedFromPeriodId ?? null, taskId, createdAt: snapshot?.createdAt ?? first?.snapshot.createdAt ?? null, title: snapshot?.title ?? null, executorId: snapshot?.executorId ?? null, executorName: known.at(-1)?.executorName ?? null, projectId: snapshot?.projectId ?? first?.snapshot.projectId ?? null, status: snapshot?.status ?? null, priority: snapshot?.priority ?? null, arranged, executed, planning: label == null ? 'unknown' : label ? 'unplanned' : 'planned', historyIncomplete });
   }
   return rows;
 }

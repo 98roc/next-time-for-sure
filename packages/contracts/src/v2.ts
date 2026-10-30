@@ -32,7 +32,7 @@ export const v2WorkNoteSchema = z.string().trim().max(500);
 /** 整个任务共用的纯文本备注；空串清空，省略兼容旧客户端与历史快照。 */
 export const v2TaskRemarkMaxLength = 5000;
 export const v2TaskRemarkSchema = z.string().trim().max(v2TaskRemarkMaxLength);
-export const v2ArrangementInputSchema = z.object({ periodId: v2IdSchema, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional() }).strict();
+export const v2ArrangementInputSchema = z.object({ periodId: v2IdSchema, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional(), unplanned: z.boolean().optional() }).strict();
 export const v2ArrangementsInputSchema = z.array(v2ArrangementInputSchema).min(1).max(100).refine((rows) => new Set(rows.map((row) => row.periodId)).size === rows.length, '日期区间不能重复');
 export type V2ArrangementInput = z.infer<typeof v2ArrangementInputSchema>;
 
@@ -47,6 +47,8 @@ export const v2ProjectTaskInputSchema = z.object({
   priority: v2PrioritySchema.default(3), milestoneId: v2IdSchema.nullable().default(null),
   plannedDays: v2RequiredPlannedDaysSchema,
   workNote: v2WorkNoteSchema.optional(),
+  /** 仅作用于首个周期；省略由服务端填默认值，false 为明确取消。 */
+  unplanned: z.boolean().optional(),
   remark: v2TaskRemarkSchema.optional(),
   additionalArrangements: z.array(v2ArrangementInputSchema).max(99).optional(),
   completion: v2CompletionSchema.optional(),
@@ -77,12 +79,19 @@ export const v2TaskSchema = z.discriminatedUnion('kind', [
   .refine((task) => task.status === 'completed' || task.completedAt === null, '未完成任务不能保留当前完成时间');
 export type V2Task = z.infer<typeof v2TaskSchema>;
 
+/** 周期标签与当前安排独立；null 仅用于保留无法还原的旧来源。 */
+export const v2PlanningLabelSchema = z.object({ taskId: v2IdSchema, periodId: v2IdSchema, unplanned: z.boolean().nullable() });
+export type V2PlanningLabel = z.infer<typeof v2PlanningLabelSchema>;
+/** 标签纠正使用操作时的周期名称留痕；不改变任务的历史执行状态。 */
+export const v2PlanningChangeSchema = z.object({ periodId: v2IdSchema, startOn: v2DateSchema, endOn: v2DateSchema, before: z.boolean().nullable(), after: z.boolean() });
+export type V2PlanningChange = z.infer<typeof v2PlanningChangeSchema>;
 /** 每次变更保存业务快照和实际操作者；migration 事件仅说明已知基线，不补造过去。 */
 export const v2TaskEventSchema = z.object({
   id: v2IdSchema, taskId: v2IdSchema, sequence: v2VersionSchema, actorId: v2IdSchema.nullable(),
   occurredAt: v2InstantSchema, action: z.enum(['created', 'updated', 'status_changed', 'deleted', 'migrated', 'completion_corrected', 'arrangement_carried']),
   beforeStatus: v2StatusSchema.nullable(), snapshot: v2TaskSchema,
   fromBacklog: z.boolean().optional(),
+  planningChanges: z.array(v2PlanningChangeSchema).optional(),
   projectName: z.string().nullable().optional(),
   executorName: z.string().nullable().default(null), actorName: z.string().nullable().default(null),
 }).strict().refine((event) => event.taskId === event.snapshot.id && event.sequence === event.snapshot.version, '事件必须对应任务及版本');
@@ -119,8 +128,8 @@ export const v2TaskCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...command, ...existing, action: z.literal('update_project'), title, executorId: v2IdSchema, priority: v2PrioritySchema, milestoneId: v2IdSchema.nullable(), milestoneConfirmation: z.string().regex(/^[a-f0-9]{64}$/u).optional() }).strict(),
   z.object({ ...command, ...existing, action: z.literal('update_private'), title, priority: v2PrioritySchema }).strict(),
   z.object({ ...command, ...existing, action: z.literal('delete'), confirmation: z.string().length(64) }).strict(),
-  z.object({ ...command, ...existing, action: z.literal('add_arrangement'), periodId: v2IdSchema, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional() }).strict(),
-  z.object({ ...command, ...existing, action: z.literal('change_arrangement'), periodId: v2IdSchema, targetPeriodId: v2IdSchema, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional(), confirmation: z.string().length(64) }).strict(),
+  z.object({ ...command, ...existing, action: z.literal('add_arrangement'), periodId: v2IdSchema, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional(), unplanned: z.boolean().optional() }).strict(),
+  z.object({ ...command, ...existing, action: z.literal('change_arrangement'), periodId: v2IdSchema, targetPeriodId: v2IdSchema, plannedDays: v2RequiredPlannedDaysSchema, workNote: v2WorkNoteSchema.optional(), unplanned: z.boolean().optional(), confirmation: z.string().length(64) }).strict(),
   z.object({ ...command, ...existing, action: z.literal('remove_arrangement'), periodId: v2IdSchema, confirmation: z.string().length(64) }).strict(),
 ]);
 export type V2TaskCommand = z.infer<typeof v2TaskCommandSchema>;

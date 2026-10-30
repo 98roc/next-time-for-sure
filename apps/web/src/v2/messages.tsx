@@ -12,7 +12,7 @@ function messagePresentation(reasons: string[]) {
   const labels = new Set<string>(), details: string[] = [];
   for (const reason of reasons) {
     if (reason.endsWith('为你安排了任务')) labels.add('分配给我');
-    else if (reason.endsWith('新增了计划外任务')) labels.add('计划外');
+    else if (reason.endsWith('新增了计划外任务') || reason.endsWith('标记了计划外任务')) labels.add('计划外');
     else if (reason.endsWith('完成了任务')) {
       labels.add('已完成');
     } else details.push(reason);

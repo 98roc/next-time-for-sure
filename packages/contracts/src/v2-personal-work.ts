@@ -17,11 +17,15 @@ export type V2SubtasksCommand = z.infer<typeof v2SubtasksCommandSchema>;
 
 /** 只记住查看模式；具体日期进入页面时重新取当天或当前区间。 */
 export const v2CompletedModeSchema = z.enum(['day', 'period']);
-export const v2PersonalPreferencesSchema = z.object({ completedMode: v2CompletedModeSchema, projectOrder: z.array(id).nullable(), version });
+/** 同一账号的所有里程碑入口共用展示模式，首次使用默认换行。 */
+export const v2MilestoneModeSchema = z.enum(['wrap', 'horizontal']);
+export type V2MilestoneMode = z.infer<typeof v2MilestoneModeSchema>;
+export const v2PersonalPreferencesSchema = z.object({ completedMode: v2CompletedModeSchema, milestoneMode: v2MilestoneModeSchema.default('wrap'), projectOrder: z.array(id).nullable(), version });
 export type V2PersonalPreferences = z.infer<typeof v2PersonalPreferencesSchema>;
 export const v2PersonalSettingsCommandSchema = z.discriminatedUnion('action', [
   z.object({ operationId: id, action: z.literal('set_completed_mode'), version, mode: v2CompletedModeSchema }).strict(),
   z.object({ operationId: id, action: z.literal('set_daily_project_order'), version, projectIds: z.array(id).max(500).nullable() }).strict(),
+  z.object({ operationId: id, action: z.literal('set_milestone_mode'), version, mode: v2MilestoneModeSchema }).strict(),
 ]);
 export type V2PersonalSettingsCommand = z.infer<typeof v2PersonalSettingsCommandSchema>;
 export const v2DailyQuerySchema = z.object({ on: v2DateSchema }).strict();

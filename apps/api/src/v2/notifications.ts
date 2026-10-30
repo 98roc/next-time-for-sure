@@ -5,23 +5,25 @@ import { v2MessageItemSchema, type V2MessageItem, type V2Task } from '@ntfs/cont
 import type { V2Context } from './context.js';
 import { decodeJson, instantColumn } from './repository-utils.js';
 import { V2PlanningRepository } from './planning.repository.js';
-import { V2TaskRepository } from './task.repository.js';
-import { classifyPlanning } from './planning-classification.js';
+import { V2PlanningLabelsRepository } from './planning-labels.repository.js';
+import { periodWindow } from './calendar.js';
 
 const storedSchema = z.object({ id: z.coerce.string(), items: z.unknown(), createdAt: z.string() });
 
 /** 在业务事务及幂等回调内生成消息；同次操作每个接收人只保留一条，任务原因合并。 */
-export async function notifyTask(manager: EntityManager, context: V2Context, task: V2Task, event: 'created' | 'completed', fromBacklog = false): Promise<void> {
+export async function notifyTask(manager: EntityManager, context: V2Context, task: V2Task, event: 'created' | 'completed' | 'planning', planningPeriodIds: string[] = []): Promise<void> {
   if (task.kind !== 'project') return;
   const project = context.projects.find((row) => row.id === task.projectId);
   if (!project) return;
   let unplanned = false;
-  if (event === 'created' && !fromBacklog) {
+  if (event !== 'completed' && planningPeriodIds.length) {
     const planning = new V2PlanningRepository(manager);
     const periods = await planning.periods(task.teamId);
-    const history = await new V2TaskRepository(manager).history([task.id]);
-    const arrangements = await planning.arrangementHistory([task.id]);
-    unplanned = periods.some((period) => classifyPlanning(period, history, arrangements) === 'unplanned');
+    const now = new Date().toISOString(), labels = new V2PlanningLabelsRepository(manager);
+    for (const period of periods.filter((row) => planningPeriodIds.includes(row.id))) {
+      const window = periodWindow(period);
+      if (now >= window.start && now < window.endExclusive && await labels.claimNotification(task.id, period.id, now)) unplanned = true;
+    }
   }
   const actorName = context.organization.accounts.find((row) => row.id === context.actor.id)?.displayName ?? '成员';
   const executorName = context.organization.accounts.find((row) => row.id === task.executorId)?.displayName ?? '成员';
@@ -33,7 +35,7 @@ export async function notifyTask(manager: EntityManager, context: V2Context, tas
     if (event === 'created' && member.accountId === task.executorId) reasons.push(`${actorName}为你安排了任务`);
     if (member.roles.includes('project_lead')) {
       if (event === 'completed') reasons.push(context.actor.id === task.executorId ? `${actorName}完成了任务` : `${actorName}代${executorName}完成了任务`);
-      if (unplanned) reasons.push(`${actorName}新增了计划外任务`);
+      if (unplanned) reasons.push(`${actorName}${event === 'created' ? '新增' : '标记'}了计划外任务`);
     }
     if (!reasons.length) continue;
     const item: V2MessageItem = { taskId: task.id, projectId: task.projectId, projectName: context.organization.projects.find((row) => row.id === task.projectId)?.name ?? '', title: task.title, reasons };
