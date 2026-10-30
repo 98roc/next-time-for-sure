@@ -5,6 +5,7 @@ import { Field, Feedback, periodLabel, useAction } from './controls';
 import { ModalPage, useModal } from './modal';
 import { useWorkspace } from './workspace';
 import { orderArrangements } from './arrangement-order';
+import './task-completion.css';
 
 /** 空和零分别表示未填写及明确零投入；重开时带回原结果。 */
 export function taskCompletion(task: V2Task): V2Completion { return { actualDays: task.actualDays ?? null, aiContribution: task.aiContribution ?? null, startedAt: task.startedAt ?? null, ...(task.completedAt ? { completedAt: task.completedAt } : {}) }; }
@@ -23,8 +24,9 @@ export function TaskCompletion({ title, initial, arrangements, onConfirm, onDone
   const [value, setValue] = useState<V2Completion>({ actualDays: initial?.actualDays ?? null, aiContribution: privateTask ? null : initial?.aiContribution ?? 'high', startedAt: initial?.startedAt ?? null, ...(initial?.completedAt ? { completedAt: initial.completedAt } : {}) });
   const estimates = orderArrangements(arrangements.filter((row) => row.plannedDays !== null), data.periods);
   const cancel = () => { if (modal.canBack) modal.back(); else modal.finish(); };
-  return <ModalPage title="完成任务" subtitle={title} compact busy={action.busy} hideCloseAction onClose={cancel} actions={<><button disabled={action.busy} onClick={cancel}>取消</button><button type="submit" form={formId} className="nt-primary" disabled={action.busy}>确认完成</button></>}>
+  return <ModalPage title="完成任务" subtitle={privateTask ? '' : title} className={privateTask ? 'v2-private-completion' : ''} compact busy={action.busy} hideCloseAction onClose={cancel} actions={<><button disabled={action.busy} onClick={cancel}>取消</button><button type="submit" form={formId} className="nt-primary" disabled={action.busy}>确认完成</button></>}>
+    {privateTask && <div className="v2-private-completion-context"><p className="v2-private-completion-title">{title}</p><p className="v2-private-completion-hint">确认后，任务将移至「已完成」。</p></div>}
     <div className="v2-completion-form">{estimates.length > 0 && <section className="v2-estimate-reference">{estimates.map((row) => { const period = data.periods.find((item) => item.id === row.periodId); return <div key={row.periodId}><span>预计投入</span><span>{period ? periodLabel(period) : '周期已变化'}</span><strong>{row.plannedDays} 人天</strong></div>; })}</section>}
-    <form id={formId} onSubmit={(event) => { event.preventDefault(); void action.act(async () => { await onConfirm(value); (onDone ?? modal.finish)(); }); }}><CompletionTime value={value} onChange={setValue} disabled={action.busy} collapsible error={action.error}>{!privateTask && <TaskResultFields value={value} onChange={setValue} required disabled={action.busy} />}</CompletionTime><Feedback error={action.error} /></form></div>
+    <form id={formId} onSubmit={(event) => { event.preventDefault(); void action.act(async () => { await onConfirm(value); (onDone ?? modal.finish)(); }); }}><CompletionTime value={value} onChange={setValue} disabled={action.busy} collapsible optional={privateTask} error={action.error}>{!privateTask && <TaskResultFields value={value} onChange={setValue} required disabled={action.busy} />}</CompletionTime><Feedback error={action.error} /></form></div>
   </ModalPage>;
 }

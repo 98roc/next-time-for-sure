@@ -15,9 +15,11 @@ let browser;
 try {
   const fixture = sortingFixture(), w = fixture.workspace, errors = [], commands = [];
   const task = { ...w.tasks[0], title: '增加本部门信息化统筹处室联系人' };
-  w.tasks = [task]; w.projects = w.projects.slice(0, 1);
+  const privateTask = { ...task, id: randomUUID(), kind: 'private', projectId: null, teamId: null, title: '打造一个个人人工智能体' };
+  w.tasks = [task, privateTask]; w.projects = w.projects.slice(0, 1);
   w.categories = ['not_started', 'in_progress', 'completed'].map((status, position) => ({ id: randomUUID(), ownerId: fixture.identity.id, name: ['任务池', '处理中', '已完成'][position], status, isDefault: true, position, version: 0 }));
   w.placements = [{ taskId: task.id, ownerId: fixture.identity.id, categoryId: w.categories[1].id, position: 0 }];
+  w.placements.push({ taskId: privateTask.id, ownerId: fixture.identity.id, categoryId: w.categories[1].id, position: 1 });
   w.arrangements = [{ taskId: task.id, periodId: w.periods[0].id, plannedDays: 0.5, workNote: '完善联系人信息', carriedFromPeriodId: null, position: 0, version: 0 }];
   await server.listen();
   const address = server.httpServer.address(); assert.ok(address && typeof address !== 'string');
@@ -29,7 +31,7 @@ try {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === 'POST') {
       const command = route.request().postDataJSON(); commands.push(command);
-      if (command.action === 'set_status') { Object.assign(task, { status: command.status, startedAt: command.completion?.startedAt ?? null, completedAt: command.completion?.completedAt ?? new Date().toISOString(), actualDays: command.completion?.actualDays, aiContribution: command.completion?.aiContribution, version: task.version + 1 }); w.placements[0].categoryId = w.categories[2].id; }
+      if (command.action === 'set_status') { const target = w.tasks.find(row => row.id === command.taskId); assert.ok(target); Object.assign(target, { status: command.status, startedAt: command.completion?.startedAt ?? null, completedAt: command.completion?.completedAt ?? new Date().toISOString(), actualDays: command.completion?.actualDays, aiContribution: command.completion?.aiContribution, version: target.version + 1 }); w.placements.find(row => row.taskId === target.id).categoryId = w.categories[2].id; }
       else if (command.action === 'save_task') Object.assign(task, command.completion, { version: task.version + 1 });
       else assert.equal(command.action, 'create_project');
       return route.fulfill({ json: { objectIds: [task.id] } });
@@ -39,6 +41,41 @@ try {
   });
   const active = page.locator('dialog [data-active="true"]');
   await page.goto(`http://127.0.0.1:${address.port}/personal`);
+  const openPrivateCompletion = () => page.locator('.mw-task').filter({ has: page.getByRole('button', { name: privateTask.title, exact: true }) }).getByRole('button', { name: '完成', exact: true }).click();
+  await openPrivateCompletion();
+  const optionalTime = active.getByRole('button', { name: '补充时间（选填）' });
+  assert.equal(await optionalTime.getAttribute('aria-expanded'), 'false');
+  assert.equal(await optionalTime.evaluate(el => el === document.activeElement), true);
+  assert.equal(await active.getByLabel('累计实际投入（人天）', { exact: true }).count(), 0);
+  assert.equal(await active.getByLabel('AI 贡献率', { exact: true }).count(), 0);
+  assert.equal(await active.getByLabel('实际完成时间（北京时间）').isVisible(), false);
+  const bounds = await page.locator('dialog').boundingBox();
+  assert.ok(bounds.width <= 460 && bounds.height < 320, `私人任务折叠确认窗口应紧凑：${JSON.stringify(bounds)}`);
+  await page.screenshot({ path: evidence + '/private-completion-dark.png', fullPage: true });
+  await optionalTime.click();
+  await active.getByLabel('实际开始时间（北京时间）').fill('2026-10-19T09:15');
+  await active.getByLabel('实际完成时间（北京时间）').fill('2026-10-20T18:30');
+  await active.getByLabel('实际完成时间（北京时间）').fill('');
+  assert.equal(await active.getByLabel('实际完成时间（北京时间）').getAttribute('required'), null);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await active.locator('.v2-content').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+  await page.screenshot({ path: evidence + '/private-completion-mobile-light.png', fullPage: true });
+  await active.getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(commands.length, 0, '取消完成不得写入任务');
+  await openPrivateCompletion();
+  await optionalTime.click();
+  await active.getByLabel('实际完成时间（北京时间）').fill('2026-10-20T18:30');
+  await active.getByLabel('实际完成时间（北京时间）').fill('');
+  await optionalTime.click();
+  await active.getByRole('button', { name: '确认完成', exact: true }).click();
+  await page.locator('dialog').waitFor({ state: 'hidden' });
+  assert.equal(commands.at(-1).completion.startedAt, null);
+  assert.equal(commands.at(-1).completion.completedAt, undefined);
+  assert.equal(commands.at(-1).completion.actualDays, null);
+  assert.equal(commands.at(-1).completion.aiContribution, null);
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.getByRole('button', { name: task.title, exact: true }).click();
   await active.getByRole('heading', { name: '编辑任务', exact: true }).waitFor();
   assert.equal(await active.getByLabel('实际开始时间（北京时间）').count(), 0);
@@ -91,5 +128,5 @@ try {
   await page.locator('dialog').waitFor({ state: 'hidden' });
   assert.equal(commands.at(-1).task.workNote, '完成审计分支合并，验证主要功能');
   assert.deepEqual(errors, []);
-  console.log('PASS task periods UI: collapsed result-header time entry, editable start/end Shanghai time payload, compact completion, same-row optional work note, dark/light/narrow layouts. Mock API only.');
+  console.log('PASS task periods UI: private compact optional times, clear then submit, cancel without writes; project result fields and Shanghai time payload; same-row optional work note; dark/light/narrow layouts. Mock API only.');
 } finally { await browser?.close(); await server.close(); }

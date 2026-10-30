@@ -1,0 +1,15 @@
+/* 仅个人任务的完成确认使用此布局，项目任务继续沿用结果表单。 */
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope dialog.v2-dialog.v2-compact:has(.v2-private-completion){width:min(460px,calc(100% - 24px));border-radius:16px}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-dialog-header{padding:20px 24px 0;border-bottom:0}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-layout.v2-private-completion .v2-dialog-header h2{font-size:18px}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-content{padding:16px 24px 20px}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-layout.v2-private-completion .v2-private-completion-title{margin:0 0 6px;font-size:16px;font-weight:500;overflow-wrap:anywhere}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-layout.v2-private-completion .v2-private-completion-hint{margin:0;color:var(--v2-muted);font-size:12px}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-completion-form{padding:0}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-execution-times{margin-top:12px}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-section-head{margin-bottom:0;justify-content:flex-start}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-dialog-layout.v2-private-completion .v2-execution-toggle{margin-left:0;padding:6px 0;font-size:13px;color:var(--v2-muted)}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-execution-inputs{grid-template-columns:minmax(0,1fr);margin:12px 0}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-dialog-footer{padding:16px 24px;justify-content:flex-end}
+.v2-scope .v2-dialog-layout.v2-private-completion .v2-footer-actions{width:auto;justify-content:flex-end;gap:10px}
+@media(max-width:420px){.v2-scope .v2-dialog-layout.v2-private-completion .v2-dialog-header{padding:18px 18px 0}.v2-scope .v2-dialog-layout.v2-private-completion .v2-content{padding:14px 18px 18px}.v2-scope .v2-dialog-layout.v2-private-completion .v2-dialog-footer{padding:14px 18px}}
