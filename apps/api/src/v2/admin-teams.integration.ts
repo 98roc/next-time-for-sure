@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { organizationSnapshotSchema, v2WorkspaceSchema, v2WeeklyStateSchema, v2ImpactSchema } from '@ntfs/contracts';
 import { withFixture, type Session } from '../testing/fixture.js';
 import { v2ResultSchema } from './repository-utils.js';
+import { generateTemporaryPassword } from '../identity/password.js';
 
 /** 真实 HTTP 与本机数据库回读，覆盖管理员跨团队操作、角色即时生效及普通账号隔离。 */
 await withFixture(async ({ source, call, prefix, teamId, projectId, admin, leader, developer, outsider }) => {
@@ -74,6 +75,37 @@ await withFixture(async ({ source, call, prefix, teamId, projectId, admin, leade
   const memberships: unknown = await source.query('SELECT project_id FROM project_members WHERE account_id=?', [admin.id]);
   assert.deepEqual(memberships, []);
 
+  // 管理员不加入目标团队，也能维护该团队的成员、项目和首页标语。
+  const password = generateTemporaryPassword(), memberLogin = `${prefix}.managed`, linkedLogin = `${prefix}.linked`;
+  const createMember = { action: 'create_member', teamId: secondTeam, loginName: memberLogin, displayName: '目标团队新成员', password };
+  await request('organization/commands', leader, createMember, 403);
+  await request('organization/commands', admin, createMember, 204);
+  await request('organization/commands', admin, { action: 'create_member', teamId: randomUUID(), loginName: `${prefix}.missing`, displayName: '无效团队', password }, 404);
+  await request('organization/commands', admin, { action: 'create_account', loginName: linkedLogin, displayName: '目标团队关联成员', password }, 204);
+  await request('organization/commands', leader, { action: 'link_member', teamId: secondTeam, loginName: linkedLogin }, 403);
+  await request('organization/commands', admin, { action: 'link_member', teamId: secondTeam, loginName: linkedLogin }, 204);
+  await request('organization/commands', admin, { action: 'link_member', teamId: secondTeam, loginName: first.accounts.find((row) => row.id === developer.id)?.loginName }, 409);
+  const managed = (await directory()).accounts.find((row) => row.loginName === memberLogin); assert.ok(managed);
+  await request('organization/commands', admin, { action: 'reset_password', accountId: managed.id, version: managed.version, password }, 204);
+  await request('organization/commands', admin, { action: 'set_disabled', accountId: managed.id, version: managed.version + 1, disabled: true }, 204);
+  await request('organization/commands', admin, { action: 'set_disabled', accountId: managed.id, version: managed.version + 2, disabled: false }, 204);
+  const configuredMembers = [{ accountId: outsider.id, roles: ['project_manager', 'project_lead'] }, { accountId: managed.id, roles: ['developer'] }];
+  const createProject = { action: 'create_project', operationId: randomUUID(), name: '目标团队新增项目', members: configuredMembers };
+  await request(`v2/team?teamId=${secondTeam}`, leader, createProject, 403);
+  const configured = v2ResultSchema.parse(await request(`v2/team?teamId=${secondTeam}`, admin, createProject));
+  const configuredId = configured.objectIds[0]; assert.ok(configuredId);
+  const createdProject = (await workspace(admin, secondTeam)).projects.find((row) => row.id === configuredId); assert.ok(createdProject);
+  await request(`v2/members-impact?teamId=${secondTeam}`, admin, { projectId: configuredId, version: createdProject.version, members: configuredMembers });
+  await request(`v2/team?teamId=${secondTeam}`, admin, { action: 'update_project', operationId: randomUUID(), projectId: configuredId, version: createdProject.version, name: '目标团队更新项目', members: configuredMembers });
+  await request(`v2/team?teamId=${teamId}`, admin, { action: 'update_project', operationId: randomUUID(), projectId: configuredId, version: createdProject.version + 1, name: '不得串队', members: configuredMembers }, 403);
+  const messageState = await workspace(admin, secondTeam);
+  await request(`v2/team?teamId=${secondTeam}`, admin, { action: 'set_messages', operationId: randomUUID(), version: messageState.teamVersion, messages: ['管理员维护的目标团队标语'] });
+  assert.deepEqual((await workspace(admin, secondTeam)).teamMessages, ['管理员维护的目标团队标语']);
+  assert.equal((await workspace(admin, teamId)).projects.some((row) => row.id === configuredId), false);
+  const configuredRows: unknown = await source.query('SELECT team_id AS teamId,name FROM projects WHERE id=?', [configuredId]);
+  assert.deepEqual(configuredRows, [{ teamId: secondTeam, name: '目标团队更新项目' }]);
+  assert.ok((await workspace(admin, secondTeam)).accounts.some((row) => row.loginName === linkedLogin && row.teamId === secondTeam));
+
   let account = (await directory()).accounts.find((row) => row.id === developer.id); assert.ok(account);
   const promote = { action: 'update_account', accountId: account.id, loginName: account.loginName, displayName: account.displayName, version: account.version, isSuperAdmin: true };
   await request('organization/commands', leader, promote, 403);
@@ -87,5 +119,5 @@ await withFixture(async ({ source, call, prefix, teamId, projectId, admin, leade
   await request(`v2/workspace?teamId=${secondTeam}`, developer, undefined, 403);
   const stored: unknown = await source.query('SELECT is_super_admin AS role, team_id AS teamId FROM accounts WHERE id=?', [developer.id]);
   assert.deepEqual(stored, [{ role: 0, teamId }]);
-  console.log('PASS: administrator cross-team create/edit/delete/backlog conversion/milestone/sort/report, self association without fake membership, immediate role revocation, ordered default team, private isolation and database readback.');
+  console.log('PASS: administrator cross-team projects/tasks, target-team member create/link/reset/disable, project configuration, messages, scope isolation, role revocation and database readback.');
 });

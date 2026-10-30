@@ -16,8 +16,11 @@ try {
   const address = server.httpServer.address(); assert.ok(address && typeof address !== 'string');
   browser = await chromium.launch({ channel: 'msedge', headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  page.setDefaultTimeout(10000);
   const first = sortingFixture(), second = sortingFixture(), fixtures = [first, second];
   const identity = { ...first.identity, isSuperAdmin: true };
+  second.identity.displayName = '晚团队负责人'; second.workspace.accounts[0].displayName = second.identity.displayName;
+  second.identity.loginName = 'later-leader'; second.workspace.accounts[0].loginName = second.identity.loginName;
   const teams = fixtures.map((fixture, index) => ({ ...fixture.workspace.team, name: index === 0 ? '创建较早的团队' : '创建较晚的团队' }));
   first.workspace.projects[0].name = '早团队项目'; second.workspace.projects[0].name = '晚团队项目';
   for (const fixture of fixtures) {
@@ -28,18 +31,24 @@ try {
     fixture.weekly.canEditText = true;
   }
   let teamCount = 2, roleUpdates = 0;
+  const teamCommands = [], memberCommands = [];
   const errors = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url()), endpoint = url.pathname;
     const teamId = url.searchParams.get('teamId'), fixture = fixtures.find((value) => value.workspace.team.id === teamId) ?? first;
     let result;
     if (endpoint.endsWith('/auth/me')) result = identity;
-    else if (endpoint.endsWith('/workspace')) result = teamCount === 0 ? { ...first.workspace, team: null, teams: [], projects: [], periods: [], tasks: [], arrangements: [], backlog: [], orders: [] } : { ...fixture.workspace, teams: teams.slice(0, teamCount) };
+    else if (endpoint.endsWith('/workspace')) {
+      if (teamId && !fixtures.some((value) => value.workspace.team.id === teamId)) return route.fulfill({ status: 404, json: { message: '团队不存在。' } });
+      if (!identity.isSuperAdmin && teamId && teamId !== teams[0].id) return route.fulfill({ status: 403, json: { message: '没有该团队的查看权限。' } });
+      result = teamCount === 0 ? { ...first.workspace, team: null, teams: [], projects: [], periods: [], tasks: [], arrangements: [], backlog: [], orders: [] } : { ...fixture.workspace, teams: teams.slice(0, teamCount) };
+    }
     else if (endpoint.endsWith('/weekly')) result = fixture.weekly;
     else if (endpoint.endsWith('/summary')) result = fixture.summary;
     else if (endpoint.endsWith('/notifications')) result = { accountId: identity.id, cursor: '0', page: 1, total: 0, messages: [] };
     else if (endpoint.endsWith('/history')) result = [];
-    else if (endpoint.endsWith('/organization/commands')) { const body = route.request().postDataJSON(); if (body.action === 'update_account' && body.isSuperAdmin === true) roleUpdates++; return route.fulfill({ status: 204 }); }
+    else if (endpoint.endsWith('/team')) { teamCommands.push({ teamId, body: route.request().postDataJSON() }); return route.fulfill({ json: { objectIds: [fixture.workspace.projects[0].id] } }); }
+    else if (endpoint.endsWith('/organization/commands')) { const body = route.request().postDataJSON(); memberCommands.push(body); if (body.action === 'update_account' && body.isSuperAdmin === true) roleUpdates++; return route.fulfill({ status: 204 }); }
     else if (endpoint.endsWith('/organization')) result = { teams, projects: [], accounts: [{ id: identity.id, loginName: 'admin-test', displayName: '管理员', teamId: null, disabled: false, isSuperAdmin: true, version: 0 }, { ...first.workspace.accounts[0], id: second.identity.id, loginName: 'candidate', displayName: '候选管理员', isSuperAdmin: false }] };
     return route.fulfill({ status: result ? 200 : 404, json: result ?? { message: '未模拟接口' } });
   });
@@ -78,13 +87,71 @@ try {
   await page.getByRole('combobox', { name: '角色', exact: true }).selectOption('admin');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await page.getByText('已保存。', { exact: true }).waitFor(); assert.equal(roleUpdates, 1);
+  // 工作台记住第二个团队时，名称和管理入口仍必须进入点击的团队。
+  await page.getByRole('link', { name: '团队管理', exact: true }).click();
+  await page.getByRole('link', { name: teams[0].name, exact: true }).click();
+  await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
+  assert.equal(new URL(page.url()).pathname, `/organization/${teams[0].id}`);
+  assert.equal(await page.getByRole('button', { name: '成员', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('.v2-topbar').innerText(), '系统管理 / 团队管理');
+  await page.reload(); await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
+  assert.equal(await page.locator('.nt-row.nt-between .nt-muted').innerText(), teams[0].name);
+  assert.equal(await page.evaluate((id) => localStorage.getItem(`ntfs.selected-team.${id}`), identity.id), teams[1].id);
+  await page.getByRole('button', { name: '项目', exact: true }).click();
+  await page.getByRole('row').filter({ hasText: '早团队项目' }).getByRole('link', { name: '进入项目 →', exact: true }).click();
+  await page.getByRole('heading', { name: '早团队项目', exact: true }).waitFor();
+  assert.equal(await page.evaluate((id) => localStorage.getItem(`ntfs.selected-team.${id}`), identity.id), teams[0].id);
+  await page.goBack();
+  await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
+  await page.getByRole('link', { name: '← 返回团队列表', exact: true }).click();
+  await page.getByRole('row').filter({ has: page.getByRole('link', { name: teams[1].name, exact: true }) }).getByRole('link', { name: '管理', exact: true }).click();
+  await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
+  assert.equal(new URL(page.url()).pathname, `/organization/${teams[1].id}`);
+  await page.screenshot({ path: evidence + '/team-members.png', fullPage: true });
+  // 工作区附带的当前管理员不属于该团队，不能混进成员列表或项目成员候选。
+  assert.equal(await page.locator('.nt-table tbody tr').filter({ hasText: identity.loginName }).count(), 0);
+  await page.getByRole('button', { name: '新增成员', exact: true }).click();
+  await page.getByRole('button', { name: '添加已有账号', exact: true }).click();
+  await page.getByRole('textbox', { name: '登录账号', exact: true }).fill('existing.member');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('heading', { name: '新增成员', exact: true }).waitFor();
+  await page.getByRole('button', { name: '关闭', exact: true }).first().click();
+  await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
+  assert.ok(memberCommands.some((command) => command.action === 'link_member' && command.teamId === teams[1].id));
+  await page.getByRole('button', { name: '首页标语', exact: true }).click();
+  await page.getByRole('button', { name: '＋ 新增标语', exact: true }).click();
+  await page.getByRole('textbox', { name: '标语 1', exact: true }).fill('目标团队标语');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
+  assert.ok(teamCommands.some((command) => command.teamId === teams[1].id && command.body.action === 'set_messages'));
+  await page.getByRole('button', { name: '项目', exact: true }).click();
+  await page.getByRole('button', { name: '新增项目', exact: true }).click();
+  assert.equal(await page.getByRole('checkbox', { name: `${identity.displayName}：加入项目`, exact: true }).count(), 0);
+  await page.getByRole('textbox', { name: '项目名称', exact: true }).fill('管理员创建的目标团队项目');
+  await page.getByRole('checkbox', { name: `${second.identity.displayName}：项目经理`, exact: true }).check();
+  await page.getByRole('checkbox', { name: `${second.identity.displayName}：项目研发负责人`, exact: true }).check();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: '新增项目', exact: true }).waitFor();
+  assert.ok(teamCommands.some((command) => command.teamId === teams[1].id && command.body.action === 'create_project'));
+  await page.screenshot({ path: evidence + '/team-management.png', fullPage: true });
+  await page.goto(`${base}/organization/00000000-0000-4000-8000-000000000001`);
+  await page.getByRole('alert').waitFor();
+  assert.equal(await page.getByRole('button', { name: '新增项目', exact: true }).count(), 0);
+  await page.getByRole('link', { name: '返回团队列表', exact: true }).click();
   await page.evaluate(() => localStorage.clear()); teamCount = 1;
   await page.goto(`${base}/work`); await page.getByRole('link', { name: /早团队项目/ }).waitFor(); assert.equal(await filter.count(), 0);
   teamCount = 2; identity.isSuperAdmin = false;
   await page.reload(); await page.getByRole('link', { name: /早团队项目/ }).waitFor(); assert.equal(await filter.count(), 0);
   assert.equal(await page.getByRole('link', { name: '账号管理', exact: true }).count(), 0);
+  await page.goto(`${base}/organization`);
+  await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
+  assert.equal(await page.getByRole('link', { name: '← 返回团队列表', exact: true }).count(), 0);
+  await page.goto(`${base}/organization/${teams[1].id}`);
+  await page.getByRole('alert').waitFor();
+  assert.equal(await page.getByRole('button', { name: '新增成员', exact: true }).count(), 0);
+  await page.goto(`${base}/work`);
   identity.isSuperAdmin = true; teamCount = 0;
   await page.reload(); await page.getByText('未加入团队', { exact: false }).first().waitFor(); assert.equal(await filter.count(), 0);
   assert.deepEqual(errors, []);
-  console.log('PASS: remembered single-team scope, title-right selector without redundant label, administrator self association, account dialog layout, role assignment, one-team/non-admin/no-team visibility.');
+  console.log('PASS: both team-management links, route scope over saved preference, refresh/back, member linking, project/messages writes scoped to clicked team, outsider exclusion, invalid/foreign route rejection and existing administrator UI.');
 } finally { await browser?.close(); await server.close(); }

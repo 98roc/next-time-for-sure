@@ -46,7 +46,7 @@ async function executeCommand(repository: OrganizationRepository, actor: PolicyA
   const requireSuper = () => { if (!actor.isSuperAdmin) throw new ForbiddenException('仅超管可执行此操作。'); };
   const requireTeamLeader = (teamId: string) => {
     if (!snapshot.teams.some((team) => team.id === teamId)) throw new NotFoundException('团队不存在。');
-    if (!isTeamLeader(actor, snapshot, teamId)) throw new ForbiddenException('没有本团队的操作权限。');
+    if (!actor.isSuperAdmin && !isTeamLeader(actor, snapshot, teamId)) throw new ForbiddenException('没有本团队的操作权限。');
   };
   const member = (id: string, teamId: string) => {
     const account = snapshot.accounts.find((item) => item.id === id && item.teamId === teamId && !item.disabled);

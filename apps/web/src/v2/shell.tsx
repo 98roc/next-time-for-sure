@@ -55,7 +55,7 @@ function Frame() {
   const variant = path === '/personal' ? 'personal' : path === '/weekly-plans' ? 'weekly' : 'project';
   const id = variant === 'personal' ? 'ntfs-my-work' : variant === 'weekly' ? 'ntfs-weekly-demo' : 'nt-project';
   const pageClass = variant === 'weekly' ? 'w-app' : variant === 'project' ? 'nt-app' : '';
-  const pageLabel = navigation.find((link) => link.to === path)?.label ?? '工作空间';
+  const pageLabel = navigation.find((link) => link.to === path || (link.to === '/organization' && path.startsWith('/organization/')))?.label ?? '工作空间';
   // 业务区域切换重置外层弹窗；总览由页面切换器暂停来源弹窗，保留返回所需状态。
   return <div id={id} className="v2-scope"><NavigationGuard><ModalProvider key={`${path}:${data.team?.id ?? ''}`}>
     <div className={`v2-frame${collapsed ? ' is-sidebar-collapsed' : ''}`}>
@@ -65,7 +65,7 @@ function Frame() {
           <button type="button" className="v2-sidebar-toggle" aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'} title={collapsed ? '展开侧边栏' : '收起侧边栏'} aria-expanded={!collapsed} aria-controls="v2-sidebar" onClick={toggle}>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /><path d={collapsed ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'} /></svg>
           </button>
-          <span>{user.isSuperAdmin && ['/accounts', '/organization'].includes(path) ? '系统管理' : '工作空间'} / {pageLabel}</span><MessagesButton />
+          <span>{user.isSuperAdmin && (path === '/accounts' || path === '/organization' || path.startsWith('/organization/')) ? '系统管理' : '工作空间'} / {pageLabel}</span><MessagesButton />
         </div>
         <main key={`${path}:${data.team?.id ?? ''}`} className="v2-main" aria-label={pageLabel}>
           <div className={`v2-page ${pageClass}`}><MilestonePageSwitch><Outlet /></MilestonePageSwitch></div>
