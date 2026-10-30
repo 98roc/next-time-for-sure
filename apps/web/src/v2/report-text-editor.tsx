@@ -20,8 +20,12 @@ export function ReportTextEditor({ title, scope, state, canEdit, readError, onSa
     const body = draft?.body ?? state.text.body;
     try { if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable'); await navigator.clipboard.writeText(body); setCopyStatus('已复制当前显示的文字'); }
     catch {
+      // HTTP 站点或受限客户端可能无法使用 Clipboard API，继续尝试用户点击触发的兼容复制。
       if (draft && textarea.current) { textarea.current.focus(); textarea.current.select(); }
       else if (text.current) { const range = document.createRange(); range.selectNodeContents(text.current); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); }
+      try {
+        if (document.execCommand('copy')) { setCopyStatus('已复制当前显示的文字'); return; }
+      } catch { /* 浏览器同时禁止两种写入方式时，保留选区供用户手动复制。 */ }
       setCopyStatus('已选中文字，请按 Ctrl+C 或使用系统复制');
     }
   }
