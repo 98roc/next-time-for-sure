@@ -48,6 +48,14 @@ const active = page.locator('dialog[open] [data-active="true"]');
 const panel = page.getByRole('region', { name: `${project.name}里程碑`, exact: true });
 const close = () => active.getByRole('button', { name: '关闭', exact: true }).last().click();
 const screenshot = async (name) => { if (process.env.SCREENSHOT_DIR) { await mkdir(process.env.SCREENSHOT_DIR, { recursive: true }); await page.screenshot({ path: join(process.env.SCREENSHOT_DIR, `${name}.png`), fullPage: false }); } };
+/** 连线必须铺满实际路线，不能只检查路径存在，防止被页面的 SVG 图标规则缩成16px。 */
+async function verifyAxisViewport() {
+  await page.waitForFunction(() => {
+    const svg = document.querySelector('.v2-ms-page .v2-ms-route');
+    const bounds = svg?.getBoundingClientRect(), parent = svg?.parentElement?.getBoundingClientRect();
+    return bounds && parent && bounds.width > 100 && Math.abs(bounds.width - parent.width) < 1 && Math.abs(bounds.height - parent.height) < 1;
+  });
+}
 try {
   await page.goto(base + '/work?view=milestones');
   await panel.waitFor();
@@ -68,6 +76,7 @@ try {
   // 换行折返为圆角且不穿过同日多目标；横向只滚动当前项目，保存失败保持原选择。
   assert.equal(await page.getByRole('button', { name: '换行时间轴', exact: true }).getAttribute('aria-pressed'), 'true');
   await page.waitForFunction(() => document.querySelector('.v2-ms-route path')?.getAttribute('d')?.includes(' Q '));
+  await verifyAxisViewport();
   assert.equal(await page.locator('dialog[open]').count(), 0);
   rejectPreference = true;
   await page.getByRole('button', { name: '横向时间轴', exact: true }).click();
@@ -75,6 +84,7 @@ try {
   assert.equal(await page.getByRole('button', { name: '换行时间轴', exact: true }).getAttribute('aria-pressed'), 'true');
   await page.getByRole('button', { name: '横向时间轴', exact: true }).click();
   await panel.locator('.is-horizontal').waitFor();
+  await verifyAxisViewport();
   assert.equal(data.personalPreferences.milestoneMode, 'horizontal');
   assert.ok(await panel.locator('.v2-ms-scroll').evaluate((element) => element.scrollWidth > element.clientWidth));
   const scrollLeft = await panel.locator('.v2-ms-scroll').evaluate((element) => { element.scrollLeft = 160; return element.scrollLeft; });
@@ -146,6 +156,11 @@ try {
   const sourcePeriods = [await page.getByLabel('总结区间', { exact: true }).inputValue(), await page.getByLabel('计划区间', { exact: true }).inputValue()];
   await page.getByRole('button', { name: '里程碑', exact: true }).click();
   await page.getByRole('heading', { name: '里程碑总览', exact: true }).waitFor();
+  await verifyAxisViewport();
+  await page.getByRole('button', { name: '横向时间轴', exact: true }).click();
+  await panel.locator('.is-horizontal').waitFor(); await verifyAxisViewport();
+  await page.getByRole('button', { name: '换行时间轴', exact: true }).click();
+  await panel.locator('.v2-ms-roadmap-wrap').waitFor(); await verifyAxisViewport();
   assert.equal(await page.locator('dialog[open]').count(), 0);
   assert.match(page.url(), /view=milestones/);
   assert.equal(await panel.locator('.v2-ms-card h4 button').first().evaluate((element) => getComputedStyle(element).fontSize), '16px');

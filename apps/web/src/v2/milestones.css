@@ -32,7 +32,8 @@
 .v2-ms-count strong { font-size:13px;font-weight:500;color:var(--ms-text); }
 .v2-ms-scroll { min-width:0;margin:0 0 18px; }
 .v2-ms-roadmap { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:60px 16px;padding:0 20px;align-items:start;position:relative;isolation:isolate; }
-.v2-ms-route { position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;color:var(--ms-axis);z-index:-1; }
+/* 连线画布必须覆盖页面原型的 SVG 图标尺寸，尤其是周报入口的 16px 通用规则。 */
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-ms-route { position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;color:var(--ms-axis);z-index:-1; }
 .v2-ms-route path { fill:none;stroke:currentColor;stroke-width:1.2;stroke-linejoin:round;stroke-linecap:round; }
 .v2-ms-stage { min-width:0;position:relative; }
 .v2-ms-node { position:absolute;top:61px;left:18px;width:9px;height:9px;box-sizing:border-box;transform:rotate(45deg);background:var(--ms-muted);border:2px solid var(--ms-bg); }
