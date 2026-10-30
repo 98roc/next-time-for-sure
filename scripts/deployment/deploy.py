@@ -248,6 +248,11 @@ def main():
     client.connect(values['DEPLOY_HOST'], port=int(values['DEPLOY_SSH_PORT']), username=values['DEPLOY_USER'],
                    password=password, timeout=15, auth_timeout=20)
     try:
+        # 本机编译、依赖导出期间也保持 SSH 活跃，避免长时间无远端流量被网关断开。
+        transport = client.get_transport()
+        if transport is None:
+            raise RuntimeError('SSH transport is unavailable after authentication')
+        transport.set_keepalive(15)
         command = 'bash ' + shlex.quote(base + '/deploy.sh')
         command += ' ' + ' '.join(shlex.quote(value) for value in [args.action.lower(), base, release, values['HTTP_BIND'], values['HTTP_PORT']])
         if args.action in ['Check', 'InitAdmin']:
