@@ -1,4 +1,4 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { OrganizationCommand, OrganizationSnapshot } from '@ntfs/contracts';
@@ -13,6 +13,7 @@ type Editor = { action: EditorAction; targetId: string | undefined; data: Organi
 
 /** 超管专用的基础目录；团队内部项目配置统一由 V2 团队页维护。 */
 export function OrganizationPage({ accounts = false }: { accounts?: boolean }) {
+  const navigate = useNavigate();
   const client = useQueryClient();
   const identity = useQuery({ queryKey: ['identity'], queryFn: currentIdentity, retry: false });
   const snapshot = useQuery({ queryKey: ['organization', identity.data?.id], queryFn: organizationSnapshot, enabled: Boolean(identity.data?.isSuperAdmin && !identity.data.mustChangePassword), retry: false });
@@ -47,7 +48,7 @@ export function OrganizationPage({ accounts = false }: { accounts?: boolean }) {
       <div className="org-directory"><section className="panel org-table-wrap">{accounts ? <table className="org-table"><thead><tr><th>账号</th><th>姓名</th><th>团队</th><th>角色</th><th>状态</th><th>操作</th></tr></thead><tbody>
         {filteredAccounts.map((entry) => <tr key={entry.id}><td>{entry.loginName}</td><td>{entry.displayName}</td><td>{teamName(entry.teamId)}</td><td>{entry.isSuperAdmin ? '系统管理员' : '普通账号'}</td><td>{entry.disabled ? '已停用' : '已启用'}</td><td><div className="org-actions"><button onClick={() => open('update_account', entry.id)}>编辑</button><button disabled={entry.id === identity.data?.id} onClick={() => open('reset_password', entry.id)}>重置密码</button><button disabled={entry.id === identity.data?.id} onClick={() => open('set_disabled', entry.id)}>{entry.disabled ? '启用' : '停用'}</button><button disabled={entry.id === identity.data?.id} className="danger-button" onClick={() => open('delete_account', entry.id)}>删除</button></div></td></tr>)}
         {!filteredAccounts.length && <tr><td colSpan={6} className="org-empty">暂无符合条件的账号。</td></tr>}
-      </tbody></table> : <table className="org-table"><thead><tr><th>团队名称</th><th>团队管理员</th><th>成员数</th><th>操作</th></tr></thead><tbody>{filteredTeams.map((team) => <tr key={team.id}><td><Link className="text-button" to={`/organization/${team.id}`}>{team.name}</Link></td><td>{displayName(team.leaderId)}</td><td>{data.accounts.filter((entry) => entry.teamId === team.id).length}</td><td><div className="org-actions"><Link to={`/organization/${team.id}`}>管理</Link><button onClick={() => open('update_team', team.id)}>编辑</button><button className="danger-button" onClick={() => open('delete_team', team.id)}>删除</button></div></td></tr>)}{!filteredTeams.length && <tr><td colSpan={4} className="org-empty">暂无符合条件的团队。请先创建账号，再指定团队管理员。</td></tr>}</tbody></table>}</section></div>
+      </tbody></table> : <table className="org-table"><thead><tr><th>团队名称</th><th>团队管理员</th><th>成员数</th><th>操作</th></tr></thead><tbody>{filteredTeams.map((team) => <tr key={team.id}><td><Link className="text-button" to={`/organization/${team.id}`}>{team.name}</Link></td><td>{displayName(team.leaderId)}</td><td>{data.accounts.filter((entry) => entry.teamId === team.id).length}</td><td><div className="org-actions"><button type="button" onClick={() => navigate(`/organization/${team.id}`)}>管理</button><button onClick={() => open('update_team', team.id)}>编辑</button><button className="danger-button" onClick={() => open('delete_team', team.id)}>删除</button></div></td></tr>)}{!filteredTeams.length && <tr><td colSpan={4} className="org-empty">暂无符合条件的团队。请先创建账号，再指定团队管理员。</td></tr>}</tbody></table>}</section></div>
     </>}
     {editor && <Dialog title={editorTitle} busy={save.isPending} onClose={() => setEditor(null)}>{save.error && <p role="alert" className="form-error">{save.error.message} 若数据已变更，请关闭弹窗后重新打开。</p>}<CommandForm action={editor.action} targetId={editor.targetId} data={editor.data} pending={save.isPending} submit={(command) => save.mutate(command)} cancel={() => setEditor(null)} /></Dialog>}
   </main>;

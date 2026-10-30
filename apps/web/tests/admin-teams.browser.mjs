@@ -104,7 +104,7 @@ try {
   await page.goBack();
   await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
   await page.getByRole('link', { name: '← 返回团队列表', exact: true }).click();
-  await page.getByRole('row').filter({ has: page.getByRole('link', { name: teams[1].name, exact: true }) }).getByRole('link', { name: '管理', exact: true }).click();
+  await page.getByRole('row').filter({ has: page.getByRole('link', { name: teams[1].name, exact: true }) }).getByRole('button', { name: '管理', exact: true }).click();
   await page.getByRole('button', { name: '新增成员', exact: true }).waitFor();
   assert.equal(new URL(page.url()).pathname, `/organization/${teams[1].id}`);
   await page.screenshot({ path: evidence + '/team-members.png', fullPage: true });
