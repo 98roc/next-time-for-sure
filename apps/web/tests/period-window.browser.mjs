@@ -37,27 +37,43 @@ await page.route('**/api/v1/**', async (route) => {
   return route.fulfill({ status: data ? 200 : 404, json: data ?? { message: 'Unmocked endpoint' } });
 });
 const active = page.locator('dialog [data-active="true"]');
-const rows = active.locator('.w-period-editor');
-const starts = () => rows.locator('input[type="date"]').evaluateAll((inputs) => inputs.filter((_, index) => index % 2 === 0).map((input) => input.value));
+const rows = active.locator('.v2-period-row');
+const starts = () => rows.evaluateAll((items) => items.map((row) => { const cell = row.cells[1]; return cell.querySelector('input')?.value ?? cell.querySelector('time')?.dateTime; }));
 const open = async () => { await page.getByRole('button', { name: '日期区间', exact: true }).click(); await rows.first().waitFor(); };
-const save = async () => { await active.getByRole('button', { name: '保存窗口', exact: true }).click(); await page.waitForFunction(() => document.querySelector('.v2-period-window')?.textContent?.includes('保存后全团队生效') === false); };
+const save = async () => { await active.getByRole('button', { name: '保存展示范围', exact: true }).click(); await active.getByRole('button', { name: '核对日期影响', exact: true }).waitFor(); };
 const refresh = async () => { const done = page.waitForResponse((response) => response.url().endsWith('/v2/workspace')); await page.clock.runFor(10010); await (await done).finished(); await page.clock.runFor(100); };
 try {
   await page.goto(base + '/weekly-plans'); await open();
   assert.equal(await rows.count(), 8);
   assert.equal((await starts())[0], '2026-10-19');
-  assert.equal(await rows.first().locator('input').first().isDisabled(), true);
+  assert.equal(await rows.first().locator('input').count(), 0);
+  assert.equal(await rows.first().locator('time').count(), 2);
+  assert.equal(await active.locator('.v2-content button').count(), 0);
+  assert.equal(await active.getByText('随当前区间滚动，收起不删除任务或历史。', { exact: true }).count(), 0);
 
   // 收起已改行时保留草稿，窗口保存不携带任何日期修改。
   const editedEnd = rows.last().locator('input').last();
   await editedEnd.fill('2026-12-14');
-  await active.getByRole('button', { name: '减少后面区间', exact: true }).click();
+  await active.getByLabel('向后区间数量', { exact: true }).fill('5');
   await active.getByText('窗口外未保存的日期修改', { exact: true }).waitFor();
   assert.equal(await rows.count(), 8);
+  assert.equal(await active.getByRole('button', { name: '核对日期影响', exact: true }).count(), 0);
+  assert.equal(await active.getByRole('button', { name: '撤销日期修改', exact: true }).count(), 0);
   await save();
   assert.equal(await rows.last().locator('input').last().inputValue(), '2026-12-14');
   assert.equal(saved[0].after, 5);
-  await active.getByRole('button', { name: '增加后面区间', exact: true }).click(); await save();
+  await active.getByLabel('向后区间数量', { exact: true }).fill('6'); await save();
+
+  // 底部日期入口继续走真实影响预览协议；返回保留原日期草稿。
+  await active.getByRole('button', { name: '核对日期影响', exact: true }).click();
+  await active.getByRole('heading', { name: '确认调整日期区间', exact: true }).waitFor();
+  await active.getByText('日期边界检查', { exact: true }).waitFor();
+  const preview = saved.at(-1);
+  assert.equal(preview.action, 'change_periods');
+  assert.equal(preview.periods[0].endOn, '2026-12-14');
+  assert.equal('before' in preview || 'after' in preview, false);
+  await active.getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(await rows.last().locator('input').last().inputValue(), '2026-12-14');
 
   // 跨周轮询保持编辑锚点，撤销后立即恢复团队窗口滚动。
   fixture.workspace.today = '2026-11-02'; await refresh();
@@ -68,37 +84,51 @@ try {
   assert.equal(await rows.count(), 8);
 
   // 他人修改窗口后不覆盖本地窗口草稿，明确提供读取最新入口。
-  await active.getByRole('button', { name: '增加前面区间', exact: true }).click();
+  await active.getByLabel('向前区间数量', { exact: true }).fill('3');
   fixture.workspace.periodWindow = { before: 2, after: 3, version: fixture.workspace.periodWindow.version + 1 }; await refresh();
-  assert.equal(await active.getByRole('button', { name: '保存窗口', exact: true }).isDisabled(), true);
-  await active.getByRole('button', { name: '读取最新窗口', exact: true }).click();
+  assert.equal(await active.getByRole('button', { name: '保存展示范围', exact: true }).isDisabled(), true);
+  await active.getByRole('button', { name: '读取最新范围', exact: true }).click();
   assert.equal(await rows.count(), 6);
-  await active.getByRole('button', { name: '恢复默认', exact: true }).click(); await save();
+  await active.getByRole('button', { name: '恢复默认范围', exact: true }).click(); await save();
   assert.equal(await rows.count(), 8);
 
   // 两端均可缩至零，当前区间仍保留；关闭保护未保存窗口。
-  await active.getByRole('button', { name: '减少前面区间', exact: true }).click();
-  for (let i = 0; i < 6; i++) await active.getByRole('button', { name: '减少后面区间', exact: true }).click();
+  await active.getByLabel('向前区间数量', { exact: true }).fill('0');
+  await active.getByLabel('向后区间数量', { exact: true }).fill('0');
   assert.equal(await rows.count(), 1);
   assert.equal((await starts())[0], '2026-11-02');
-  assert.equal(await active.getByRole('button', { name: '减少前面区间', exact: true }).isDisabled(), true);
+  assert.equal(await active.getByLabel('向前区间数量', { exact: true }).inputValue(), '0');
+  for (const invalid of ['-1', '1.5', '521']) {
+    await active.getByLabel('向前区间数量', { exact: true }).fill(invalid);
+    assert.equal(await active.getByLabel('向前区间数量', { exact: true }).inputValue(), '0');
+  }
+  await active.getByRole('button', { name: '撤销范围修改', exact: true }).click();
+  assert.equal(await rows.count(), 8);
+  await active.getByLabel('向后区间数量', { exact: true }).fill('0');
   await active.getByRole('button', { name: '关闭', exact: true }).last().click();
   await page.getByRole('button', { name: '确认放弃', exact: true }).click();
   await open(); assert.equal(await rows.count(), 8);
 
   // 390px 小屏布局与普通成员只读入口。
   await mkdir('.cache/period-window-evidence', { recursive: true });
+  const footer = active.locator('.v2-dialog-footer');
+  assert.equal(await footer.getByRole('button', { name: '恢复默认范围', exact: true }).count(), 1);
+  assert.equal(await active.locator('.v2-content h3').count(), 0);
   await page.screenshot({ path: '.cache/period-window-evidence/desktop.png' });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({ path: '.cache/period-window-evidence/dark.png' });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await active.evaluate((element) => element.scrollWidth > element.clientWidth + 1), false);
   await page.screenshot({ path: '.cache/period-window-evidence/mobile.png' });
+  await page.setViewportSize({ width: 320, height: 720 });
+  assert.equal(await active.locator('.v2-content').evaluate((element) => element.scrollWidth > element.clientWidth + 1), false);
+  assert.equal(await footer.evaluate((element) => element.scrollWidth > element.clientWidth + 1), false);
   fixture.workspace.teamLeader = false;
   await page.reload(); await open();
   assert.equal(await rows.count(), 8);
-  assert.equal(await active.getByRole('button', { name: '保存窗口', exact: true }).count(), 0);
-  assert.equal(await active.getByRole('button', { name: '增加前面区间', exact: true }).isDisabled(), true);
+  assert.equal(await active.getByRole('button', { name: '保存展示范围', exact: true }).count(), 0);
+  assert.equal(await active.getByLabel('向前区间数量', { exact: true }).isDisabled(), true);
+  assert.equal(await rows.locator('time').count(), 16);
   assert.equal(await rows.locator('input:not(:disabled)').count(), 0);
   assert.deepEqual(errors, []);
   console.log('Period window browser passed: default, team changes, drafts, rolling, conflict, reset, zero edges, member permissions and narrow layout.');

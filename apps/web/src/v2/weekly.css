@@ -62,17 +62,11 @@
 #ntfs-weekly-demo .w-batch-row{display:grid;grid-template-columns:minmax(0,1fr) 100px 80px 32px;gap:8px;margin-top:10px;align-items:end}
 #ntfs-weekly-demo .w-batch-row button{padding:6px}
 #ntfs-weekly-demo .w-batch-row .w-field{font-size:11px}
-#ntfs-weekly-demo .w-period-editor{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--w-line)}
-#ntfs-weekly-demo .v2-period-window{padding-bottom:16px;border-bottom:1px solid var(--w-line);margin-bottom:16px}
-#ntfs-weekly-demo .v2-period-window-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:12px}
-#ntfs-weekly-demo .v2-period-window-controls output{min-width:74px;text-align:center}
-#ntfs-weekly-demo .v2-period-window .w-button{color:var(--w-text)}
-#ntfs-weekly-demo .v2-period-outside{grid-column:1/-1;margin:0}
 #ntfs-weekly-demo .w-error{color:var(--w-amber);font-size:12px;margin-top:12px!important}
 #ntfs-weekly-demo .w-danger{color:light-dark(#a63232,#f2a0a0)!important}
 #ntfs-weekly-demo .w-foot{font-size:11px;color:var(--w-muted);padding-top:8px}
 @media(max-width:850px){#ntfs-weekly-demo .w-columns{grid-template-columns:1fr}#ntfs-weekly-demo .w-column+.w-column{border-left:0;border-top:1px solid var(--w-line)}#ntfs-weekly-demo .w-periods{grid-template-columns:1fr}}
-@media(max-width:580px){#ntfs-weekly-demo .w-app h1{font-size:23px}#ntfs-weekly-demo .w-heading{align-items:flex-start}#ntfs-weekly-demo .w-column{padding:13px}#ntfs-weekly-demo .w-form-grid{grid-template-columns:1fr}#ntfs-weekly-demo .w-batch-row{grid-template-columns:minmax(0,1fr) 76px 32px;border-bottom:1px solid var(--w-line);padding-bottom:10px}#ntfs-weekly-demo .w-batch-row .w-field:first-child{grid-column:1/-1}#ntfs-weekly-demo .w-period-editor{grid-template-columns:1fr}}
+@media(max-width:580px){#ntfs-weekly-demo .w-app h1{font-size:23px}#ntfs-weekly-demo .w-heading{align-items:flex-start}#ntfs-weekly-demo .w-column{padding:13px}#ntfs-weekly-demo .w-form-grid{grid-template-columns:1fr}#ntfs-weekly-demo .w-batch-row{grid-template-columns:minmax(0,1fr) 76px 32px;border-bottom:1px solid var(--w-line);padding-bottom:10px}#ntfs-weekly-demo .w-batch-row .w-field:first-child{grid-column:1/-1}}
 @media(pointer:coarse){#ntfs-weekly-demo .w-app button{min-height:44px}#ntfs-weekly-demo .w-app input,#ntfs-weekly-demo .w-app select,#ntfs-weekly-demo .w-app textarea{font-size:16px}}
 @media(max-width:850px){#ntfs-weekly-demo .w-column-date{display:block}#ntfs-weekly-demo .w-columns{gap:14px}#ntfs-weekly-demo .w-column+.w-column{border:1px solid var(--w-line)}#ntfs-weekly-demo .w-periods{gap:12px}}
 #ntfs-weekly-demo .w-report{margin:20px 0 24px;background:var(--w-surface);border:1px solid var(--w-line);border-radius:10px;padding:18px;min-width:0}
