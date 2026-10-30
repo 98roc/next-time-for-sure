@@ -123,7 +123,9 @@ def build_artifacts(directory):
     context = directory / 'context'
     context.mkdir()
     api = context / 'api'
-    pnpm('--filter', '@ntfs/api', '--prod', 'deploy', '--legacy', str(api))
+    # 使用共享锁文件导出已验证的依赖；旧版导出会重新解析版本并依赖在线包元数据。
+    # 仅为本次导出注入工作区包，不修改开发工作区的安装方式或配置文件。
+    pnpm('--config.inject-workspace-packages=true', '--filter', '@ntfs/api', '--prod', 'deploy', str(api))
     for item in api.iterdir():
         if item.name not in ['dist', 'node_modules', 'package.json']:
             if item.is_dir():
