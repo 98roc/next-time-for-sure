@@ -14,7 +14,7 @@ let failNext = false;
 const base = process.env.UI_TEST_URL || 'http://127.0.0.1:5174';
 const evidence = fileURLToPath(new URL('../../../.cache/sorting-ux-evidence/', import.meta.url));
 await mkdir(evidence, { recursive: true });
-page.on('pageerror', (error) => errors.push(error.message));
+page.on('pageerror', (error) => { if (!errors.length) console.error(error.stack); errors.push(error.message); });
 await page.route('**/api/v1/**', async (route) => {
   const request = route.request(), path = new URL(request.url()).pathname;
   if (request.method() === 'POST') {
@@ -58,7 +58,7 @@ async function drag(scope, from, to, { cancel = false, outside = false, stationa
     await page.screenshot({ path: evidence + '/drag.png' });
   }
   if (cancel) await page.keyboard.press('Escape');
-  const submitted = !cancel && !outside ? page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/planning')) : null;
+  const submitted = !cancel && !outside ? page.waitForRequest((request) => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/planning')) : null;
   await page.mouse.up();
   if (cancel || outside) { await page.waitForTimeout(100); assert.equal(commands.length, count); assert.deepEqual(await ids(scope), before); }
   else {
@@ -175,10 +175,10 @@ try {
   fixture.workspace.teamLeader = false; fixture.workspace.projects.forEach((project) => { project.canManage = false; }); fixture.weekly.canEditText = false;
   await page.reload();
   await page.getByRole('button', { name: '文字版', exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: '项目排序', exact: true }).count(), 0);
-  assert.equal(await page.getByRole('button', { name: /任务排序选项/ }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '项目排序', exact: true }).count(), 1);
+  assert.ok(await page.getByRole('button', { name: /任务排序选项/ }).count() > 0);
   await page.getByRole('button', { name: '文字版', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: '编辑', exact: true }).count(), 0);
-  assert.deepEqual(errors, []);
+  assert.deepEqual([...new Set(errors)], []);
   console.log(JSON.stringify({ result: 'passed', commands: commands.length, evidence, checks: 'project/task drag, stable target, Escape/outside cancel, conflict rollback, report save/regenerate/dirty guard, keyboard focus, edge scrolling, scoped reset, readonly view, menus, narrow layout' }));
 } finally { await browser.close(); }

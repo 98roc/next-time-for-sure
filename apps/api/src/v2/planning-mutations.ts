@@ -5,7 +5,7 @@ import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import type { V2PlanningCommand, V2ReportCommand } from '@ntfs/contracts';
 import { checkRule, requireProject, requireVersion, type V2Context } from './context.js';
-import { canManageProject } from './permissions.js';
+import { V2ViewOrderRepository } from './view-order.repository.js';
 import { V2PlanningRepository } from './planning.repository.js';
 import { shiftDate } from './calendar.js';
 import { requireConfirmation } from './impact.js';
@@ -13,18 +13,19 @@ import { confirmReport, editReport, reorderScoped } from './shared-report.js';
 import { buildWeeklyState } from './weekly-state.js';
 import { weeklyPeopleIds } from './weekly-people.js';
 
-/** 团队负责人管日期与跨项目排序，项目负责人只能管理本项目区间内顺序。 */
+/** 排序只修改本人偏好；项目须当前可见，日期管理仍要求团队负责人。 */
 export function authorizePlanning(context: V2Context, command: V2PlanningCommand): void {
   if (!context.teamId) throw new ForbiddenException('请先加入团队。');
   if (command.action === 'reorder_tasks' || command.action === 'reorder_project_items') {
-    if (!canManageProject(context.actor, requireProject(context, command.projectId))) throw new ForbiddenException('没有本项目排序权限。');
-  } else if (command.action !== 'extend_periods' && !context.teamLeader) throw new ForbiddenException('仅团队负责人可以维护日期、跨项目及人员排序。');
+    requireProject(context, command.projectId);
+  } else if ((command.action === 'change_periods' || command.action === 'set_period_window') && !context.teamLeader) throw new ForbiddenException('仅团队负责人可以维护日期与展示范围。');
 }
 
 /** 日期扩展仅在范围边缘补自然周；任意边界调整必须预览并验证历史锁定。 */
 export async function mutatePlanning(manager: EntityManager, context: V2Context, command: V2PlanningCommand, today: string): Promise<string[]> {
   if (!context.teamId) throw new ForbiddenException('请先加入团队。');
   const repository = new V2PlanningRepository(manager), teamId = context.teamId;
+  const orders = new V2ViewOrderRepository(manager, context.actor.id);
   if (command.action === 'set_period_window') {
     await repository.ensure(teamId, today);
     requireVersion((await repository.periodWindow(teamId)).version, command.version);
@@ -54,12 +55,12 @@ export async function mutatePlanning(manager: EntityManager, context: V2Context,
       if (!periods.some((row) => row.id === command.periodId)) throw new ConflictException('日期区间不存在。');
     }
     ids = context.organization.projects.filter((project) => project.teamId === teamId).map((project) => project.id);
-    allowed = ids; requested = command.projectIds;
+    allowed = context.projects.filter((project) => project.teamId === teamId).map((project) => project.id); requested = command.projectIds;
   } else if (command.action === 'reorder_people') {
     scope = 'weekly:people';
     ids = await weeklyPeopleIds(manager, context);
     // 人员视图只展示有任务的成员；其余周期的人员位置必须保留。
-    allowed = command.executorIds; requested = command.executorIds;
+    allowed = (await weeklyPeopleIds(manager, context, true)).filter((id) => command.executorIds.includes(id)); requested = command.executorIds;
   } else if (command.action === 'reorder_project_items') {
     scope = `project-page:${command.target}:${command.projectId}`;
     const source = await projectItemIds(manager, command.projectId, command.target);
@@ -74,14 +75,14 @@ export async function mutatePlanning(manager: EntityManager, context: V2Context,
     allowed = command.view === 'summary' ? source.summary.filter((row) => !command.executorId || row.executorId === command.executorId).map((row) => row.taskId) : source.plan.filter((row) => !command.executorId || row.executorId === command.executorId).map((row) => row.id);
     requested = command.taskIds; scope = `tasks:${command.projectId}:${command.periodId}`;
   }
-  const current = await repository.order(teamId, scope, ids, newestIds);
+  const current = await orders.order(teamId, scope, ids, newestIds);
   requireVersion(current.version, command.version);
   if (command.reset) {
     // 恢复默认作用于整个项目/区间；前端入口明确显示此范围，不只重排筛选结果。
-    await repository.saveOrder(teamId, scope, [], false);
+    await orders.saveOrder(teamId, scope, [], false);
   } else {
     const next = checkRule(() => reorderScoped(current.ids, allowed, requested, current.version, command.version));
-    await repository.saveOrder(teamId, scope, next);
+    await orders.saveOrder(teamId, scope, next);
   }
   return [teamId];
 }

@@ -117,6 +117,7 @@ export class OrganizationRepository {
 
   /** 只删除服务已确认无业务关联的账号；审计不随账号删除。 */
   async deleteAccount(id: string): Promise<void> {
+    await this.manager.query('DELETE FROM v2_view_orders WHERE owner_id = ?', [id]);
     await this.manager.query('DELETE FROM login_sessions WHERE account_id = ?', [id]);
     await this.manager.query('DELETE FROM personal_tokens WHERE account_id = ?', [id]);
     await this.manager.query('DELETE FROM accounts WHERE id = ?', [id]);
@@ -124,6 +125,7 @@ export class OrganizationRepository {
 
   /** 空团队删除前解除唯一管理员的团队归属，账号本身保留。 */
   async deleteTeam(id: string): Promise<void> {
+    await this.manager.query('DELETE FROM v2_view_orders WHERE team_id = ?', [id]);
     await this.manager.query('UPDATE accounts SET team_id = NULL, version = version + 1, updated_at = UTC_TIMESTAMP(3) WHERE team_id = ?', [id]);
     await this.manager.query('DELETE FROM teams WHERE id = ?', [id]);
   }

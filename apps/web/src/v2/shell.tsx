@@ -75,16 +75,19 @@ function Frame() {
   </ModalProvider></NavigationGuard></div>;
 }
 
-/** 四个入口顺序与原型一致，团队管理权限不足时保留原因说明。 */
+/** 完全没有管理权限时隐藏入口，权限校验仍由服务端执行。 */
 function Sidebar() {
   const { user, data } = useWorkspace();
+  const links = (user.isSuperAdmin ? [navigation[0], navigation[1], navigation[2], navigation[4], navigation[3]] : navigation.slice(0, 4))
+    .filter((link) => link !== undefined && (link.to !== '/organization' || user.isSuperAdmin || data.teamLeader));
   return <aside id="v2-sidebar" className="v2-sidebar">
     <div className="v2-brand" aria-label="下次一定" title="下次一定"><span className="v2-mark" aria-hidden="true" /><span className="v2-brand-text">下次一定<small>团队协作工作台</small></span></div>
-    <nav aria-label="主导航">{(user.isSuperAdmin ? [...navigation.slice(0, 3), navigation[4], navigation[3]].filter((link) => link !== undefined) : navigation.slice(0, 4)).map((link) => {
+    <nav aria-label="主导航">{links.map((link) => {
+      if (!link) return null;
       const index = navigation.findIndex((entry) => entry.to === link.to);
       const className = (active: boolean) => `v2-nav-item${active ? ' is-current' : ''}`;
       const content = <><NavigationIcon index={index} /><span className="v2-nav-label">{link.label}</span></>;
-      return link.to === '/organization' && !user.isSuperAdmin && !data.teamLeader ? <span key={link.to} className={className(false)} aria-label={`${link.label}：团队配置由团队负责人维护，请联系团队负责人`} aria-disabled="true" tabIndex={0} title="团队配置由团队负责人维护，请联系团队负责人">{content}</span> : <NavLink key={link.to} to={link.to} aria-label={link.label} title={link.label} className={({ isActive }) => className(isActive)}>{content}</NavLink>;
+      return <NavLink key={link.to} to={link.to} aria-label={link.label} title={link.label} className={({ isActive }) => className(isActive)}>{content}</NavLink>;
     })}</nav>
     <NavLink to="/account" className="v2-account" title={`${user.displayName}，账号与安全`} aria-label={`${user.displayName}，账号与安全`}><span className="v2-avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span><span className="v2-account-info"><span title={user.displayName}>{user.displayName}</span><small>{user.isSuperAdmin ? '系统管理员' : data.teamLeader ? '团队负责人' : '账号与安全'}</small></span></NavLink>
   </aside>;
@@ -92,5 +95,6 @@ function Sidebar() {
 
 /** 导航沿用原型的线性图标，不依赖不同系统的字形符号。 */
 function NavigationIcon({ index }: { index: number }) {
+  if (index === 4) return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="7" r="4" /><path d="M2 21v-3a6 6 0 0 1 9-5" /><circle cx="17" cy="17" r="3" /><path d="M17 12v2m0 6v2m5-5h-2m-6 0h-2m8.5-3.5-1.4 1.4m-4.2 4.2-1.4 1.4m7 0-1.4-1.4m-4.2-4.2-1.4-1.4" /></svg>;
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{index === 0 ? <><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></> : index === 1 ? <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18M8 15h.01M12 15h.01M16 15h.01M8 18h.01M12 18h.01" /></> : index === 2 ? <><path d="m6 14 1.5-4h14l-3 10H3V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2" /></> : <><circle cx="9" cy="8" r="4" /><path d="M17 4a4 4 0 0 1 0 8M3 21v-2a6 6 0 0 1 12 0v2M21 21v-2a6 6 0 0 0-4-5.65" /></>}</svg>;
 }

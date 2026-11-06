@@ -13,7 +13,7 @@ import { MilestoneModeControl } from './milestone-mode';
 
 export { MilestoneDetail } from './milestone-detail';
 
-/** 所有总览入口复用项目页共享顺序，只在独立页面展示。 */
+/** 所有总览入口复用本人项目页顺序，只在独立页面展示。 */
 export function MilestoneOverview() {
   const { data } = useWorkspace();
   const sort = useProjectSort(data.projects.map((row) => row.id), 'projects');

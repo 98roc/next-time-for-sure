@@ -1,4 +1,3 @@
-import { resolveOrder } from './sorting.js';
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
@@ -10,7 +9,7 @@ import { missingWindowPeriods } from './period-window.js';
 
 const textSchema = z.object({ body: z.string(), manual: z.union([z.boolean(), z.number()]).transform(Boolean), sourceHash: z.string(), version: z.number() });
 
-/** 团队日期、共享顺序和共享文字持久化；调用前必须检查相应团队或项目管理权限。 */
+/** 团队日期和共享文字持久化；调用前必须检查相应团队或项目管理权限。 */
 export class V2PlanningRepository {
   constructor(private readonly manager: EntityManager) {}
 
@@ -72,22 +71,6 @@ export class V2PlanningRepository {
   async arrangementHistory(taskIds: string[]) {
     if (!taskIds.length) return [];
     return z.array(z.object({ plannedDays: z.coerce.number().nullable(), voided: z.coerce.boolean().optional() }).passthrough().pipe(v2ArrangementHistorySchema)).parse(await this.manager.query(`SELECT id,task_id AS taskId,period_id AS periodId,provenance,planned_days AS plannedDays,work_note AS workNote,carried_from_period_id AS carriedFromPeriodId,voided,${instantColumn('valid_from','validFrom')},${instantColumn('valid_until','validUntil')} FROM v2_arrangement_history WHERE task_id IN (${taskIds.map(() => '?').join(',')}) ORDER BY valid_from,id`, taskIds));
-  }
-  /** 完整作用域在组织锁内合并新增项并保存，避免下一次新增挤乱已置顶对象。 */
-  async order(teamId: string, scope: string, ids: string[], newestIds = ids) {
-    const rows = z.array(z.object({ ordered_ids: z.unknown(), version: z.number(), manual_order: z.coerce.boolean() })).parse(await this.manager.query('SELECT ordered_ids,version,manual_order FROM v2_shared_orders WHERE team_id=? AND scope_key=?', [teamId, scope]));
-    const row = rows[0], stored = row ? z.array(z.string()).parse(decodeJson(row.ordered_ids)) : [];
-    const manual = row?.manual_order ?? false, resolved = resolveOrder(ids, manual ? stored : null, newestIds);
-    let version = row?.version ?? 0;
-    if (manual && JSON.stringify(resolved) !== JSON.stringify(stored)) {
-      await this.saveOrder(teamId, scope, resolved); version++;
-    }
-    return { ids: resolved, version, manual };
-  }
-
-  /** 恢复默认也递增版本，不删除版本行，防止旧的拖动请求再次覆盖。 */
-  async saveOrder(teamId: string, scope: string, ids: string[], manual = true): Promise<void> {
-    await this.manager.query('INSERT INTO v2_shared_orders(team_id,scope_key,ordered_ids,version,manual_order) VALUES (?,?,?,1,?) ON DUPLICATE KEY UPDATE ordered_ids=VALUES(ordered_ids),manual_order=VALUES(manual_order),version=version+1', [teamId, scope, JSON.stringify(ids), Number(manual)]);
   }
   /** 整稿仅供团队负责人，受限成员不调用本查询。 */
   async report(teamId: string, summaryId: string, planId: string): Promise<V2ReportText | null> { return z.array(textSchema).parse(await this.manager.query('SELECT body,manual,source_hash AS sourceHash,version FROM v2_report_texts WHERE team_id=? AND summary_period_id=? AND plan_period_id=?', [teamId, summaryId, planId]))[0] ?? null; }

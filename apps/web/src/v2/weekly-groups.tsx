@@ -48,22 +48,22 @@ export function WeeklyGroups({ state, filter, view, sorting }: { state: V2Weekly
   const drag = usePointerSort({ root, move: (id, key, target) => move(id, key, target.beforeId) });
   // 保存期间拦截重复操作，但不禁用正在聚焦的按钮，便于保存后继续键盘排序。
   function handle(id: string, key: string, title: string, allowed: boolean, compact = false) {
-    return <button className={compact ? 'w-project-sort-handle' : 'w-drag'} aria-label={`拖动排序：${title}；也可用上下方向键`} disabled={!allowed} aria-disabled={!allowed || action.busy} onPointerDown={(event) => { if (allowed && !action.busy) drag.start(event, id, key); }} onKeyDown={(event) => { if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return; event.preventDefault(); if (!allowed || action.busy) return; const ids = orderIds(key), index = ids.indexOf(id); if (event.key === 'ArrowUp' && index > 0) move(id, key, ids[index - 1] ?? null); else if (event.key === 'ArrowDown' && index < ids.length - 1) move(id, key, ids[index + 2] ?? null); }}>⠿{compact && <><span>{title}</span></>}</button>;
+    return <button className={compact ? 'w-project-sort-handle' : 'w-drag'} aria-label={`拖动排序：${title}；也可用上下方向键`} title="排序仅影响本人" disabled={!allowed} aria-disabled={!allowed || action.busy} onPointerDown={(event) => { if (allowed && !action.busy) drag.start(event, id, key); }} onKeyDown={(event) => { if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return; event.preventDefault(); if (!allowed || action.busy) return; const ids = orderIds(key), index = ids.indexOf(id); if (event.key === 'ArrowUp' && index > 0) move(id, key, ids[index - 1] ?? null); else if (event.key === 'ArrowDown' && index < ids.length - 1) move(id, key, ids[index + 2] ?? null); }}>⠿{compact && <><span>{title}</span></>}</button>;
   }
   function resetMenu(side: 'summary' | 'plan', projectId: string, person?: string) {
-    const allowed = data.projects.find((row) => row.id === projectId)?.canManage && person !== 'unknown';
+    const allowed = data.projects.some((row) => row.id === projectId) && person !== 'unknown';
     const periodId = side === 'summary' ? state.summaryPeriod.id : state.planPeriod.id;
     const order = state.taskOrders.find((row) => row.projectId === projectId && row.periodId === periodId);
-    return allowed && (ordered(side, projectId, person).length > 1 || order?.manual) && <OrderMenu label={`${side === 'summary' ? '总结' : '计划'}任务排序选项`} scope="本项目整个日期区间，包含其他人员" disabled={action.busy || !order?.manual} onReset={() => reset(side, projectId)} />;
+    return allowed && (ordered(side, projectId, person).length > 1 || order?.manual) && <OrderMenu label={`${side === 'summary' ? '总结' : '计划'}任务排序选项`} scope="本人视图中本项目整个日期区间，包含其他人员" disabled={action.busy || !order?.manual} onReset={() => reset(side, projectId)} />;
   }
   function taskList(side: 'summary' | 'plan', projectId: string, person?: string) {
-    const selected = ordered(side, projectId, person), key = scope(side, projectId, person), allowed = Boolean(data.projects.find((row) => row.id === projectId)?.canManage) && person !== 'unknown';
+    const selected = ordered(side, projectId, person), key = scope(side, projectId, person), allowed = data.projects.some((row) => row.id === projectId) && person !== 'unknown';
     return <><div className="w-task-list" data-sort-scope={key}>{selected.map((row) => <div key={row.id}><div className="w-task-row" data-sort-id={row.id}>{handle(row.id, key, row.title, allowed)}<div className="w-task-info"><button className="w-task-title" onClick={() => { const task = data.tasks.find((item) => item.id === row.id); modal.open(task ? <TaskEditor task={task} /> : <TaskHistory taskId={row.id} />); }}>{row.title}</button><div className="w-task-meta"><StatusBadge status={row.status} />{row.carriedFromPeriodId && <span>上期未完成</span>}{row.planning === 'unplanned' && <PlanningBadge>计划外</PlanningBadge>}{row.planning === 'unknown' && <PlanningBadge>计划性不可还原</PlanningBadge>}{side === 'summary' ? row.incomplete && <span>早期历史不完整</span> : <span title={`优先级 ${row.priority ?? 3}`}>{priorityLabels[(row.priority ?? 3) - 1]}</span>}</div>{row.workNote && <p className="v2-period-work-note">{row.workNote}</p>}</div>{person === undefined && <span className="w-task-person">{row.executorName}</span>}{side === 'plan' && <span className="w-task-days">{row.days === null ? '未估算' : `${row.days} 天`}</span>}</div></div>)}{!selected.length && <div className="w-empty">{side === 'summary' ? '该区间暂无任务记录' : '暂无安排，可批量新增任务'}</div>}</div></>;
   }
-  /** 空项目行和展开后的计划栏共用入口，权限提示保持一致。 */
+  /** 空项目行和展开后的计划栏共用入口，仅在具备创建权限时显示，普通研发人员仍可批量创建本人任务。 */
   function planActions(projectId: string) {
     const project = data.projects.find((row) => row.id === projectId);
-    return <div className="w-plan-actions"><button className="w-button primary" disabled={!project?.canCreate} title={!project?.canCreate ? '仅项目经理角色请在待建任务中提出事项' : undefined} onClick={() => modal.open(<TaskCreate projectId={projectId} periodId={state.planPeriod.id} batch />)}>＋ 批量新增</button></div>;
+    return project?.canCreate && <div className="w-plan-actions"><button className="w-button primary" onClick={() => modal.open(<TaskCreate projectId={projectId} periodId={state.planPeriod.id} batch />)}>＋ 批量新增</button></div>;
   }
   function column(side: 'summary' | 'plan', projectId: string) {
     const selected = ordered(side, projectId);
@@ -84,8 +84,8 @@ export function WeeklyGroups({ state, filter, view, sorting }: { state: V2Weekly
     }
     return <div key={id}>
       <section className={`w-project ${sorting ? 'is-sorting' : empty ? 'is-empty' : ''}`} data-sort-id={id}>
-        {sorting ? handle(id, 'projects', project.name, data.teamLeader, true) : <>
-          <ProjectHeading projectId={id} level="h2" handle={handle(id, 'projects', project.name, data.teamLeader)}
+        {sorting ? handle(id, 'projects', project.name, true, true) : <>
+          <ProjectHeading projectId={id} level="h2" handle={handle(id, 'projects', project.name, true)}
             details={empty && <button className="w-empty-project-toggle" aria-expanded={expanded} aria-label={`${expanded ? '收起' : '展开'}${project.name}的任务区域`} onClick={toggle}>
                 <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>两个区间暂无任务
               </button>}
@@ -98,7 +98,7 @@ export function WeeklyGroups({ state, filter, view, sorting }: { state: V2Weekly
   /** 排序时收起任务，两栏共用人员整组位置；未知历史执行人固定保留在末尾。 */
   function personGroup(person: string) {
     const name = data.accounts.find((row) => row.id === person)?.displayName ?? rows.summary.find((row) => row.executorId === person)?.executorName ?? '历史成员';
-    const allowed = data.teamLeader && person !== 'unknown';
+    const allowed = person !== 'unknown';
     return <div key={person} className="w-person-slot"><section className={`w-project ${sorting ? 'is-sorting' : ''}`} data-sort-id={person === 'unknown' ? undefined : person}>
       {sorting ? handle(person, 'people', name, allowed, true) : <>
         <header className="w-person-head"><div className="w-row">{handle(person, 'people', name, allowed)}<span className="w-avatar">{name.slice(0, 1)}</span><h2>{name}</h2></div></header>

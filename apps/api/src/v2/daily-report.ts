@@ -5,7 +5,7 @@ import type { V2Context } from './context.js';
 import { periodWindow } from './calendar.js';
 import { hashValue } from './repository-utils.js';
 import { PersonalWorkRepository, type SubtaskSnapshot } from './personal-work.repository.js';
-import { V2PlanningRepository } from './planning.repository.js';
+import { V2ViewOrderRepository } from './view-order.repository.js';
 
 type DailyRow = { taskId: string; title: string; projectId: string | null; projectName: string; completed: boolean; children: string[] };
 
@@ -47,10 +47,10 @@ export function generateDailyText(projects: { id: string; name: string }[], rows
   return lines.join('\n').trim();
 }
 
-/** 日报项目默认沿用项目页共享顺序，旧私人配置中的已撤权项目不向排序界面泄露。 */
+/** 日报项目默认沿用本人项目页顺序，旧私人配置中的已撤权项目不向排序界面泄露。 */
 export async function dailyProjects(manager: EntityManager, context: V2Context) {
   const all = context.organization.projects.filter((row) => row.teamId === context.teamId).map((row) => row.id);
-  const shared = context.teamId ? (await new V2PlanningRepository(manager).order(context.teamId, 'project-page:projects', all)).ids : [];
+  const shared = context.teamId ? (await new V2ViewOrderRepository(manager, context.actor.id).order(context.teamId, 'project-page:projects', all)).ids : [];
   return shared.filter((id) => context.projects.some((row) => row.id === id)).map((id) => ({ id, name: context.organization.projects.find((row) => row.id === id)?.name ?? '历史项目' }));
 }
 

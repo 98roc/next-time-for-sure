@@ -1,7 +1,7 @@
 import { newestTaskIds } from './sorting.js';
 import type { EntityManager } from 'typeorm';
 import type { V2Context } from './context.js';
-import { V2PlanningRepository } from './planning.repository.js';
+import { V2ViewOrderRepository } from './view-order.repository.js';
 import { V2TaskRepository } from './task.repository.js';
 import { V2ProjectRepository } from './project.repository.js';
 
@@ -14,7 +14,7 @@ export async function projectItemIds(manager: EntityManager, projectId: string, 
 /** 项目页顺序独立于周计划；全团队项目先合并再投影，受限读取不删除隐藏对象。 */
 export async function readProjectOrders(manager: EntityManager, context: V2Context) {
   if (!context.teamId) return [];
-  const repository = new V2PlanningRepository(manager);
+  const repository = new V2ViewOrderRepository(manager, context.actor.id);
   const all = context.organization.projects.filter((row) => row.teamId === context.teamId).map((row) => row.id);
   const projects = await repository.order(context.teamId, 'project-page:projects', all);
   const result = [{ scope: 'project-page:projects', ...projects, ids: projects.ids.filter((id) => context.projects.some((row) => row.id === id)) }];

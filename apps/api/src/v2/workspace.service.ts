@@ -115,7 +115,7 @@ export class V2WorkspaceService {
     });
   }
 
-  /** 共享排序及日期修改在同一事务检查作用域、影响与版本。 */
+  /** 个人排序及团队日期修改在同一事务检查作用域、影响与版本。 */
   async planning(token: string, csrf: string, command: V2PlanningCommand, teamId?: string) { return this.database.transaction(async (manager) => { const context = await loadV2Context(manager, this.identity, token, csrf, teamId ?? null); authorizePlanning(context, command); return executeOnce(manager, context.actor.id, command, async () => ({ objectIds: await mutatePlanning(manager, context, command, shanghaiDate(new Date().toISOString())) })); }); }
 
   /** 不让受限成员通过已知幂等键读取或修改全团队共享稿。 */

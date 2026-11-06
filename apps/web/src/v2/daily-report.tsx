@@ -37,7 +37,7 @@ function DailyProjectOrder({ initial }: { initial: V2DailyReport }) {
   </ModalPage>;
 }
 
-/** 恢复只删除个人排序覆盖，不修改项目页共享排序或已保存的手工文字。 */
+/** 恢复只删除个人排序覆盖，不修改本人项目页排序或已保存的手工文字。 */
 function ResetDailyOrder({ version }: { version: number }) {
   const { run } = useWorkspace(), modal = useModal(), action = useAction();
   return <ConfirmationPage title="恢复跟随项目排序" busy={action.busy} actions={<button className="nt-primary" disabled={action.busy} onClick={() => { void action.act(async () => { await run('personal-settings', { action: 'set_daily_project_order', operationId: createOperationId(), version, projectIds: null }); modal.finish(); }); }}>确认恢复</button>}><p>本人日报恢复使用项目页顺序。手工编辑过的日报仍保留原文。</p><Feedback error={action.error} /></ConfirmationPage>;

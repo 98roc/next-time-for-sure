@@ -41,7 +41,7 @@ export class V2WorkspaceController {
   /** 按相邻两个日期区间读取总结和计划。 */
   @Get('weekly') @Header('Cache-Control', 'no-store')
   weekly(@Req() request: IncomingMessage, @Query() query: unknown) { const pair = parseBody(v2PeriodPairSchema.extend({ teamId: v2IdSchema.optional() }), query); return this.service.weekly(businessToken(request), pair.summaryPeriodId, pair.planPeriodId, pair.teamId); }
-  /** 日期与共享排序命令。 */
+  /** 团队日期与个人排序命令。 */
   @Post('planning') @HttpCode(200)
   planning(@Req() request: IncomingMessage, @Body() body: unknown, @Query() query: unknown) { assertBusinessOrigin(request); return this.service.planning(businessToken(request), csrfHeader(request), parseBody(v2PlanningCommandSchema, body), parseBody(teamScopeSchema, query).teamId); }
   /** 共享文字写入，服务再次核验团队负责人身份。 */

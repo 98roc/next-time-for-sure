@@ -18,7 +18,7 @@ export function MilestoneDetail({ milestoneId }: { milestoneId: string }) {
   return <ModalPage title={`${project?.name ?? ''} / 里程碑`} className="v2-ms-modal" closeLabel="关闭" footerNote={<span className="v2-ms-footer-note">由项目研发负责人确认</span>} actions={<>
     {project?.canManage && <MilestoneDeleteButton milestone={milestone} />}
     {project?.canManage && <button onClick={() => modal.push(<MilestoneForm projectId={milestone.projectId} milestone={milestone} />)}>编辑目标</button>}
-    <CompleteButton milestone={milestone} disabled={!project?.canConfirmMilestone || (milestone.status === 'open' && unfinished > 0)} />
+    {project?.canConfirmMilestone && <CompleteButton milestone={milestone} disabled={milestone.status === 'open' && unfinished > 0} />}
   </>}>
     <div className="v2-ms-detail"><MilestoneStatus milestone={milestone} /><h3 className="v2-ms-title">{milestone.title}</h3>
       <section className="v2-ms-deadline-box" aria-label="截止日期"><p>截止日期</p>{milestone.expectedOn ? <Deadline date={milestone.expectedOn} today={data.today} completed={milestone.status === 'completed'} /> : <strong>未规划</strong>}</section>

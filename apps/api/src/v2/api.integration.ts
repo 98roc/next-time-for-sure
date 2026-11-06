@@ -342,7 +342,7 @@ async function smoke(): Promise<void> {
         await db.query('DELETE FROM v2_daily_reports WHERE owner_id=?', [actor.id]); await db.query('DELETE FROM v2_personal_preferences WHERE owner_id=?', [actor.id]);
         await db.query('DELETE FROM v2_notifications WHERE account_id=?', [actor.id]); await db.query('DELETE FROM v2_operations WHERE actor_id=?', [actor.id]); await db.query('DELETE FROM v2_categories WHERE owner_id=?', [actor.id]); await db.query('DELETE FROM v2_personal_views WHERE owner_id=?', [actor.id]); await db.query('DELETE FROM login_sessions WHERE account_id=?', [actor.id]); await db.query('DELETE FROM audit_events WHERE actor_id=?', [actor.id]);
       }
-      for (const table of ['v2_report_texts', 'v2_shared_orders', 'v2_object_events', 'v2_periods', 'v2_team_settings']) await db.query(`DELETE FROM ${table} WHERE team_id=?`, [teamId]);
+      for (const table of ['v2_report_texts', 'v2_view_orders', 'v2_shared_orders', 'v2_object_events', 'v2_periods', 'v2_team_settings']) await db.query(`DELETE FROM ${table} WHERE team_id=?`, [teamId]);
       await db.query('DELETE FROM v2_milestones WHERE project_id IN (?,?)', [projectId, hiddenProjectId]); await db.query('DELETE FROM project_members WHERE project_id IN (?,?)', [projectId, hiddenProjectId]); await db.query('DELETE FROM projects WHERE id IN (?,?)', [projectId, hiddenProjectId]);
       await db.query('UPDATE accounts SET team_id=NULL WHERE team_id=?', [teamId]); await db.query('DELETE FROM teams WHERE id=?', [teamId]);
       for (const actor of actors) await db.query('DELETE FROM accounts WHERE id=?', [actor.id]);

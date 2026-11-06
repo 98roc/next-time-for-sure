@@ -52,15 +52,16 @@ export async function verifySorting(h: Harness): Promise<void> {
   assert.deepEqual(selected(order(baseline).ids, pair), [b, a]);
   assert.deepEqual(selected((await state(developer)).placements.map((row) => row.taskId), pair), [b, a]);
   const reorder = { action: 'reorder_project_items', operationId: randomUUID(), projectId, target: 'tasks', version: order(baseline).version, ids: [a, b] };
-  await call('planning', manager, reorder, 403);
-  await call('planning', lead, reorder);
-  await call('planning', lead, { ...reorder, operationId: randomUUID() }, 409);
+  await call('planning', manager, reorder);
+  assert.deepEqual(order(await state()).ids, order(baseline).ids);
+  await call('planning', leader, reorder);
+  await call('planning', leader, { ...reorder, operationId: randomUUID() }, 409);
   const firstManual = order(await state());
   assert.deepEqual(firstManual.ids.filter((id) => !pair.includes(id)), order(baseline).ids.filter((id) => !pair.includes(id)));
   assert.deepEqual(selected(firstManual.ids, pair), [a, b]);
   const beforeWeekly = await weekly(), planOrder = beforeWeekly.taskOrders.find((row) => row.projectId === projectId && row.periodId === nextId); assert.ok(planOrder);
   assert.deepEqual(selected(planOrder.ids, pair), [b, a]);
-  await call('planning', lead, { action: 'reorder_tasks', operationId: randomUUID(), projectId, periodId: nextId, view: 'plan', version: planOrder.version, taskIds: [...planOrder.ids].reverse() });
+  await call('planning', leader, { action: 'reorder_tasks', operationId: randomUUID(), projectId, periodId: nextId, view: 'plan', version: planOrder.version, taskIds: [...planOrder.ids].reverse() });
   assert.deepEqual(order(await state()).ids, firstManual.ids);
 
   // 个人拖动独立保存，新增任务在手动分类顶部；默认分类不以新建顺序覆盖优先级。
@@ -78,8 +79,8 @@ export async function verifySorting(h: Harness): Promise<void> {
   await call('edit', lead, { action: 'save_task', operationId: randomUUID(), taskId: a, version: aTask.version, details: { kind: 'project', title: aTask.title, priority: 5, executorId: developer.id, milestoneId: null } });
   assert.deepEqual(order(await state()).ids, beforeEdit);
   const current = order(await state());
-  await call('planning', lead, { ...reorder, operationId: randomUUID(), version: current.version, reset: true, ids: [] });
-  await call('planning', lead, { ...reorder, operationId: randomUUID(), version: current.version }, 409);
+  await call('planning', leader, { ...reorder, operationId: randomUUID(), version: current.version, reset: true, ids: [] });
+  await call('planning', leader, { ...reorder, operationId: randomUUID(), version: current.version }, 409);
   assert.equal(order(await state()).manual, false);
   assert.deepEqual(selected(order(await state()).ids, [a, b, c, d]), [b, a, c, d]);
   await resetPersonal();
@@ -89,7 +90,7 @@ export async function verifySorting(h: Harness): Promise<void> {
   assert.deepEqual(selected(order(await state()).ids, [a, b, e]), [b, e, a]);
   assert.deepEqual(selected((await state(developer)).placements.map((row) => row.taskId), [a, b, e]), [b, e, a]);
   const manualWeek = (await weekly()).taskOrders.find((row) => row.projectId === projectId && row.periodId === nextId); assert.ok(manualWeek);
-  await call('planning', lead, { action: 'reorder_tasks', operationId: randomUUID(), projectId, periodId: nextId, view: 'plan', version: manualWeek.version, reset: true, taskIds: [] });
+  await call('planning', leader, { action: 'reorder_tasks', operationId: randomUUID(), projectId, periodId: nextId, view: 'plan', version: manualWeek.version, reset: true, taskIds: [] });
   const resetWeek = (await weekly()).taskOrders.find((row) => row.projectId === projectId && row.periodId === nextId); assert.ok(resetWeek);
   assert.equal(resetWeek.manual, false);
   assert.deepEqual(selected(resetWeek.ids, [a, b, c, d, e]), [b, e, a, c, d]);
@@ -101,11 +102,11 @@ export async function verifySorting(h: Harness): Promise<void> {
   };
   const ba = await createBacklog(3), bb = await createBacklog(1), backlogScope = `project-page:backlog:${projectId}`;
   assert.deepEqual(selected(order(await state(), backlogScope).ids, [ba, bb]), [bb, ba]);
-  await call('planning', lead, { action: 'reorder_project_items', operationId: randomUUID(), projectId, target: 'backlog', version: order(await state(), backlogScope).version, ids: [ba, bb] });
+  await call('planning', leader, { action: 'reorder_project_items', operationId: randomUUID(), projectId, target: 'backlog', version: order(await state(), backlogScope).version, ids: [ba, bb] });
   const bc = await createBacklog(5);
   assert.equal(order(await state(), backlogScope).ids[0], bc);
   assert.deepEqual(selected(order(await state(), backlogScope).ids, [ba, bb]), [ba, bb]);
-  await call('planning', lead, { action: 'reorder_project_items', operationId: randomUUID(), projectId, target: 'backlog', version: order(await state(), backlogScope).version, ids: [randomUUID()] }, 409);
+  await call('planning', leader, { action: 'reorder_project_items', operationId: randomUUID(), projectId, target: 'backlog', version: order(await state(), backlogScope).version, ids: [randomUUID()] }, 409);
 
   // 全团队顺序经过受限读取仍完整；周报跨周期共享，与项目页顺序保持独立。
   await source.query("UPDATE projects SET created_at='2026-01-01 00:00:00' WHERE id=?", [projectId]);
@@ -126,8 +127,8 @@ export async function verifySorting(h: Harness): Promise<void> {
   await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId: nextId, executorId: lead.id, title: '人员排序验收', priority: 3, milestoneId: null, plannedDays: 1 } });
   const beforePeople = await weekly();
   const peopleCommand = { action: 'reorder_people', operationId: randomUUID(), version: beforePeople.peopleOrder.version, executorIds: [lead.id, developer.id] };
-  await call('planning', lead, peopleCommand, 403);
-  await call('planning', manager, peopleCommand, 403);
+  await call('planning', lead, { ...peopleCommand, version: (await weekly(lead)).peopleOrder.version });
+  await call('planning', manager, { ...peopleCommand, version: (await weekly(manager)).peopleOrder.version });
   await call('planning', leader, { ...peopleCommand, executorIds: [randomUUID()] }, 409);
   await call('planning', leader, { ...peopleCommand, executorIds: [lead.id, lead.id] }, 409);
   await call('planning', leader, peopleCommand);
@@ -139,7 +140,7 @@ export async function verifySorting(h: Harness): Promise<void> {
   const peopleElsewhere = v2WeeklyStateSchema.parse(await call(`weekly?summaryPeriodId=${nextId}&planPeriodId=${after.id}`, leader)).peopleOrder;
   assert.equal(peopleElsewhere.version, peopleAfter.version);
   assert.equal(peopleElsewhere.manual, true);
-  const storedPeople = () => source.query('SELECT ordered_ids FROM v2_shared_orders WHERE team_id=? AND scope_key=?', [teamId, 'weekly:people']);
+  const storedPeople = () => source.query('SELECT ordered_ids FROM v2_view_orders WHERE owner_id=? AND team_id=? AND scope_key=?', [leader.id, teamId, 'weekly:people']);
   const persistedPeople = await storedPeople();
   await weekly(lead);
   assert.deepEqual(await storedPeople(), persistedPeople);
@@ -150,7 +151,7 @@ export async function verifySorting(h: Harness): Promise<void> {
   assert.equal(resetPeople.peopleOrder.manual, false);
   assert.equal(resetPeople.currentSourceHash, textBeforePeople, '按项目生成的文字不因人员展示顺序变化而失效');
 
-  await call('planning', lead, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: another.projectOrder.version, projectIds: [hiddenProjectId, projectId] }, 403);
+  await call('planning', lead, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: (await weekly(lead)).projectOrder.version, projectIds: [hiddenProjectId, projectId] }, 409);
   await call('planning', leader, { action: 'reorder_projects', periodId: nextId, operationId: randomUUID(), version: week.projectOrder.version, projectIds: [hiddenProjectId, projectId] }, 409);
   await call('planning', leader, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: another.projectOrder.version, reset: true, projectIds: [] });
   const resetProjects = (await weekly()).projectOrder;
@@ -174,9 +175,9 @@ export async function verifySorting(h: Harness): Promise<void> {
       await db.query('DELETE FROM projects WHERE id=? AND team_id=?', [newProject, teamId]);
     });
   }
-  const persisted = z.array(z.object({ scope_key: z.string(), manual_order: z.coerce.number(), version: z.number() })).parse(await source.query('SELECT scope_key,manual_order,version FROM v2_shared_orders WHERE team_id=?', [teamId]));
+  const persisted = z.array(z.object({ scope_key: z.string(), manual_order: z.coerce.number(), version: z.number() })).parse(await source.query('SELECT scope_key,manual_order,version FROM v2_view_orders WHERE owner_id=? AND team_id=?', [leader.id, teamId]));
   assert.equal(persisted.find((row) => row.scope_key === projectScope)?.manual_order, 0);
   assert.equal(persisted.find((row) => row.scope_key === backlogScope)?.manual_order, 1);
   assert.ok(persisted.some((row) => row.scope_key === 'weekly:projects' && row.version > 0));
-  console.log('Sorting API/MySQL verified: defaults, manual order, prepend, reset, stale versions, permissions, hidden items, independent pages/tasks and shared weekly project order.');
+  console.log('Sorting API/MySQL verified: defaults, manual order, prepend, reset, stale versions, permissions, hidden items, independent pages/tasks and account-isolated weekly project order.');
 }
