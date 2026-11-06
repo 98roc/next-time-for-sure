@@ -14,8 +14,8 @@ export class V2ProjectRepository {
 
   /** 项目列表已经过当前权限裁剪，查询不扩散到其他项目。 */
   async milestones(projectIds: string[]): Promise<V2Milestone[]> { return projectIds.length ? milestones.parse(await this.manager.query(`${milestoneSelect} WHERE deleted_at IS NULL AND project_id IN (${projectIds.map(() => '?').join(',')}) ORDER BY expected_on,id`, projectIds)) : []; }
-  /** 目标读取后由服务检查项目权限及版本。 */
-  async milestone(id: string): Promise<V2Milestone | undefined> { return milestones.parse(await this.manager.query(`${milestoneSelect} WHERE id=? AND deleted_at IS NULL`, [id]))[0]; }
+  /** 目标读取后由服务检查权限及版本；包含已删除记录仅用于删除重试的权限核验。 */
+  async milestone(id: string, includeDeleted = false): Promise<V2Milestone | undefined> { return milestones.parse(await this.manager.query(`${milestoneSelect} WHERE id=?${includeDeleted ? '' : ' AND deleted_at IS NULL'}`, [id]))[0]; }
   /** 转换后记录保留用于幂等，但不再出现在待建列表。 */
   async backlog(projectIds: string[]): Promise<V2Backlog[]> { return projectIds.length ? z.array(v2BacklogSchema).parse(await this.manager.query(`${backlogSelect} WHERE deleted_at IS NULL AND converted_task_id IS NULL AND project_id IN (${projectIds.map(() => '?').join(',')}) ORDER BY priority,created_at,id`, projectIds)) : []; }
   /** 删除记录不对外暴露，但同一次删除幂等仍可核对来源。 */
@@ -28,6 +28,11 @@ export class V2ProjectRepository {
   async deleteBacklog(id: string): Promise<void> { await this.manager.query('UPDATE v2_backlog SET deleted_at=UTC_TIMESTAMP(3),version=version+1 WHERE id=?', [id]); }
   /** 转换由上层同事务创建任务并记实际转换人。 */
   async convertBacklog(id: string, taskId: string, actorId: string): Promise<void> { await this.manager.query('UPDATE v2_backlog SET converted_task_id=?,converted_by=?,version=version+1 WHERE id=?', [taskId, actorId, id]); }
+  /** 软删除保留原目标与审计，关联任务由上层在同一事务解除并记录任务历史。 */
+  async deleteMilestone(row: V2Milestone, actorId: string): Promise<void> {
+    await this.manager.query('UPDATE v2_milestones SET deleted_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3),version=version+1 WHERE id=?', [row.id]);
+    await this.manager.query("INSERT INTO v2_object_events(id,team_id,project_id,object_id,actor_id,action,payload_json,occurred_at) SELECT ?,team_id,id,?,?,'milestone.deleted',?,UTC_TIMESTAMP(3) FROM projects WHERE id=?", [randomUUID(), row.id, actorId, JSON.stringify({ before: row, after: { ...row, version: row.version + 1, deleted: true } }), row.projectId]);
+  }
   /** 保存里程碑及实际操作人；不再记录人员归属。 */
   async saveMilestone(row: V2Milestone, create: boolean, actorId: string): Promise<void> {
     const previous = create ? null : await this.milestone(row.id);

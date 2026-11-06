@@ -65,6 +65,7 @@ export async function previewImpact(manager: EntityManager, context: V2Context, 
       }
       if (intent.unlinkTasks?.length) details.push('保留任务、执行人、状态及全部日期安排，仅解除里程碑关联。');
     }
+    else if (intent.action === 'delete_milestone') { details.push(`删除此里程碑，并解除 ${related.length} 条任务关联；保留任务、执行人、状态、全部日期安排及历史记录。`, ...related.map((task) => `解除关联：${task.title}`)); }
     else if (intent.action === 'complete_milestone') { inspect(() => validateMilestoneCompletion(milestone, related)); if (milestone.status !== 'open') blockers.push('里程碑已经完成'); details.push(`关联任务 ${related.length} 条；请确认阶段目标实际已达成。`); }
     else { if (milestone.status !== 'completed') blockers.push('里程碑尚未完成'); details.push('重开目标并保留原完成历史，不修改关联任务状态。'); }
   } else if (intent.action === 'delete_backlog') {

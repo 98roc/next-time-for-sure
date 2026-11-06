@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createOperationId } from '../identity/operation-id';
 import { useNavigationGuard } from './navigation-guard';
@@ -20,23 +20,24 @@ export function ModalProvider({ children, suspended = false }: { children: React
   const pageFocus = useRef(new Map<string, HTMLElement>());
   const active = pages.at(-1)?.key;
   const opened = pages.length > 0;
-  useEffect(() => {
+  // 原生模态层与焦点在绘制前就绪，避免先露出来源页再显示目标弹窗。
+  useLayoutEffect(() => {
     if (!opened || suspended) return;
     priorFocus.current = document.activeElement;
     const element = dialog.current, overflow = document.body.style.overflow;
     element?.showModal(); document.body.style.overflow = 'hidden';
-    return () => { element?.close(); document.body.style.overflow = overflow; if (priorFocus.current instanceof HTMLElement && priorFocus.current.isConnected) priorFocus.current.focus(); };
+    return () => { element?.close(); document.body.style.overflow = overflow; if (priorFocus.current instanceof HTMLElement && priorFocus.current.isConnected) priorFocus.current.focus({ preventScroll: true }); };
   }, [opened, suspended]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (suspended) return;
     const page = dialog.current?.querySelector('[data-active="true"]');
     // 排期入口明确指定日期焦点，优先于原生 dialog 打开时自动聚焦的返回按钮。
     const preferred = page?.querySelector('[data-v2-autofocus]:not(:disabled)');
-    if (preferred instanceof HTMLElement) { preferred.focus(); return; }
+    if (preferred instanceof HTMLElement && preferred.getClientRects().length) { preferred.focus({ preventScroll: true }); return; }
     const remembered = active ? pageFocus.current.get(active) : undefined;
-    if (remembered?.isConnected && page?.contains(remembered) && !remembered.matches(':disabled')) { remembered.focus(); return; }
-    const field = page?.querySelector('input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[data-v2-back],button');
-    if (field instanceof HTMLElement) field.focus();
+    if (remembered?.isConnected && page?.contains(remembered) && remembered.getClientRects().length && !remembered.matches(':disabled')) { remembered.focus({ preventScroll: true }); return; }
+    const field = Array.from(page?.querySelectorAll('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled),[data-v2-back]:not(:disabled),button:not(:disabled)') ?? []).find((element) => element.getClientRects().length > 0);
+    if (field instanceof HTMLElement) field.focus({ preventScroll: true });
   }, [active, suspended]);
 
   function navigate(action: 'back' | 'close', force = false) {
@@ -51,7 +52,7 @@ export function ModalProvider({ children, suspended = false }: { children: React
     open: (content) => { if (pages.length) throw new Error('请在当前弹窗内继续操作'); dirty.current.clear(); setPages([{ key: createOperationId(), content }]); },
     push: (content) => { setPending(null); setPages((previous) => [...previous, { key: createOperationId(), content }]); },
     back: () => navigate('back'), close: (force) => navigate('close', force), canBack: pages.length > 1,
-    finishPage: (key) => { setPending(null); setPages((previous) => { const index = previous.findIndex((page) => page.key === key); for (const page of previous.slice(index)) { dirty.current.delete(page.key); locked.current.delete(page.key); pageFocus.current.delete(page.key); } return index < 0 ? previous : previous.slice(0, index); }); },
+    finishPage: (key) => { setPending(null); setPages((previous) => { const index = previous.findIndex((page) => page.key === key); if (index < 0) return previous; for (const page of previous.slice(index)) { dirty.current.delete(page.key); locked.current.delete(page.key); pageFocus.current.delete(page.key); } return previous.slice(0, index); }); },
     dirty: (key, value, busy) => { dirty.current.set(key, value); locked.current.set(key, busy); },
   };
   return <FlowContext.Provider value={flow}>{children}{opened && <dialog ref={dialog} className="v2-dialog" aria-label="工作操作" onFocusCapture={(event) => { if (active && event.target instanceof HTMLElement && event.target.closest('[data-active="true"]')) pageFocus.current.set(active, event.target); }} onCancel={(event) => { event.preventDefault(); navigate(pages.length > 1 ? 'back' : 'close'); }}>
@@ -65,8 +66,13 @@ export function ModalPage({ title, children, actions, dirty = false, busy = fals
   useNavigationGuard(dirty || busy);
   const flow = useModal(), page = useContext(PageContext), label = useId(), root = useRef<HTMLDivElement>(null);
   useEffect(() => { flow.dirty(page.key, dirty, busy); }, [flow, page.key, dirty, busy]);
-  useEffect(() => { if (page.active) root.current?.closest('dialog')?.classList.toggle('v2-wide', wide); }, [page.active, wide]);
-  useEffect(() => { if (page.active) root.current?.closest('dialog')?.classList.toggle('v2-compact', compact); }, [page.active, compact]);
+  // 返回栈保留隐藏页面；只有当前页可设置容器尺寸，并在首帧前同时更新。
+  useLayoutEffect(() => {
+    if (!page.active) return;
+    const dialog = root.current?.closest('dialog');
+    dialog?.classList.toggle('v2-wide', wide);
+    dialog?.classList.toggle('v2-compact', compact);
+  }, [page.active, wide, compact]);
   return <div ref={root} className={`v2-dialog-layout ${className}`} aria-labelledby={label}>
     <header className="v2-dialog-header">{flow.canBack && <button data-v2-back disabled={busy} onClick={flow.back}>← 返回</button>}<h2 id={label}>{title}{subtitle && <span className="v2-dialog-subtitle">{subtitle}</span>}</h2><button className="v2-close" aria-label="关闭" disabled={busy} onClick={onClose ?? (() => flow.close())}>{closeLabel}</button></header>
     <div className="v2-content">{children}</div>{(!hideCloseAction || actions) && <footer className="v2-dialog-footer">{footerNote}<div className="v2-actions v2-footer-actions">{!hideCloseAction && <button disabled={busy} onClick={() => flow.close()}>关闭</button>}{actions}</div></footer>}

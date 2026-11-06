@@ -44,6 +44,17 @@ export async function mutateProject(manager: EntityManager, context: V2Context, 
   const milestone = await repository.milestone(command.milestoneId);
   if (!milestone) throw new ConflictException('里程碑不存在。');
   requireVersion(milestone.version, command.version);
+  if (command.action === 'delete_milestone') {
+    // 预览绑定全部当前关联，重新确认后原子解除；不删除任务、排期或历史。
+    await requireConfirmation(manager, context, { action: command.action, milestoneId: milestone.id, version: command.version }, command.confirmation, today);
+    const tasks = new V2TaskRepository(manager);
+    const related = (await tasks.visible(context.actor.id, [milestone.projectId])).filter((task) => task.milestoneId === milestone.id);
+    for (const task of related) {
+      await tasks.update(task, { ...task, milestoneId: null, version: task.version + 1, updatedAt: new Date().toISOString() }, context.actor.id);
+    }
+    await repository.deleteMilestone(milestone, context.actor.id);
+    return [milestone.id, ...related.map((task) => task.id)];
+  }
   if (command.action === 'edit_milestone') {
     // 先核验整个草稿，确认摘要绑定日期、关联任务与版本；任何失败都回滚整次保存。
     if (command.expectedOn !== milestone.expectedOn || command.unlinkTasks?.length) {

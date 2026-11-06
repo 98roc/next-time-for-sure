@@ -6,6 +6,7 @@ import { ModalPage, useModal } from './modal';
 import { Confirmation } from './confirmation';
 import { TaskEditor } from './task-editor';
 import { MilestoneForm } from './milestone-form';
+import { MilestoneDeleteButton } from './milestone-delete';
 import { Deadline, MilestoneStatus, MilestoneTaskIcon } from './milestone-parts';
 
 /** 详情只读共享任务；编辑关联统一进入编辑器，完成仍由研发负责人显式确认。 */
@@ -15,6 +16,7 @@ export function MilestoneDetail({ milestoneId }: { milestoneId: string }) {
   const project = data.projects.find((row) => row.id === milestone.projectId), tasks = data.tasks.filter((row) => row.milestoneId === milestoneId);
   const unfinished = tasks.filter((row) => row.status !== 'completed').length;
   return <ModalPage title={`${project?.name ?? ''} / 里程碑`} className="v2-ms-modal" closeLabel="关闭" footerNote={<span className="v2-ms-footer-note">由项目研发负责人确认</span>} actions={<>
+    {project?.canManage && <MilestoneDeleteButton milestone={milestone} />}
     {project?.canManage && <button onClick={() => modal.push(<MilestoneForm projectId={milestone.projectId} milestone={milestone} />)}>编辑目标</button>}
     <CompleteButton milestone={milestone} disabled={!project?.canConfirmMilestone || (milestone.status === 'open' && unfinished > 0)} />
   </>}>
@@ -35,5 +37,5 @@ function CompleteButton({ milestone, disabled }: { milestone: V2Milestone; disab
   const { run } = useWorkspace(), modal = useModal();
   const action = milestone.status === 'completed' ? 'reopen_milestone' : 'complete_milestone';
   const label = milestone.status === 'completed' ? '重开里程碑' : '确认完成';
-  return <button className="nt-primary" disabled={disabled} onClick={() => modal.push(<Confirmation label={label} intent={{ action, milestoneId: milestone.id, version: milestone.version }} onConfirm={(confirmation) => run('projects', { action, operationId: createOperationId(), milestoneId: milestone.id, version: milestone.version, confirmation })} />)}>{label}</button>;
+  return <button className="nt-primary" disabled={disabled} onClick={() => modal.push(<Confirmation label={label} intent={{ action, milestoneId: milestone.id, version: milestone.version }} onConfirm={(confirmation) => run('projects', { action, operationId: createOperationId(), milestoneId: milestone.id, version: milestone.version, confirmation })} onDone={() => modal.close(true)} />)}>{label}</button>;
 }

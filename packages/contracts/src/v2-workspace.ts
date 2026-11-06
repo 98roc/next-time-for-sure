@@ -66,6 +66,7 @@ export const v2ProjectCommandSchema = z.discriminatedUnion('action', [
   z.object({ ...operation, action: z.literal('edit_milestone'), ...milestoneEdit, confirmation: confirmation.optional() }).strict(),
   z.object({ ...operation, action: z.literal('complete_milestone'), milestoneId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('reopen_milestone'), milestoneId: id, version, confirmation }).strict(),
+  z.object({ ...operation, action: z.literal('delete_milestone'), milestoneId: id, version, confirmation }).strict(),
   z.object({ ...operation, action: z.literal('unlink_milestone'), taskId: id, version, confirmation }).strict(),
 ]);
 export type V2ProjectCommand = z.infer<typeof v2ProjectCommandSchema>;
@@ -94,6 +95,7 @@ export const v2ImpactIntentSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('delete_backlog'), backlogId: id, version }).strict(),
   z.object({ action: z.literal('complete_milestone'), milestoneId: id, version }).strict(),
   z.object({ action: z.literal('reopen_milestone'), milestoneId: id, version }).strict(),
+  z.object({ action: z.literal('delete_milestone'), milestoneId: id, version }).strict(),
   z.object({ action: z.literal('unlink_milestone'), taskId: id, version }).strict(),
   z.object({ action: z.literal('delete_category'), version, categoryId: id, receiverId: id }).strict(),
   z.object({ action: z.literal('change_periods'), version, periods: z.array(v2PeriodChangeSchema).min(1).max(500) }).strict(),

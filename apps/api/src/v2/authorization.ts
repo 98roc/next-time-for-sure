@@ -41,7 +41,8 @@ export function authorizeTaskCommand(context: V2Context, command: V2TaskCommand,
 export async function authorizeProjectCommand(manager: EntityManager, context: V2Context, command: V2ProjectCommand): Promise<string> {
   const repository = new V2ProjectRepository(manager);
   const backlog = 'backlogId' in command ? await repository.backlogItem(command.backlogId) : undefined;
-  const milestone = 'milestoneId' in command ? await repository.milestone(command.milestoneId) : undefined;
+  // 删除重试仍按保留记录核验当前权限，再由幂等层返回已完成结果。
+  const milestone = 'milestoneId' in command ? await repository.milestone(command.milestoneId, command.action === 'delete_milestone') : undefined;
   const task = 'taskId' in command ? requireTask(context, await new V2TaskRepository(manager).get(command.taskId)) : undefined;
   const projectId = 'projectId' in command ? command.projectId : backlog?.projectId ?? milestone?.projectId ?? task?.projectId;
   if (!projectId) throw new NotFoundException('对象不存在或无权访问。');
@@ -52,6 +53,6 @@ export async function authorizeProjectCommand(manager: EntityManager, context: V
   if (command.action === 'convert_backlog' && command.task.projectId === projectId && canCreateProjectTask(context.actor, project, command.task.executorId)) { requireProjectMember(context, project, command.task.executorId); return projectId; }
   if ((command.action === 'edit_backlog' || command.action === 'delete_backlog') && (manage || backlog?.creatorId === context.actor.id)) return projectId;
   if ((command.action === 'complete_milestone' || command.action === 'reopen_milestone') && milestone && canConfirmMilestone(context.actor, milestone, project)) return projectId;
-  if (['create_milestone', 'edit_milestone', 'unlink_milestone'].includes(command.action) && manage) return projectId;
+  if (['create_milestone', 'edit_milestone', 'delete_milestone', 'unlink_milestone'].includes(command.action) && manage) return projectId;
   throw new ForbiddenException('没有此项项目操作权限。');
 }

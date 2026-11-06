@@ -74,5 +74,55 @@ export async function verifyMilestoneEditor({ source, lead, leader, developer, o
   await save({ ...undate, confirmation: undateImpact.confirmation });
   await save({ ...undate, version: target.version + 1, title: '名称独立修改' });
   assert.equal((await state()).milestones.find((row) => row.id === milestoneId)?.expectedOn, null);
+  await verifyMilestoneDeletion({ source, lead, leader, developer, outsider, projectId, periodId, call, state });
   console.log('Milestone editor API/database checks passed: authorization, confirmation, atomic save, stale versions, idempotence, audit and preserved tasks/arrangements.');
+}
+
+/** 删除沿用管理权限，确认过期不得解除关联；重复提交只产生一次删除审计。 */
+async function verifyMilestoneDeletion({ source, lead, leader, developer, outsider, projectId, periodId, call, state }: Harness): Promise<void> {
+  const milestoneId = v2ResultSchema.parse(await call('projects', lead, { action: 'create_milestone', projectId, title: '删除与历史保留验收', expectedOn: null, operationId: randomUUID() })).objectIds[0];
+  assert.ok(milestoneId);
+  const taskId = v2ResultSchema.parse(await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId, executorId: developer.id, title: '删除目标后仍保留任务', plannedDays: 1, milestoneId } })).objectIds[0];
+  assert.ok(taskId);
+  const intent = { action: 'delete_milestone', milestoneId, version: 0 };
+  const initial = v2ImpactSchema.parse(await call('impact', leader, intent));
+  assert.ok(initial.details.some((line) => line.includes('保留任务')));
+  await call('impact', developer, intent, 403);
+  await call('impact', outsider, intent, 403);
+  const deletion = { ...intent, confirmation: initial.confirmation, operationId: randomUUID() };
+  await call('projects', developer, deletion, 403);
+  await call('projects', outsider, deletion, 403);
+  await call('projects', leader, { ...deletion, confirmation: '0'.repeat(64) }, 409);
+
+  // 关联任务状态变化使确认失效，整次删除不得写入任何对象。
+  await call('tasks', developer, { action: 'set_status', taskId, version: 0, status: 'in_progress', operationId: randomUUID() });
+  await call('projects', leader, deletion, 409);
+  const before = await state(), task = before.tasks.find((row) => row.id === taskId); assert.ok(task);
+  assert.equal(task.milestoneId, milestoneId);
+  assert.ok(before.milestones.some((row) => row.id === milestoneId));
+  const impact = v2ImpactSchema.parse(await call('impact', leader, intent));
+  const command = { ...deletion, confirmation: impact.confirmation };
+  await call('projects', leader, command);
+  await call('projects', leader, command);
+  const after = await state(), saved = after.tasks.find((row) => row.id === taskId); assert.ok(saved);
+  assert.ok(!after.milestones.some((row) => row.id === milestoneId));
+  assert.deepEqual(saved, { ...task, milestoneId: null, version: task.version + 1, updatedAt: saved.updatedAt });
+  assert.deepEqual(after.arrangements.filter((row) => row.taskId === taskId), before.arrangements.filter((row) => row.taskId === taskId));
+  const history = v2TaskHistorySchema.parse(await call(`history?taskId=${taskId}`, lead));
+  assert.equal(history.at(-1)?.actorId, leader.id);
+  assert.equal(history.at(-1)?.snapshot.milestoneId, null);
+  const stored = z.array(z.object({ removed: z.coerce.number(), version: z.number() })).parse(await source.query('SELECT deleted_at IS NOT NULL AS removed,version FROM v2_milestones WHERE id=?', [milestoneId]));
+  assert.deepEqual(stored, [{ removed: 1, version: 1 }]);
+  const events = z.array(z.object({ count: z.coerce.number() })).parse(await source.query("SELECT COUNT(*) AS count FROM v2_object_events WHERE object_id=? AND action='milestone.deleted'", [milestoneId]));
+  assert.equal(events[0]?.count, 1);
+  await call('projects', leader, { ...command, operationId: randomUUID() }, 409);
+
+  // 已完成且没有关联任务的里程碑同样允许研发负责人删除。
+  const completedId = v2ResultSchema.parse(await call('projects', lead, { action: 'create_milestone', projectId, title: '已完成目标删除', expectedOn: null, operationId: randomUUID() })).objectIds[0]; assert.ok(completedId);
+  for (const [action, version] of [['complete_milestone', 0], ['delete_milestone', 1]] as const) {
+    const next = { action, milestoneId: completedId, version };
+    const preview = v2ImpactSchema.parse(await call('impact', lead, next));
+    await call('projects', lead, { ...next, confirmation: preview.confirmation, operationId: randomUUID() });
+  }
+  assert.ok(!(await state()).milestones.some((row) => row.id === completedId));
 }

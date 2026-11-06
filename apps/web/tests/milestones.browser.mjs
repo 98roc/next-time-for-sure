@@ -131,9 +131,8 @@ try {
   assert.equal(await active.getByLabel('目标名称').inputValue(), '审计分支融合与功能测试（调整）');
   await active.getByRole('button', { name: '保存', exact: true }).click();
   await active.getByRole('button', { name: '确认保存目标变更', exact: true }).click();
-  await active.getByRole('button', { name: '编辑目标', exact: true }).waitFor();
+  await page.locator('dialog[open]').waitFor({ state: 'hidden' });
   assert.equal(saved.length, 2); assert.equal(saved[1].unlinkTasks.length, 1); assert.equal(saved[1].confirmation, 'a'.repeat(64));
-  await close();
 
   // 历史翻页返回原页；窄屏和浅色无全页横向溢出。
   await panel.getByRole('button', { name: /^历史 11/ }).click();

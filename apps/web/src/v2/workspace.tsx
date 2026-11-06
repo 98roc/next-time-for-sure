@@ -50,7 +50,9 @@ export function WorkspaceProvider({ user, children }: { user: Identity; children
     try {
       const result = await sendCommand(path, { ...body, operationId: stableId }, user.csrfToken, query.data?.team?.id);
       pendingCommands.current.delete(key);
-      await client.invalidateQueries({ queryKey: ['v2'] });
+      // 成功操作会结束当前确认；重查其旧版本意图会闪出伪冲突，甚至改变仍在提交中的视图。
+      // 只刷新业务数据，真实冲突仍由提交校验及确认页的主动重新核对处理。
+      await client.invalidateQueries({ queryKey: ['v2'], predicate: (query) => query.queryKey[1] !== 'impact' });
       setMessage('已保存'); return result;
     } catch (error) {
       if (error instanceof IdentityApiError && error.status < 500) pendingCommands.current.delete(key);
