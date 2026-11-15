@@ -1,0 +1,25 @@
+.v2-scope .v2-task-remark-controls .v2-task-reminder-toggle{min-width:0;text-align:left}
+.v2-scope .v2-task-reminder-toggle>span{white-space:nowrap;color:var(--v2-text)}
+.v2-scope .v2-task-reminder-bell{flex-shrink:0;color:var(--v2-accent)}
+.v2-scope .v2-task-reminder-dialog form{display:grid;gap:10px;padding:4px 0}
+.v2-scope .v2-task-reminder-recipient{margin:0}
+.v2-scope .v2-task-reminder-recipient span{color:var(--v2-muted);margin-right:6px}
+.v2-scope .v2-task-reminder-mode{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;padding:0;border:0;min-width:0}
+.v2-scope .v2-task-reminder-mode legend{padding:0 0 4px;color:var(--v2-muted);font-size:12px}
+.v2-scope .v2-task-reminder-mode label{display:flex;align-items:center;gap:6px;min-height:28px;white-space:nowrap}
+:is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-task-reminder-mode input[type=radio]{flex:none;width:14px;height:14px;min-height:0;margin:0;padding:0;border:0;background:transparent;accent-color:var(--v2-accent)}
+.v2-scope .v2-task-reminder-fields{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:8px}
+.v2-scope .v2-task-reminder-daily{grid-template-columns:minmax(0,1.35fr) minmax(0,.7fr) minmax(0,1fr)}
+.v2-scope .v2-task-reminder-fields .v2-field,.v2-scope .v2-task-reminder-fields input{min-width:0;width:100%}
+.v2-scope .v2-task-reminder-preview{display:grid;gap:4px;border:1px solid var(--v2-line);border-radius:8px;padding:8px 10px;background:var(--v2-canvas)}
+.v2-scope .v2-task-reminder-preview>div{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.v2-scope .v2-task-reminder-preview strong{font-size:13px;font-weight:500}
+.v2-scope .v2-task-reminder-preview ul{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 6px}
+.v2-scope .v2-task-reminder-preview :is(p,ul){margin:0;font-size:12px;overflow-wrap:anywhere}
+.v2-scope .v2-task-reminder-preview :is(span,small),.v2-scope .v2-task-reminder-delivery{font-size:12px;color:var(--v2-muted)}
+.v2-scope .v2-task-reminder-delivery{margin:0}
+@media(max-width:420px){
+  .v2-scope .v2-task-reminder-daily{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .v2-scope .v2-task-reminder-daily>.v2-field:first-child{grid-column:1/-1}
+}
+@media(pointer:coarse){.v2-scope .v2-task-reminder-mode label{min-height:44px}}

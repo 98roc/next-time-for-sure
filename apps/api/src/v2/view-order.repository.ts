@@ -4,6 +4,7 @@ import { decodeJson } from './repository-utils.js';
 import { resolveOrder } from './sorting.js';
 
 const orderRows = z.array(z.object({ ordered_ids: z.unknown(), version: z.number(), manual_order: z.coerce.boolean() }));
+const projectListScopes = new Set(['project-page:projects', 'weekly:projects']);
 
 /** 当前账号的页面顺序；账号只能由已认证上下文提供，调用方须在组织锁内校验可见范围。 */
 export class V2ViewOrderRepository {
@@ -14,7 +15,11 @@ export class V2ViewOrderRepository {
     await this.manager.query('INSERT IGNORE INTO v2_view_orders(owner_id,team_id,scope_key,ordered_ids,version,manual_order) SELECT ?,team_id,scope_key,ordered_ids,version,manual_order FROM v2_shared_orders WHERE team_id=? AND scope_key=?', [this.ownerId, teamId, scope]);
     const [row] = orderRows.parse(await this.manager.query('SELECT ordered_ids,version,manual_order FROM v2_view_orders WHERE owner_id=? AND team_id=? AND scope_key=?', [this.ownerId, teamId, scope]));
     const stored = row ? z.array(z.string()).parse(decodeJson(row.ordered_ids)) : [];
-    const manual = row?.manual_order ?? false, resolved = resolveOrder(ids, manual ? stored : null, newestIds);
+    const manual = row?.manual_order ?? false;
+
+    // 项目组把新增项追加在已排顺序之后，留出列表顶部给用户已排好的项目。
+    const insertNewAt = projectListScopes.has(scope) ? 'end' : 'start';
+    const resolved = resolveOrder(ids, manual ? stored : null, newestIds, insertNewAt);
     let version = row?.version ?? 0;
 
     // 自动并入新增项也递增版本，避免另一窗口用旧列表覆盖新顺序。

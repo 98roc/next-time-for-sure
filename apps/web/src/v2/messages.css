@@ -21,8 +21,9 @@
 .v2-message-heading .nt-link{flex:1;min-width:0;font-weight:500}
 .v2-message-tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:45%}
 .v2-message-tag{font-size:11px;line-height:1.6;padding:1px 5px;border-radius:4px;background:var(--v2-canvas);color:var(--v2-muted);white-space:nowrap}
-.v2-message-meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--v2-muted)}
-.v2-message-meta time{white-space:nowrap}
+.v2-message-meta{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12px;color:var(--v2-muted)}
+.v2-message-meta time{white-space:nowrap;font-variant-numeric:tabular-nums}
+.v2-message-executor{max-width:45%;text-align:right}
 .v2-message-detail{font-size:12px;color:var(--v2-muted)}
 .v2-message-pagination{display:flex;align-items:center;gap:10px;margin-left:auto;white-space:nowrap}
 

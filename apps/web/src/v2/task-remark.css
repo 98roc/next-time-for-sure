@@ -1,4 +1,6 @@
 .v2-scope .v2-task-remark { grid-column:1/-1;min-width:0; }
+.v2-scope .v2-task-remark-controls { display:flex;align-items:center;gap:12px; }
+.v2-scope .v2-task-option-note { margin:0 0 4px;color:var(--v2-muted);font-size:12px; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-content .v2-task-remark-toggle { display:flex;align-items:center;gap:6px;width:max-content;max-width:100%;min-height:36px;padding:4px 0;border:0;border-radius:0;background:transparent;color:var(--v2-muted);font:inherit;font-size:12px; }
 :is(#nt-project,#ntfs-my-work,#ntfs-weekly-demo).v2-scope .v2-content .v2-task-remark-toggle:hover { color:var(--v2-text);background:transparent; }
 .v2-scope .v2-task-remark-chevron { flex-shrink:0; }

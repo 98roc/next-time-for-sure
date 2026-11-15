@@ -15,6 +15,7 @@ import { V2ProjectRepository } from './project.repository.js';
 import { milestoneAfterTaskChange, rearrangeTask, transitionTask, validateMilestoneLink } from './task-rules.js';
 import { V2PlanningLabelsRepository } from './planning-labels.repository.js';
 import { defaultUnplanned } from './planning-classification.js';
+import { V2TaskReminderRepository } from './task-reminder.repository.js';
 
 /** 共用任务创建服务，供项目、我的工作、周计划批量和待建转换调用。 */
 export async function createProjectTask(manager: EntityManager, context: V2Context, input: V2ProjectTaskInput, creatorId = context.actor.id, categoryId?: string, fromBacklog = false): Promise<V2Task> {
@@ -47,6 +48,7 @@ export async function createProjectTask(manager: EntityManager, context: V2Conte
   });
   await reconcileCompletion(manager, null, task, now);
   await tasks.insert(task, context.actor.id, planningChanges);
+  if (input.reminder) await new V2TaskReminderRepository(manager).save(task, input.reminder, Date.parse(now));
   for (const row of arrangements) {
     await tasks.addArrangement(task, row.periodId, row.plannedDays, context.actor.id, now, row.workNote);
     const period = periods.find((item) => item.id === row.periodId), change = planningChanges.find((item) => item.periodId === row.periodId);
@@ -71,7 +73,10 @@ export async function mutateTask(manager: EntityManager, context: V2Context, com
     const now = new Date().toISOString();
     const status = category?.status ?? 'not_started';
     const created: V2Task = { id: randomUUID(), kind: 'private', teamId: null, projectId: null, creatorId: context.actor.id, executorId: context.actor.id, milestoneId: null, title: command.task.title, remark: command.task.remark ?? '', priority: command.task.priority, status, startedAt: status === 'in_progress' ? now : null, completedAt: status === 'completed' ? now : null, deletedAt: null, createdAt: now, updatedAt: now, version: 0 };
-    await tasks.insert(created, context.actor.id); await personal.place(created, undefined, command.task.categoryId); return [created.id];
+    await tasks.insert(created, context.actor.id);
+    if (command.task.reminder) await new V2TaskReminderRepository(manager).save(created, command.task.reminder, Date.parse(now));
+    await personal.place(created, undefined, command.task.categoryId);
+    return [created.id];
   }
   if (!task || task.deletedAt) throw new NotFoundException('任务已删除或不存在。');
   const now = new Date().toISOString();

@@ -6,7 +6,7 @@ import { TaskRemark } from './task-remark';
 import { TaskMilestoneField } from './task-milestone-field';
 
 /** 项目、计划和个人入口复用同一字段组，差异只由权限和默认值传入。 */
-export function TaskFields({ value, onChange, data, selfId, disabled = false, onlySelf = false, excludeSelf = false, showArrangement = true, fromBacklog = false, originalMilestoneId = null, children }: { value: V2ProjectTaskInput; onChange: (value: V2ProjectTaskInput) => void; data: V2Workspace; selfId: string; disabled?: boolean; onlySelf?: boolean; excludeSelf?: boolean; showArrangement?: boolean; fromBacklog?: boolean; originalMilestoneId?: string | null; children?: ReactNode }) {
+export function TaskFields({ value, onChange, data, selfId, disabled = false, onlySelf = false, excludeSelf = false, showArrangement = true, fromBacklog = false, originalMilestoneId = null, remarkActions, remarkNotice, children }: { value: V2ProjectTaskInput; onChange: (value: V2ProjectTaskInput) => void; data: V2Workspace; selfId: string; disabled?: boolean; onlySelf?: boolean; excludeSelf?: boolean; showArrangement?: boolean; fromBacklog?: boolean; originalMilestoneId?: string | null; remarkActions?: ReactNode; remarkNotice?: ReactNode; children?: ReactNode }) {
   const project = data.projects.find((row) => row.id === value.projectId);
   const members = data.accounts.filter((account) => (!excludeSelf || account.id !== selfId) && (!onlySelf || account.id === selfId) && (project?.members.some((member) => member.accountId === account.id) || account.id === value.executorId || (account.id === selfId && account.isSuperAdmin)));
   return <><div className="v2-fields">
@@ -15,7 +15,7 @@ export function TaskFields({ value, onChange, data, selfId, disabled = false, on
     <PriorityField value={value.priority} disabled={disabled} onChange={(priority) => onChange({ ...value, priority })} />
     {children}
     <TaskMilestoneField projectId={value.projectId} value={value.milestoneId} originalId={originalMilestoneId} canCreate={!fromBacklog && project?.canManage === true} disabled={disabled} onChange={(milestoneId) => onChange({ ...value, milestoneId })} />
-    <TaskRemark value={value.remark ?? ''} disabled={disabled} onChange={(remark) => onChange({ ...value, remark })} />
+    <TaskRemark value={value.remark ?? ''} disabled={disabled} actions={remarkActions} notice={remarkNotice} onChange={(remark) => onChange({ ...value, remark })} />
   </div>{showArrangement && <TaskArrangements value={[{ periodId: value.periodId, plannedDays: value.plannedDays, workNote: value.workNote, unplanned: value.unplanned }, ...(value.additionalArrangements ?? [])]} periods={data.periods} defaultUnplanned={(period, index) => !fromBacklog && index === 0 && period.startOn <= data.today && period.endOn >= data.today} canSchedule canEstimate disabled={disabled} onChange={(arrangements) => { const [first, ...additionalArrangements] = arrangements; if (first) onChange({ ...value, ...first, additionalArrangements }); }} />}</>;
 }
 

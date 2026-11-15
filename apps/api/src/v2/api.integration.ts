@@ -7,6 +7,8 @@ import { verifySorting } from './sorting.integration.js';
 import { verifyEffort } from './effort.integration.js';
 import { verifyMilestoneEditor } from './milestone-editor.integration.js';
 import { verifyPersonalWork } from './personal-work.integration.js';
+import { verifyTaskReminders } from './task-reminder.integration.js';
+import { TaskReminderService } from './task-reminder.service.js';
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -44,7 +46,7 @@ async function smoke(): Promise<void> {
       for (const [id, roles] of [[lead.id, ['project_lead']], [developer.id, ['developer']], [manager.id, ['project_manager']]]) await db.query('INSERT INTO project_members(project_id,account_id,roles_json) VALUES (?,?,?)', [projectId, id, JSON.stringify(roles)]);
       await db.query('INSERT INTO project_members(project_id,account_id,roles_json) VALUES (?,?,?)', [hiddenProjectId, outsider.id, JSON.stringify(['project_manager', 'project_lead', 'developer'])]);
     });
-    app = await NestFactory.create(AppModule, { logger: false }); app.get(TaskRolloverService).onModuleDestroy(); app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new SafeExceptionFilter()); await app.listen(0, '127.0.0.1'); base = await app.getUrl();
+    app = await NestFactory.create(AppModule, { logger: false }); app.get(TaskRolloverService).onModuleDestroy(); app.get(TaskReminderService).onModuleDestroy(); app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new SafeExceptionFilter()); await app.listen(0, '127.0.0.1'); base = await app.getUrl();
 
     /** 只在测试内持有 Cookie，不写入文件或输出。 */
     async function call(path: string, actor: typeof leader, body?: unknown, expected = 200) {
@@ -55,6 +57,11 @@ async function smoke(): Promise<void> {
     const state = async (actor = leader) => v2WorkspaceSchema.parse(await call('workspace', actor));
     const initial = await state(); const period = initial.periods.find((row) => row.startOn <= initial.today && row.endOn >= initial.today); assert.ok(period);
     const next = initial.periods[initial.periods.indexOf(period) + 1]; assert.ok(next);
+    if (process.argv.includes('--task-reminders')) {
+      stage = 'task reminders';
+      await verifyTaskReminders({ source, lead, developer, manager, outsider, projectId, periodId: period.id, call, state });
+      return;
+    }
     if (process.argv.includes('--planning-labels')) {
       stage = 'planning labels';
       await verifyPlanningLabels({ source, lead, developer, manager, outsider, projectId, periodId: period.id, nextPeriodId: next.id, call, state });

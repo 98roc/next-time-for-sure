@@ -161,23 +161,41 @@ export async function verifySorting(h: Harness): Promise<void> {
   assert.deepEqual(order(await state(), 'project-page:projects').ids, [projectId, hiddenProjectId]);
   await call('planning', leader, { action: 'reorder_projects', page: 'weekly', operationId: randomUUID(), version: resetProjects.version, projectIds: [projectId, hiddenProjectId] });
   assert.deepEqual((await weekly(lead)).projectOrder.ids, [projectId]);
-  const newProject = v2ResultSchema.parse(await call('team', leader, { action: 'create_project', operationId: randomUUID(), name: '排序验收新项目', members: [{ accountId: lead.id, roles: ['project_lead'] }, { accountId: manager.id, roles: ['project_manager'] }] })).objectIds[0];
-  assert.ok(newProject);
+
+  // 两个项目在首次回读前连续加入，验证手动顺序追加和默认顺序置顶可以同时生效。
+  const createdProjects: string[] = [];
+  const createProject = async (name: string) => {
+    const result = v2ResultSchema.parse(await call('team', leader, { action: 'create_project', operationId: randomUUID(), name, members: [{ accountId: lead.id, roles: ['project_lead'] }, { accountId: manager.id, roles: ['project_manager'] }] }));
+    const id = result.objectIds[0]; assert.ok(id);
+    createdProjects.push(id);
+    return id;
+  };
   try {
-    assert.equal(order(await state(), 'project-page:projects').ids[0], newProject);
-    assert.equal((await weekly()).projectOrder.ids[0], newProject);
-    const creation = z.array(z.object({ recorded: z.coerce.number() })).parse(await source.query('SELECT created_at IS NOT NULL AS recorded FROM projects WHERE id=?', [newProject]));
-    assert.equal(creation[0]?.recorded, 1);
+    const first = await createProject('排序验收新项目一');
+    const second = await createProject('排序验收新项目二');
+    const creation = z.array(z.object({ recorded: z.coerce.number() })).parse(await source.query('SELECT created_at IS NOT NULL AS recorded FROM projects WHERE id IN (?,?)', [first, second]));
+    assert.deepEqual(creation.map((row) => row.recorded), [1, 1]);
+    // 固定测试时间差，避免依赖两个请求一定落在不同毫秒。
+    await source.query("UPDATE projects SET created_at='2026-01-03 00:00:00' WHERE id=?", [first]);
+    await source.query("UPDATE projects SET created_at='2026-01-04 00:00:00' WHERE id=?", [second]);
+
+    const expected = [projectId, hiddenProjectId, first, second];
+    assert.deepEqual(order(await state(), 'project-page:projects').ids, expected);
+    assert.deepEqual((await weekly()).projectOrder.ids, expected);
+    assert.deepEqual(order(await state(manager), 'project-page:projects').ids, [second, first, projectId]);
+    assert.deepEqual((await weekly(manager)).projectOrder.ids, [second, first, projectId]);
   } finally {
     await source.transaction(async (db) => {
-      await db.query('DELETE FROM v2_object_events WHERE project_id=?', [newProject]);
-      await db.query('DELETE FROM project_members WHERE project_id=?', [newProject]);
-      await db.query('DELETE FROM projects WHERE id=? AND team_id=?', [newProject, teamId]);
+      for (const id of createdProjects) {
+        await db.query('DELETE FROM v2_object_events WHERE project_id=?', [id]);
+        await db.query('DELETE FROM project_members WHERE project_id=?', [id]);
+        await db.query('DELETE FROM projects WHERE id=? AND team_id=?', [id, teamId]);
+      }
     });
   }
   const persisted = z.array(z.object({ scope_key: z.string(), manual_order: z.coerce.number(), version: z.number() })).parse(await source.query('SELECT scope_key,manual_order,version FROM v2_view_orders WHERE owner_id=? AND team_id=?', [leader.id, teamId]));
   assert.equal(persisted.find((row) => row.scope_key === projectScope)?.manual_order, 0);
   assert.equal(persisted.find((row) => row.scope_key === backlogScope)?.manual_order, 1);
   assert.ok(persisted.some((row) => row.scope_key === 'weekly:projects' && row.version > 0));
-  console.log('Sorting API/MySQL verified: defaults, manual order, prepend, reset, stale versions, permissions, hidden items, independent pages/tasks and account-isolated weekly project order.');
+  console.log('Sorting API/MySQL verified: defaults, manual project append and task prepend, reset, stale versions, permissions, hidden items, independent pages/tasks and account-isolated weekly project order.');
 }

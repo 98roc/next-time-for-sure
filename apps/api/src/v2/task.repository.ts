@@ -3,6 +3,7 @@ import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
 import { v2ArrangementSchema, v2PlanningChangeSchema, v2TaskEventSchema, v2TaskSchema, type V2PlanningChange, type V2Task, type V2TaskEvent } from '@ntfs/contracts';
 import { dbTime, decodeJson, instantColumn } from './repository-utils.js';
+import { V2TaskReminderRepository } from './task-reminder.repository.js';
 
 const taskSelect = `SELECT id,kind,team_id AS teamId,project_id AS projectId,creator_id AS creatorId,executor_id AS executorId,milestone_id AS milestoneId,title,COALESCE(remark,'') AS remark,priority,status,version,actual_days + 0e0 AS actualDays,ai_contribution AS aiContribution,${instantColumn('started_at','startedAt')},${instantColumn('completed_at','completedAt')},${instantColumn('deleted_at','deletedAt')},${instantColumn('created_at','createdAt')},${instantColumn('updated_at','updatedAt')} FROM v2_tasks`;
 
@@ -28,6 +29,9 @@ export class V2TaskRepository {
   /** 每次聚合更新只追加一个对应版本事件，执行人代改由实际 actorId 留痕。 */
   async update(previous: V2Task, task: V2Task, actorId: string | null, action: V2TaskEvent['action'] = 'updated', planningChanges: V2PlanningChange[] = []): Promise<void> {
     await this.manager.query('UPDATE v2_tasks SET title=?,remark=?,executor_id=?,milestone_id=?,priority=?,status=?,started_at=?,completed_at=?,actual_days=?,ai_contribution=?,deleted_at=?,version=?,updated_at=? WHERE id=?', [task.title, task.remark ?? '', task.executorId, task.milestoneId, task.priority, task.status, dbTime(task.startedAt ?? null), dbTime(task.completedAt), task.actualDays ?? null, task.aiContribution ?? null, dbTime(task.deletedAt), task.version, dbTime(task.updatedAt), task.id]);
+    if ((task.status === 'completed' && previous.status !== 'completed') || (task.deletedAt && !previous.deletedAt)) {
+      await new V2TaskReminderRepository(this.manager).clear(task.id);
+    }
     await this.event(task, actorId, action, previous.status, planningChanges);
   }
 

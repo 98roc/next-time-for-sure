@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { v2TaskReminderReason } from '@ntfs/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { readMessages, readWorkspace } from './api';
@@ -11,11 +12,11 @@ import './messages.css';
 function messagePresentation(reasons: string[]) {
   const labels = new Set<string>(), details: string[] = [];
   for (const reason of reasons) {
-    if (reason.endsWith('为你安排了任务')) labels.add('分配给我');
-    else if (reason.endsWith('新增了计划外任务') || reason.endsWith('标记了计划外任务')) labels.add('计划外');
-    else if (reason.endsWith('完成了任务')) {
-      labels.add('已完成');
-    } else details.push(reason);
+    if (reason.endsWith('为你安排了任务')) labels.add('创建任务');
+    else if (reason.endsWith('新增了计划外任务') || reason.endsWith('标记了计划外任务')) labels.add('标记为计划外');
+    else if (reason.endsWith('完成了任务')) labels.add('已完成');
+    else if (reason === v2TaskReminderReason) labels.add(v2TaskReminderReason);
+    else details.push(reason);
   }
   return { labels: [...labels], details };
 }
@@ -62,7 +63,10 @@ function MessagesDialog() {
               <button className="nt-link" onClick={() => modal.push(<MessageTask taskId={item.taskId} />)}>{item.title}</button>
               <span className="v2-message-tags">{presentation.labels.map((label) => <span className="v2-message-tag" key={label}>{label}</span>)}</span>
             </div>
-            <div className="v2-message-meta"><span>{item.projectName}</span><span aria-hidden="true">·</span><time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</time></div>
+            <div className="v2-message-meta">
+              <span>{item.projectName} · <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hourCycle: 'h23', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</time></span>
+              {item.executorName && <span className="v2-message-executor">执行人：{item.executorName}</span>}
+            </div>
             {presentation.details.length > 0 && <span className="v2-message-detail">{presentation.details.join('；')}</span>}
           </div>;
         })}

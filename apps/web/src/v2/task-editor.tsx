@@ -2,7 +2,7 @@ import { TaskRemark } from './task-remark';
 import { CompletionTime } from './completion-time';
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { v2AiContributionLabels, v2StatusLabels, v2StatusSchema, v2TaskEditSchema, type V2ArrangementInput, type V2ImpactIntent, type V2ProjectTaskInput, type V2Task, type V2TaskEdit } from '@ntfs/contracts';
+import { upcomingTaskReminders, v2AiContributionLabels, v2StatusLabels, v2StatusSchema, v2TaskEditSchema, type V2ArrangementInput, type V2ImpactIntent, type V2ProjectTaskInput, type V2Task, type V2TaskEdit } from '@ntfs/contracts';
 import { createOperationId } from '../identity/operation-id';
 import { useWorkspace, WorkspaceRefreshNotice } from './workspace';
 import { ModalPage, useModal } from './modal';
@@ -13,6 +13,7 @@ import { readHistory } from './api';
 import { TaskArrangements } from './task-arrangements';
 import { taskCompletion, TaskResultFields } from './task-results';
 import { orderArrangements } from './arrangement-order';
+import { TaskReminderButton } from './task-reminder';
 import './task-editor.css';
 
 /** 共用详情分离任务字段、周期安排及完成结果，权限按字段执行，整份草稿一次保存。 */
@@ -25,6 +26,12 @@ export function TaskEditor({ task }: { task: V2Task }) {
   const [arrangements, setArrangements] = useState<V2ArrangementInput[]>(originalArrangements);
   const [draft, setDraft] = useState<V2ProjectTaskInput>({ projectId: task.projectId ?? '', title: task.title, remark: task.remark ?? '', priority: task.priority, executorId: task.executorId, milestoneId: task.milestoneId, periodId: originalArrangements[0]?.periodId ?? '', plannedDays: originalArrangements[0]?.plannedDays ?? null });
   const [status, setStatus] = useState(task.status), [completion, setCompletion] = useState(() => taskCompletion(task));
+  const storedReminder = data.taskReminders?.find((row) => row.taskId === task.id);
+  const [initialReminder] = useState(() => storedReminder?.plan ?? null);
+  const [reminder, setReminder] = useState(initialReminder);
+  const reminderChanged = JSON.stringify(reminder) !== JSON.stringify(initialReminder);
+  const nextReminder = reminderChanged ? (reminder ? upcomingTaskReminders(reminder, Date.now()).first : null)
+    : (storedReminder?.nextAt ? Date.parse(storedReminder.nextAt) : null);
   const [initialCategory] = useState(() => data.placements.find((row) => row.taskId === task.id)?.categoryId ?? '');
   const [categoryId, setCategoryId] = useState(initialCategory);
   const detailsChanged = draft.title !== task.title || draft.priority !== task.priority || draft.executorId !== task.executorId || draft.milestoneId !== task.milestoneId;
@@ -37,7 +44,7 @@ export function TaskEditor({ task }: { task: V2Task }) {
   const periodsChanged = arrangements.length !== originalArrangements.length || originalArrangements.some((row) => !arrangements.some((item) => item.periodId === row.periodId));
   const completionChanged = completion.startedAt !== (task.startedAt ?? null) || completion.completedAt !== (task.completedAt ?? undefined) || completion.actualDays !== (task.actualDays ?? null) || completion.aiContribution !== (task.aiContribution ?? null);
   const remarkChanged = (draft.remark ?? '').trim() !== (task.remark ?? '');
-  const dirty = remarkChanged || detailsChanged || arrangementsChanged || planningLabels.length > 0 || completionChanged || status !== task.status || categoryId !== initialCategory;
+  const dirty = remarkChanged || reminderChanged || detailsChanged || arrangementsChanged || planningLabels.length > 0 || completionChanged || status !== task.status || categoryId !== initialCategory;
   const current = data.tasks.find((row) => row.id === task.id), stale = !current || current.version !== task.version;
   // 历史空结果只在本次完成或编辑结果时要求补齐，改名称不会触发历史补录。
   const requireResults = status === 'completed' && (task.status !== 'completed' || completionChanged);
@@ -50,6 +57,7 @@ export function TaskEditor({ task }: { task: V2Task }) {
   async function save(confirmations: { arrangement?: string; milestone?: string } = {}) {
     const command: V2TaskEdit = { action: 'save_task', operationId: createOperationId(), taskId: task.id, version: task.version,
       ...(remarkChanged ? { remark: draft.remark ?? '' } : {}),
+      ...(reminderChanged && status !== 'completed' ? { reminder } : {}),
       ...(planningLabels.length ? { planningLabels } : {}),
       ...(detailsChanged ? { details: task.kind === 'private' ? { kind: 'private', title: draft.title, priority: draft.priority } : { kind: 'project', title: draft.title, priority: draft.priority, executorId: draft.executorId, milestoneId: draft.milestoneId } } : {}),
       ...(status !== task.status ? { status } : {}), ...(draft.executorId === user.id && categoryId && categoryId !== initialCategory ? { categoryId } : {}),
@@ -77,6 +85,13 @@ export function TaskEditor({ task }: { task: V2Task }) {
   function remove() { modal.push(<Confirmation intent={{ action: 'delete_task', taskId: task.id, version: task.version }} label="删除任务" danger onConfirm={(confirmation) => run('tasks', { action: 'delete', taskId: task.id, version: task.version, operationId: createOperationId(), confirmation })} onDone={modal.finish} />); }
   const statusFields = <><Field label="当前执行状态">{canStatus ? <select value={status} onChange={(event) => { const next = v2StatusSchema.parse(event.target.value); changeStatus(next); if (self && next !== status) setCategoryId(data.categories.find((row) => row.status === next && row.isDefault)?.id ?? ''); }}>{v2StatusSchema.options.map((value) => <option key={value} value={value}>{v2StatusLabels[value]}</option>)}</select> : <StatusBadge status={task.status} />}</Field>
     {self && draft.executorId === user.id && <Field label="个人分类"><select value={categoryId} onChange={(event) => { const row = data.categories.find((item) => item.id === event.target.value); if (row) { setCategoryId(row.id); changeStatus(row.status); } }}>{data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>}</>;
+  const reminderExecutor = task.kind === 'private' ? user.displayName : data.accounts.find((account) => account.id === draft.executorId && !account.disabled)?.displayName;
+  const reminderButton = canStatus && status !== 'completed' && <TaskReminderButton plan={reminder} next={nextReminder} executor={reminderExecutor}
+    pending={reminderChanged} removing={reminderChanged && !reminder} onChange={setReminder} />;
+  const reminderNotice = status === 'completed' && task.status !== 'completed' && (nextReminder !== null || storedReminder?.nextAt)
+    ? '保存后停止提醒。'
+    : status !== 'completed' && nextReminder !== null && draft.executorId !== task.executorId && reminderExecutor
+      ? `保存后，后续提醒将发给${reminderExecutor}。` : undefined;
   return <ModalPage title={canStatus ? '编辑任务' : '任务详情'} className="v2-task-editor" wide={task.kind === 'project'} busy={action.busy} dirty={dirty} actions={<>
     {canDelete && <button className="v2-danger" disabled={action.busy || stale} onClick={remove}>删除任务</button>}
     {canStatus && <button className="nt-primary" type="submit" form={formId} disabled={action.busy || stale || !dirty}>保存</button>}
@@ -86,8 +101,8 @@ export function TaskEditor({ task }: { task: V2Task }) {
     <div className="v2-task-meta"><span>{task.kind === 'private' ? '个人 · 仅自己可见' : `项目：${project?.name ?? '项目'}`} · 创建人：{data.accounts.find((row) => row.id === task.creatorId)?.displayName ?? (self ? user.displayName : '历史成员')}</span><button className="nt-link" onClick={() => modal.push(<TaskHistory taskId={task.id} />)}>操作历史</button></div>
     <form id={formId} onSubmit={(event) => { event.preventDefault(); submit(); }}><fieldset disabled={action.busy || stale}>
       <div className="v2-editor-basics">
-      {task.kind === 'project' && manage ? <TaskFields value={draft} onChange={setDraft} data={data} selfId={user.id} showArrangement={false} originalMilestoneId={task.milestoneId}>{statusFields}</TaskFields> : task.kind === 'private' ? <div className="v2-fields"><Field label="任务名称" full><input required maxLength={200} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></Field><PriorityField value={draft.priority} onChange={(priority) => setDraft({ ...draft, priority })} />{statusFields}</div> : <><dl className="v2-facts"><dt>任务名称</dt><dd>{task.title}</dd><dt>执行人</dt><dd>{data.accounts.find((row) => row.id === task.executorId)?.displayName ?? '历史成员'}</dd><dt>优先级</dt><dd>{task.priority}</dd></dl><div className="v2-fields">{statusFields}<Field label="关联里程碑" full><input readOnly value={data.milestones.find((row) => row.id === task.milestoneId)?.title ?? '不关联里程碑'} /></Field></div></>}
-      {(task.kind === 'private' || !manage) && <TaskRemark value={draft.remark ?? ''} readOnly={!canStatus} onChange={(remark) => setDraft({ ...draft, remark })} />}
+      {task.kind === 'project' && manage ? <TaskFields value={draft} onChange={setDraft} data={data} selfId={user.id} showArrangement={false} originalMilestoneId={task.milestoneId} remarkActions={reminderButton} remarkNotice={reminderNotice}>{statusFields}</TaskFields> : task.kind === 'private' ? <div className="v2-fields"><Field label="任务名称" full><input required maxLength={200} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></Field><PriorityField value={draft.priority} onChange={(priority) => setDraft({ ...draft, priority })} />{statusFields}</div> : <><dl className="v2-facts"><dt>任务名称</dt><dd>{task.title}</dd><dt>执行人</dt><dd>{data.accounts.find((row) => row.id === task.executorId)?.displayName ?? '历史成员'}</dd><dt>优先级</dt><dd>{task.priority}</dd></dl><div className="v2-fields">{statusFields}<Field label="关联里程碑" full><input readOnly value={data.milestones.find((row) => row.id === task.milestoneId)?.title ?? '不关联里程碑'} /></Field></div></>}
+      {(task.kind === 'private' || !manage) && <TaskRemark value={draft.remark ?? ''} readOnly={!canStatus} actions={reminderButton} notice={reminderNotice} onChange={(remark) => setDraft({ ...draft, remark })} />}
       </div>
       {task.kind === 'project' && <><TaskArrangements requireEstimates={arrangementsChanged} retainedLabels={data.planningLabels.filter((row) => row.taskId === task.id)} carriedPeriods={data.arrangements.filter((row) => row.taskId === task.id && row.carriedFromPeriodId).map((row) => row.periodId)} value={arrangements} onChange={setArrangements} periods={data.periods} canSchedule={manage} canEstimate={canStatus} />{status === 'completed' && <CompletionTime value={completion} onChange={setCompletion} disabled={!canStatus}><TaskResultFields value={completion} onChange={setCompletion} required={requireResults} disabled={!canStatus} /></CompletionTime>}</>}
       {task.kind === 'private' && status === 'completed' && <CompletionTime value={completion} onChange={setCompletion} disabled={!canStatus} />}

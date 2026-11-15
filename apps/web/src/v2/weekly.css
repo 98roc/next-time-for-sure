@@ -25,7 +25,7 @@
 #ntfs-weekly-demo .w-periods>.w-field{padding:13px 16px 16px;background:var(--w-surface);border:1px solid var(--w-line);border-top:3px solid var(--w-accent);border-radius:9px;font-size:14px;font-weight:600}
 #ntfs-weekly-demo .w-periods>.w-field:first-child{border-top-color:var(--w-muted)}
 #ntfs-weekly-demo .w-field{display:grid;gap:6px;min-width:0;font-size:12px;color:var(--w-muted)}
-#ntfs-weekly-demo .w-app select,#ntfs-weekly-demo .w-app input:not([type=checkbox]),#ntfs-weekly-demo .w-app textarea{width:100%;min-width:0;border:1px solid var(--w-line);border-radius:7px;background:var(--w-surface);color:var(--w-text);padding:8px 10px;font-size:13px}
+#ntfs-weekly-demo .w-app select,#ntfs-weekly-demo .w-app input:not([type=checkbox],[type=radio]),#ntfs-weekly-demo .w-app textarea{width:100%;min-width:0;border:1px solid var(--w-line);border-radius:7px;background:var(--w-surface);color:var(--w-text);padding:8px 10px;font-size:13px}
 #ntfs-weekly-demo .w-app textarea{resize:vertical;line-height:1.8;min-height:132px}
 #ntfs-weekly-demo .w-app input[type=checkbox]{accent-color:var(--w-accent);width:16px;height:16px;flex-shrink:0}
 #ntfs-weekly-demo .w-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px;padding-top:3px}

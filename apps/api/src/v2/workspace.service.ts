@@ -9,7 +9,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { loadV2Context, requireVersion } from './context.js';
 import { naturalWeek, shanghaiDate } from './calendar.js';
-import { canCreateProjectTask, canManageProject, canParticipateProject, canConfirmMilestone } from './permissions.js';
+import { canChangeTaskStatus, canCreateProjectTask, canManageProject, canParticipateProject, canConfirmMilestone } from './permissions.js';
 import { authorizeProjectCommand, authorizeTaskCommand, requireTask } from './authorization.js';
 import { V2TaskRepository } from './task.repository.js';
 import { V2PersonalRepository } from './personal.repository.js';
@@ -26,6 +26,7 @@ import { memberImpact, mutateTeam, requireTeamLeader } from './team-management.j
 import { authorizeEdit, saveTask } from './task-edit.js';
 import { summarizePeriod } from './history.js';
 import { V2PlanningLabelsRepository } from './planning-labels.repository.js';
+import { V2TaskReminderRepository } from './task-reminder.repository.js';
 
 /** V2 工作区统一事务边界，所有入口包含 Token 都重读当前身份与权限。 */
 @Injectable()
@@ -46,9 +47,11 @@ export class V2WorkspaceService {
       if (context.teamId) await rolloverTeam(manager, context.teamId);
       const projectIds = context.projects.map((project) => project.id), visible = await tasks.visible(context.actor.id, projectIds);
       const settings = context.teamId ? await planning.settings(context.teamId) : { messages: [], version: 0 };
+      const editable = visible.filter((task) => canChangeTaskStatus(context.actor, task, context.projects.find((project) => project.id === task.projectId)));
       return {
         teams: context.organization.teams.filter((team) => context.actor.isSuperAdmin || team.id === context.actor.teamId),
         planningLabels: await new V2PlanningLabelsRepository(manager).read(visible.map((task) => task.id)),
+        taskReminders: await new V2TaskReminderRepository(manager).read(editable.map((task) => task.id)),
         periodWindow: context.teamId ? await planning.periodWindow(context.teamId) : { before: v2PeriodWindowLimits.before, after: v2PeriodWindowLimits.after, version: 0 },
         personalPreferences: await new PersonalWorkRepository(manager).preferences(context.actor.id),
         categoryPeriodFilters: await personal.periodFilterCategoryIds(context.actor.id),

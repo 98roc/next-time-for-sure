@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { v2PersonalPreferencesSchema } from './v2-personal-work.js';
-import { v2WorkNoteSchema, v2TaskRemarkSchema, v2CompletionSchema, v2ArrangementsInputSchema, v2PlanningLabelSchema } from './v2.js';
+import { v2WorkNoteSchema, v2TaskRemarkSchema, v2CompletionSchema, v2ArrangementsInputSchema, v2PlanningLabelSchema, v2TaskReminderPlanSchema, v2TaskReminderSchema } from './v2.js';
 import { v2IdSchema as id, v2VersionSchema as version, v2InstantSchema, v2RequiredPlannedDaysSchema, v2StatusSchema, v2PrioritySchema, v2DateSchema, v2PeriodSchema, v2CategorySchema, v2MilestoneSchema, v2TaskSchema, v2TaskEventSchema, v2ProjectTaskInputSchema } from './v2.js';
 import { directoryAccountSchema, projectRoleSchema, teamSchema } from './organization.js';
 
@@ -34,6 +34,8 @@ export const v2WorkspaceSchema = z.object({
   accounts: z.array(directoryAccountSchema), projects: z.array(v2ProjectSchema), periods: z.array(v2PeriodSchema),
   tasks: z.array(v2TaskSchema), arrangements: z.array(v2ArrangementSchema), milestones: z.array(v2MilestoneSchema), backlog: z.array(v2BacklogSchema),
   planningLabels: z.array(v2PlanningLabelSchema).default([]),
+  /** 当前账号可维护的任务提醒。 */
+  taskReminders: z.array(v2TaskReminderSchema).optional(),
   /** 已启用周期筛选的本人分类，具体周期只保存在当前页面。 */
   categoryPeriodFilters: z.array(id).default([]),
   categories: z.array(v2CategorySchema), placements: z.array(v2PlacementSchema), personalVersion: version, orders: z.array(v2OrderSchema.extend({ scope: z.string() })),
@@ -135,6 +137,8 @@ export const v2TaskEditSchema = z.object({
   ...operation, action: z.literal('save_task'), taskId: id, version,
   /** 与基本信息分开鉴权，允许当前执行人单独维护备注；省略保留、空串清空。 */
   remark: v2TaskRemarkSchema.optional(),
+  /** 省略保留，null 移除；用任务版本保护与其他字段的合并保存。 */
+  reminder: v2TaskReminderPlanSchema.nullable().optional(),
   /** 独立修改标签不要求重填历史未估算投入；仍使用任务聚合版本与权限。 */
   planningLabels: z.array(z.object({ periodId: id, unplanned: z.boolean() }).strict()).min(1).max(100).refine((rows) => new Set(rows.map((row) => row.periodId)).size === rows.length, '标签周期不能重复').optional(),
   details: z.discriminatedUnion('kind', [
@@ -148,7 +152,7 @@ export const v2TaskEditSchema = z.object({
 export type V2TaskEdit = z.infer<typeof v2TaskEditSchema>;
 
 /** 消息内容按任务合并，不设已读状态；游标字符串避免数据库大整数精度丢失。 */
-export const v2MessageItemSchema = z.object({ taskId: id, projectId: id, projectName: z.string(), title: z.string(), reasons: z.array(z.string()) });
+export const v2MessageItemSchema = z.object({ taskId: id, projectId: id.nullable(), projectName: z.string(), title: z.string(), executorName: z.string().optional(), reasons: z.array(z.string()) });
 export type V2MessageItem = z.infer<typeof v2MessageItemSchema>;
 export const v2MessagesSchema = z.object({ accountId: id, cursor: z.string().regex(/^\d+$/u), page: z.number().int().positive(), total: z.number().int().nonnegative(), messages: z.array(z.object({ id: z.string(), createdAt: v2InstantSchema, items: z.array(v2MessageItemSchema) })) });
 export type V2Messages = z.infer<typeof v2MessagesSchema>;

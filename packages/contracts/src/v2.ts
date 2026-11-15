@@ -12,6 +12,14 @@ export const v2DateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).refine((val
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }, '请输入有效日期');
 export const v2InstantSchema = z.iso.datetime({ precision: 3 });
+/** 提醒日期、时间均按北京时间输入。每日提醒包含目标当天。 */
+const reminderTime = { on: v2DateSchema, time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u) };
+export const v2TaskReminderPlanSchema = z.discriminatedUnion('mode', [
+  z.object({ ...reminderTime, mode: z.literal('once') }).strict(),
+  z.object({ ...reminderTime, mode: z.literal('daily'), advanceDays: z.int().positive() }).strict(),
+]);
+export type V2TaskReminderPlan = z.infer<typeof v2TaskReminderPlanSchema>;
+export const v2TaskReminderSchema = z.object({ taskId: v2IdSchema, plan: v2TaskReminderPlanSchema, nextAt: v2InstantSchema.nullable() });
 const title = z.string().trim().min(1).max(200);
 
 /** 区间投入最多两位小数，空代表未估算，零代表明确估算为零。 */
@@ -50,6 +58,7 @@ export const v2ProjectTaskInputSchema = z.object({
   /** 仅作用于首个周期；省略由服务端填默认值，false 为明确取消。 */
   unplanned: z.boolean().optional(),
   remark: v2TaskRemarkSchema.optional(),
+  reminder: v2TaskReminderPlanSchema.optional(),
   additionalArrangements: z.array(v2ArrangementInputSchema).max(99).optional(),
   completion: v2CompletionSchema.optional(),
 }).strict().refine((value) => {
@@ -59,7 +68,7 @@ export const v2ProjectTaskInputSchema = z.object({
 export type V2ProjectTaskInput = z.infer<typeof v2ProjectTaskInputSchema>;
 
 /** 私人任务不接受项目、里程碑或团队排期字段，不通过接口猜测其归属。 */
-export const v2PrivateTaskInputSchema = z.object({ title, priority: v2PrioritySchema.default(3), categoryId: v2IdSchema.optional(), remark: v2TaskRemarkSchema.optional() }).strict();
+export const v2PrivateTaskInputSchema = z.object({ title, priority: v2PrioritySchema.default(3), categoryId: v2IdSchema.optional(), remark: v2TaskRemarkSchema.optional(), reminder: v2TaskReminderPlanSchema.optional() }).strict();
 
 const taskFields = {
   id: v2IdSchema, title, priority: v2PrioritySchema, status: v2StatusSchema,

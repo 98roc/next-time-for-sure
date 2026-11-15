@@ -14,6 +14,7 @@ import { applyCompletion } from './task-completion.js';
 import { saveArrangements } from './task-arrangements.js';
 import { V2PlanningLabelsRepository } from './planning-labels.repository.js';
 import { V2PlanningRepository } from './planning.repository.js';
+import { V2TaskReminderRepository } from './task-reminder.repository.js';
 
 /** 编辑字段分别鉴权；只读执行人不能利用合并保存获得项目管理权限。 */
 export function authorizeEdit(context: V2Context, task: V2Task, command: V2TaskEdit): void {
@@ -24,8 +25,8 @@ export function authorizeEdit(context: V2Context, task: V2Task, command: V2TaskE
     if (command.details.kind === 'project') authorizeTaskCommand(context, { ...base, ...command.details, action: 'update_project' }, task);
     else authorizeTaskCommand(context, { ...base, ...fields, action: 'update_private' }, task);
   }
-  // 备注与执行状态共用执行人/管理者权限；空串是清空请求，也必须鉴权。
-  if (command.remark !== undefined || command.status || command.categoryId || command.completion || command.arrangements || command.planningLabels) authorizeTaskCommand(context, { ...base, action: 'set_status', status: command.status ?? task.status }, task);
+  // 备注与提醒共用执行人/管理者权限，显式清空也必须鉴权。
+  if (command.remark !== undefined || command.reminder !== undefined || command.status || command.categoryId || command.completion || command.arrangements || command.planningLabels) authorizeTaskCommand(context, { ...base, action: 'set_status', status: command.status ?? task.status }, task);
   if (command.arrangement && command.arrangements) throw new ConflictException('不能同时提交单条和全量安排。');
   if (command.arrangementConfirmation) authorizeTaskCommand(context, { ...base, action: 'add_arrangement', periodId: command.arrangements?.[0]?.periodId ?? task.id, plannedDays: null }, task);
   if (command.categoryId && (command.details?.kind === 'project' ? command.details.executorId : task.executorId) !== context.actor.id) throw new ForbiddenException('不能指定他人的个人分类。');
@@ -70,6 +71,12 @@ export async function saveTask(manager: EntityManager, context: V2Context, task:
   await reconcileCompletion(manager, task, next, now);
   await personal.place(next, task, command.categoryId);
   await tasks.update(task, next, context.actor.id, task.status !== next.status ? 'status_changed' : (task.completedAt !== next.completedAt || task.startedAt !== next.startedAt) ? 'completion_corrected' : 'updated', planningChanges);
+  if (command.reminder !== undefined) {
+    if (command.reminder && !context.organization.accounts.some((account) => account.id === next.executorId && !account.disabled)) {
+      throw new ConflictException('请为已启用的执行人设置定时提醒。');
+    }
+    await new V2TaskReminderRepository(manager).save(next, command.reminder, Date.parse(now));
+  }
   if (planningChanges.some((row) => row.after)) await notifyTask(manager, context, next, 'planning', planningChanges.filter((row) => row.after).map((row) => row.periodId));
   if (task.status !== 'completed' && next.status === 'completed') await notifyTask(manager, context, next, 'completed');
   if (command.arrangement) await mutateTask(manager, context, { ...command.arrangement, operationId: command.operationId, action: 'change_arrangement', taskId: task.id, version: next.version }, next);
