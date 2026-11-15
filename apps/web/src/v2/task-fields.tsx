@@ -3,7 +3,7 @@ import type { V2ProjectTaskInput, V2Workspace } from '@ntfs/contracts';
 import { Field, priorityLabels } from './controls';
 import { TaskArrangements } from './task-arrangements';
 import { TaskRemark } from './task-remark';
-import { milestoneOptions } from './milestone-options';
+import { TaskMilestoneField } from './task-milestone-field';
 
 /** 项目、计划和个人入口复用同一字段组，差异只由权限和默认值传入。 */
 export function TaskFields({ value, onChange, data, selfId, disabled = false, onlySelf = false, excludeSelf = false, showArrangement = true, fromBacklog = false, originalMilestoneId = null, children }: { value: V2ProjectTaskInput; onChange: (value: V2ProjectTaskInput) => void; data: V2Workspace; selfId: string; disabled?: boolean; onlySelf?: boolean; excludeSelf?: boolean; showArrangement?: boolean; fromBacklog?: boolean; originalMilestoneId?: string | null; children?: ReactNode }) {
@@ -14,7 +14,7 @@ export function TaskFields({ value, onChange, data, selfId, disabled = false, on
     <Field label="执行人"><select aria-label="执行人" required disabled={disabled || onlySelf} value={value.executorId} onChange={(event) => onChange({ ...value, executorId: event.target.value })}><option value="">请选择执行人</option>{members.map((account) => <option key={account.id} value={account.id} disabled={(account.disabled || (onlySelf && account.id !== selfId)) && account.id !== value.executorId}>{account.displayName}{account.disabled ? '（已停用）' : ''}</option>)}</select></Field>
     <PriorityField value={value.priority} disabled={disabled} onChange={(priority) => onChange({ ...value, priority })} />
     {children}
-    <Field label="关联里程碑" full><select disabled={disabled} value={value.milestoneId ?? ''} onChange={(event) => onChange({ ...value, milestoneId: event.target.value || null })}><option value="">不关联里程碑</option>{milestoneOptions(data.milestones, value.projectId, originalMilestoneId).map((row) => <option key={row.id} value={row.id}>{row.title}{row.status === 'completed' ? '（已完成）' : ''}</option>)}</select></Field>
+    <TaskMilestoneField projectId={value.projectId} value={value.milestoneId} originalId={originalMilestoneId} canCreate={!fromBacklog && project?.canManage === true} disabled={disabled} onChange={(milestoneId) => onChange({ ...value, milestoneId })} />
     <TaskRemark value={value.remark ?? ''} disabled={disabled} onChange={(remark) => onChange({ ...value, remark })} />
   </div>{showArrangement && <TaskArrangements value={[{ periodId: value.periodId, plannedDays: value.plannedDays, workNote: value.workNote, unplanned: value.unplanned }, ...(value.additionalArrangements ?? [])]} periods={data.periods} defaultUnplanned={(period, index) => !fromBacklog && index === 0 && period.startOn <= data.today && period.endOn >= data.today} canSchedule canEstimate disabled={disabled} onChange={(arrangements) => { const [first, ...additionalArrangements] = arrangements; if (first) onChange({ ...value, ...first, additionalArrangements }); }} />}</>;
 }

@@ -4,6 +4,10 @@
 #ntfs-my-work.v2-scope .mw-task-actions .mw-subtasks { min-height:30px;font-size:12px;border:0;background:transparent;color:var(--mw-muted);padding:3px 7px; }
 #ntfs-my-work .mw-task-actions .mw-subtasks:hover { color:var(--mw-accent);background:var(--mw-selected); }
 #ntfs-my-work .mw-col-menu-panel .is-selected { color:var(--mw-accent);background:var(--mw-selected); }
+#ntfs-my-work.v2-scope .mw-col-menu-trigger { display:grid;place-items:center;width:30px;min-height:30px;padding:0;border:0;background:transparent;color:var(--mw-muted); }
+#ntfs-my-work.v2-scope .mw-col-menu-trigger:hover,#ntfs-my-work .mw-col-menu[data-open="true"] .mw-col-menu-trigger { background:var(--mw-selected);color:var(--mw-accent); }
+#ntfs-my-work .mw-col-menu[data-open="true"] { z-index:20; }
+#ntfs-my-work .mw-col-menu-panel hr { width:100%;margin:3px 0;border:0;border-top:1px solid var(--mw-line); }
 .v2-date-navigator { display:flex;align-items:center;gap:3px;min-width:0; }
 #ntfs-my-work.v2-scope .v2-date-navigator button { font-size:12px;padding:3px 5px;min-height:32px; }
 #ntfs-my-work .v2-date-navigator input { min-width:0;width:120px;flex:1;padding:5px 3px;min-height:33px;font-size:12px; }
@@ -34,6 +38,7 @@
 .v2-daily-toolbar .mw-col-menu { margin-left:auto; }
 .v2-daily-toolbar .v2-date-navigator { max-width:100%; }
 @media(max-width:600px) {
+  #ntfs-my-work.v2-scope .mw-col-menu-trigger { width:40px;min-height:40px; }
   .v2-private-row { gap:6px; }
   .v2-subtask-row { display:grid;grid-template-columns:28px 18px minmax(0,1fr) auto auto; }
   #ntfs-my-work .v2-private-add input,#ntfs-my-work .v2-private-name input { font-size:16px; }

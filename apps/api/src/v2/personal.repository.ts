@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 import { z } from 'zod';
-import { v2CategorySchema, v2PlacementSchema, v2StatusLabels, v2StatusSchema, type V2Category, type V2Task } from '@ntfs/contracts';
+import { v2CategorySchema, v2IdSchema, v2PlacementSchema, v2StatusLabels, v2StatusSchema, type V2Category, type V2Task } from '@ntfs/contracts';
 import { destinationCategory } from './personal-view.js';
-import { checkRule } from './context.js';
+import { checkRule, requireVersion } from './context.js';
 
 /** 个人位置只影响本人看板，使用全量视图版本保护筛选外任务。 */
 export class V2PersonalRepository {
@@ -25,6 +25,21 @@ export class V2PersonalRepository {
   /** 只返回本人的分类，包括筛选外的列。 */
   async categories(ownerId: string): Promise<V2Category[]> {
     return z.array(v2CategorySchema.extend({ isDefault: z.union([z.number(), z.boolean()]).transform(Boolean) })).parse(await this.manager.query('SELECT id,owner_id AS ownerId,name,status,is_default AS isDefault,position,version FROM v2_categories WHERE owner_id=? ORDER BY position,id', [ownerId]));
+  }
+
+  /** 返回本人已开启周期筛选的分类标识。 */
+  async periodFilterCategoryIds(ownerId: string): Promise<string[]> {
+    const rows = z.array(z.object({ id: v2IdSchema })).parse(await this.manager.query("SELECT id FROM v2_categories WHERE owner_id=? AND status='not_started' AND period_filter_enabled=1", [ownerId]));
+    return rows.map(({ id }) => id);
+  }
+
+  /** 仅本人未开始分类可设置周期筛选，分类版本保护同一列的并发修改。 */
+  async setPeriodFilter(ownerId: string, categoryId: string, version: number, enabled: boolean): Promise<void> {
+    const category = (await this.categories(ownerId)).find((row) => row.id === categoryId);
+    if (category?.status !== 'not_started') throw new ConflictException('请选择本人现有的未开始分类。');
+    requireVersion(category.version, version);
+    await this.manager.query('UPDATE v2_categories SET period_filter_enabled=?,version=version+1 WHERE id=? AND owner_id=?', [Number(enabled), categoryId, ownerId]);
+    await this.bump(ownerId);
   }
 
   /** 默认零仅用于尚未初始化的新账号；正常读写先执行 ensure。 */

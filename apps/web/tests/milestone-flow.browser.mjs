@@ -167,7 +167,8 @@ try {
   await page.getByRole('button', { name: /^历史 1/ }).click();
   await button(history.title).click();
   assert.equal(await button('删除里程碑').count(), 0); assert.equal(await button('编辑目标').count(), 0);
-  assert.equal(await button('确认完成').isDisabled(), true);
+  assert.equal(await button('确认完成').count(), 0);
+  assert.equal(await active.getByText('由项目研发负责人确认完成或重开。', { exact: true }).isVisible(), true);
   const bounds = await page.locator('dialog[open]').boundingBox();
   assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 390);
   assert.deepEqual(errors, []);

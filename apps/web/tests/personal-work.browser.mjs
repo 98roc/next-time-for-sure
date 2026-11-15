@@ -8,7 +8,7 @@ import { sortingFixture } from './sorting-fixture.mjs';
 // 页面交互使用内存 API；真实权限、历史与数据库另由 personal-work.integration 验证。
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { createServer } = await import('vite');
-const server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
+const server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), server: { host: '127.0.0.1', port: 0, strictPort: false }, logLevel: 'error' });
 const evidence = fileURLToPath(new URL('../../../.cache/personal-work-evidence/', import.meta.url));
 await mkdir(evidence, { recursive: true });
 let browser;
@@ -18,9 +18,21 @@ try {
   const task = { ...w.tasks[0], status: 'not_started', title: '完善用户管理与权限联动' };
   const done = { ...w.tasks[1], status: 'completed', title: '当日完成任务', completedAt: `${w.today}T02:00:00.000Z` };
   const old = { ...w.tasks[2], status: 'completed', title: '昨日完成任务', completedAt: '2026-10-18T02:00:00.000Z' };
-  w.tasks = [task, done, old];
+  const later = { ...task, id: randomUUID(), title: '未来周期任务' };
+  const otherColumn = { ...later, id: randomUUID(), title: '其他未开始列任务' };
+  const ongoing = { ...task, id: randomUUID(), status: 'in_progress', title: '进行中任务' };
+  const personal = { ...task, id: randomUUID(), projectId: null, teamId: null, kind: 'private', title: '个人无周期任务' };
+  w.tasks = [task, later, otherColumn, personal, ongoing, done, old];
   w.categories = ['not_started', 'in_progress', 'completed'].map((status, position) => ({ id: randomUUID(), ownerId: fixture.identity.id, name: ['未开始', '进行中', '已完成'][position], status, isDefault: true, position, version: 0 }));
-  w.placements = w.tasks.map((row, position) => ({ taskId: row.id, ownerId: fixture.identity.id, categoryId: w.categories.find(c => c.status === row.status).id, position }));
+  const second = { ...w.categories[0], id: randomUUID(), name: '待处理', isDefault: false, position: 3 };
+  w.categories.splice(1, 0, second);
+  w.placements = w.tasks.map((row, position) => ({ taskId: row.id, categoryId: row.id === otherColumn.id ? second.id : w.categories.find(c => c.status === row.status).id, position }));
+  const [current, next] = w.periods;
+  w.arrangements = [
+    ...w.arrangements.filter(({ taskId }) => taskId === task.id),
+    ...[later, otherColumn, ongoing].map((row) => ({ taskId: row.id, periodId: next.id, plannedDays: 1, position: 0, version: 0 })),
+  ];
+  w.categoryPeriodFilters = [];
   let subtasks = { taskId: task.id, version: 0, items: [] }, savedReport = null;
   function report(on) {
     const projects = w.personalPreferences.projectOrder?.map(id => w.projects.find(p => p.id === id)) ?? w.projects;
@@ -38,7 +50,15 @@ try {
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON(); commands.push(body);
       if (path.endsWith('/subtasks')) subtasks = { taskId: task.id, version: subtasks.version + 1, items: body.items.map(i => ({ ...i, completedAt: i.completed ? `${w.today}T02:00:00.000Z` : null })) };
-      else if (path.endsWith('/personal-settings')) w.personalPreferences = { ...w.personalPreferences, version: w.personalPreferences.version + 1, ...(body.action === 'set_completed_mode' ? { completedMode: body.mode } : { projectOrder: body.projectIds }) };
+      else if (path.endsWith('/personal-settings') && body.action === 'set_category_period_filter') {
+        const category = w.categories.find(({ id }) => id === body.categoryId);
+        assert.equal(category.status, 'not_started');
+        assert.equal(body.version, category.version);
+        category.version++;
+        w.personalVersion++;
+        w.categoryPeriodFilters = w.categoryPeriodFilters.filter(id => id !== category.id);
+        if (body.enabled) w.categoryPeriodFilters.push(category.id);
+      } else if (path.endsWith('/personal-settings')) w.personalPreferences = { ...w.personalPreferences, version: w.personalPreferences.version + 1, ...(body.action === 'set_completed_mode' ? { completedMode: body.mode } : { projectOrder: body.projectIds }) };
       else if (path.endsWith('/daily')) savedReport = body.action === 'regenerate_daily' ? null : { body: body.body, sourceHash: body.sourceHash, version: body.version + 1, manual: true };
       else return route.fulfill({ status: 400, json: { message: 'Unexpected mutation' } });
       return route.fulfill({ json: { objectIds: [task.id] } });
@@ -55,6 +75,67 @@ try {
   const dailyButton = page.getByRole('button', { name: '我的日报', exact: true });
   await dailyButton.waitFor(); assert.equal(await dailyButton.locator('svg').count(), 1);
   const buttonStyles = await page.locator('.mw-heading .mw-quiet').evaluateAll(buttons => buttons.map(b => { const s = getComputedStyle(b); return [s.backgroundColor, s.borderWidth, s.color]; })); assert.deepEqual(buttonStyles[0], buttonStyles[1]);
+
+  const menu = page.getByRole('button', { name: '未开始分类操作', exact: true });
+  const otherMenu = page.getByRole('button', { name: '待处理分类操作', exact: true });
+  const periodOption = page.getByRole('button', { name: '按周期筛选', exact: true });
+  const periodSelect = page.getByRole('combobox', { name: '未开始项目周期', exact: true });
+  const otherSelect = page.getByRole('combobox', { name: '待处理项目周期', exact: true });
+  const taskButton = (title) => page.getByRole('button', { name: title, exact: true });
+  const search = page.getByRole('textbox', { name: '搜索任务', exact: true });
+  const boardCount = page.locator('.mw-board-meta > span').first();
+  const initialCount = await boardCount.textContent();
+
+  // 展开菜单不触发筛选；外部点击正常聚焦，另一列菜单直接接管。
+  await menu.click(); await periodOption.waitFor(); assert.equal(await periodOption.getAttribute('aria-pressed'), 'false');
+  assert.equal(await periodSelect.count(), 0);
+  await search.click(); await periodOption.waitFor({ state: 'hidden' });
+  assert.equal(await search.evaluate(input => document.activeElement === input), true);
+  await menu.click(); await otherMenu.click();
+  assert.equal(await menu.getAttribute('aria-expanded'), 'false');
+  assert.equal(await otherMenu.getAttribute('aria-expanded'), 'true');
+  await page.keyboard.press('Escape');
+  assert.equal(await otherMenu.getAttribute('aria-expanded'), 'false');
+  assert.equal(await otherMenu.evaluate(button => document.activeElement === button), true);
+
+  await menu.click(); await periodOption.click(); await periodSelect.waitFor();
+  assert.equal(await menu.getAttribute('aria-expanded'), 'false');
+  assert.equal(await periodSelect.inputValue(), current.id);
+  assert.equal(await otherSelect.count(), 0);
+  await taskButton(later.title).waitFor({ state: 'hidden' });
+  for (const row of [task, personal, otherColumn, ongoing]) await taskButton(row.title).waitFor();
+  assert.equal(await taskButton(task.title).count(), 1);
+  assert.equal(Number.parseInt(await boardCount.textContent()), Number.parseInt(initialCount) - 1);
+  await periodSelect.selectOption(next.id); await taskButton(later.title).waitFor();
+  assert.equal(await taskButton(task.title).count(), 1);
+  await page.getByRole('combobox', { name: '筛选任务来源' }).selectOption('private');
+  await taskButton(later.title).waitFor({ state: 'hidden' }); await taskButton(personal.title).waitFor();
+  await page.getByRole('combobox', { name: '筛选任务来源' }).selectOption('all');
+  await page.reload(); await periodSelect.waitFor();
+  assert.equal(await periodSelect.inputValue(), current.id);
+  assert.equal(await otherSelect.count(), 0);
+  await otherMenu.click(); await periodOption.click(); await otherSelect.waitFor();
+  await page.getByText('当前周期暂无匹配任务', { exact: true }).waitFor();
+  await otherSelect.selectOption(next.id); await taskButton(otherColumn.title).waitFor();
+  assert.equal(await periodSelect.inputValue(), current.id);
+  await menu.click(); assert.equal(await periodOption.getAttribute('aria-pressed'), 'true');
+  assert.equal(await periodOption.locator('span').textContent(), '✓');
+  assert.match(await periodOption.getAttribute('class'), /is-selected/u);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: evidence + '/period-filter-menu.png', fullPage: true });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await periodOption.click(); await periodSelect.waitFor({ state: 'hidden' }); await taskButton(later.title).waitFor();
+  await page.reload(); await otherSelect.waitFor();
+  assert.equal(await otherSelect.inputValue(), current.id);
+  assert.equal(await periodSelect.count(), 0);
+  const today = w.today;
+  w.today = '2026-10-18';
+  await page.reload(); await otherSelect.waitFor();
+  assert.equal(await otherSelect.inputValue(), 'all');
+  w.today = today;
+  await page.reload();
+
+  await page.getByRole('button', { name: '当日完成任务', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: '当日完成任务', exact: true }).count(), 1);
   assert.equal(await page.getByRole('button', { name: '昨日完成任务', exact: true }).count(), 0);
   await page.getByLabel('完成日期', { exact: true }).fill('2026-10-18');
@@ -106,5 +187,5 @@ try {
   await close(); await card.getByRole('button', { name: '子任务', exact: true }).click(); await rows().first().waitFor(); await page.screenshot({ path: evidence + '/subtasks-mobile.png', fullPage: true });
   assert.ok(await active.locator('.v2-content').evaluate(el => el.scrollWidth <= el.clientWidth + 1)); await close();
   assert.deepEqual(errors, []);
-  console.log('PASS personal work UI: quiet icon, day/period persistence, private editor CRUD, pointer sorting, unsaved guard, daily numbering, text protection, project ordering, dark and narrow layouts.');
+  console.log('PASS personal work UI: per-column period filters and menu dismissal, day/period persistence, private editor CRUD, pointer sorting, unsaved guard, daily numbering, text protection, project ordering, dark and narrow layouts.');
 } finally { await browser?.close(); await server.close(); }

@@ -51,6 +51,7 @@ export class V2WorkspaceService {
         planningLabels: await new V2PlanningLabelsRepository(manager).read(visible.map((task) => task.id)),
         periodWindow: context.teamId ? await planning.periodWindow(context.teamId) : { before: v2PeriodWindowLimits.before, after: v2PeriodWindowLimits.after, version: 0 },
         personalPreferences: await new PersonalWorkRepository(manager).preferences(context.actor.id),
+        categoryPeriodFilters: await personal.periodFilterCategoryIds(context.actor.id),
         orders: await readProjectOrders(manager, context),
         team: context.organization.teams.find((team) => team.id === context.teamId) ?? null, teamMessages: settings.messages, teamVersion: settings.version, teamLeader: context.teamLeader, today, naturalWeekStart: naturalWeek(today).startOn,
         accounts: context.organization.accounts.filter((account) => (account.teamId === context.teamId && context.teamId !== null) || (context.actor.isSuperAdmin && account.id === context.actor.id)),

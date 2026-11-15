@@ -4,7 +4,7 @@ import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { v2AiContributionLabels, v2StatusLabels, v2StatusSchema, v2TaskEditSchema, type V2ArrangementInput, type V2ImpactIntent, type V2ProjectTaskInput, type V2Task, type V2TaskEdit } from '@ntfs/contracts';
 import { createOperationId } from '../identity/operation-id';
-import { useWorkspace } from './workspace';
+import { useWorkspace, WorkspaceRefreshNotice } from './workspace';
 import { ModalPage, useModal } from './modal';
 import { Feedback, Field, StatusBadge, useAction } from './controls';
 import { PriorityField, TaskFields } from './task-fields';
@@ -17,7 +17,7 @@ import './task-editor.css';
 
 /** 共用详情分离任务字段、周期安排及完成结果，权限按字段执行，整份草稿一次保存。 */
 export function TaskEditor({ task }: { task: V2Task }) {
-  const { data, user, run, notify } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
+  const { data, user, run, notify, refresh } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
   const project = data.projects.find((row) => row.id === task.projectId), manage = task.kind === 'private' || Boolean(project?.canManage), self = task.executorId === user.id;
   const canContribute = task.kind === 'private' || project?.canContribute !== false;
   const canStatus = canContribute && (manage || self), canDelete = canContribute && (manage || (task.creatorId === user.id && task.status === 'not_started'));
@@ -58,7 +58,13 @@ export function TaskEditor({ task }: { task: V2Task }) {
       ...((task.kind === 'project' && status === 'completed' && (completionChanged || requireResults)) || (task.kind === 'private' && completionChanged && status === 'completed') ? { completion } : {}),
     };
     const parsed = v2TaskEditSchema.safeParse(command); if (!parsed.success) throw new Error('请检查任务字段、周期安排及投入数值。');
-    await run('edit', parsed.data);
+    try {
+      await run('edit', parsed.data);
+    } catch (error) {
+      // 回读新目标的可关联状态，返回编辑页后可保留其他字段重新选择。
+      if (draft.milestoneId && draft.milestoneId !== task.milestoneId) void refresh();
+      throw error;
+    }
     notify(self && draft.executorId !== user.id ? '已改派，该任务不再显示在我的工作中。' : '任务已保存。');
   }
   function submit() {
@@ -75,6 +81,7 @@ export function TaskEditor({ task }: { task: V2Task }) {
     {canDelete && <button className="v2-danger" disabled={action.busy || stale} onClick={remove}>删除任务</button>}
     {canStatus && <button className="nt-primary" type="submit" form={formId} disabled={action.busy || stale || !dirty}>保存</button>}
   </>}>
+    <WorkspaceRefreshNotice />
     {stale && <p className="v2-error" role="alert">任务已更新或删除。已保留你的输入，请关闭后重新打开核对。</p>}
     <div className="v2-task-meta"><span>{task.kind === 'private' ? '个人 · 仅自己可见' : `项目：${project?.name ?? '项目'}`} · 创建人：{data.accounts.find((row) => row.id === task.creatorId)?.displayName ?? (self ? user.displayName : '历史成员')}</span><button className="nt-link" onClick={() => modal.push(<TaskHistory taskId={task.id} />)}>操作历史</button></div>
     <form id={formId} onSubmit={(event) => { event.preventDefault(); submit(); }}><fieldset disabled={action.busy || stale}>

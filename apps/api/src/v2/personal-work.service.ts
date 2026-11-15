@@ -7,6 +7,7 @@ import { loadV2Context, requireVersion, checkRule, type V2Context } from './cont
 import { requireTask } from './authorization.js';
 import { V2TaskRepository } from './task.repository.js';
 import { PersonalWorkRepository } from './personal-work.repository.js';
+import { V2PersonalRepository } from './personal.repository.js';
 import { executeOnce } from './repository-utils.js';
 import { buildDailyReport, dailyProjects } from './daily-report.js';
 import { editReport } from './shared-report.js';
@@ -77,13 +78,17 @@ export class PersonalWorkService {
     });
   }
 
-  /** 模式与排序共用个人偏好版本，保存一项时不覆盖另一项；排序只接受有权项目全量集合。 */
+  /** 账号设置共用个人偏好版本，分类筛选使用该列版本；排序只接受有权项目全量集合。 */
   async settings(token: string, csrf: string, command: V2PersonalSettingsCommand) {
     return this.database.transaction(async (manager) => {
       const context = await loadV2Context(manager, this.identity, token, csrf), repository = new PersonalWorkRepository(manager);
       const projects = command.action === 'set_daily_project_order' ? await dailyProjects(manager, context) : [];
       if (command.action === 'set_daily_project_order' && command.projectIds !== null && (new Set(command.projectIds).size !== command.projectIds.length || command.projectIds.length !== projects.length || command.projectIds.some((id) => !projects.some((row) => row.id === id)))) throw new ForbiddenException('请完整排序当前可见项目，不能包含其他项目。');
       return executeOnce(manager, context.actor.id, command, async () => {
+        if (command.action === 'set_category_period_filter') {
+          await new V2PersonalRepository(manager).setPeriodFilter(context.actor.id, command.categoryId, command.version, command.enabled);
+          return { objectIds: [command.categoryId] };
+        }
         const previous = await repository.preferences(context.actor.id);
         requireVersion(previous.version, command.version);
         const change = command.action === 'set_completed_mode' ? { completedMode: command.mode }

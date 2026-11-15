@@ -9,8 +9,47 @@ import { shiftDate } from './calendar.js';
 type Actor = { id: ReturnType<typeof randomUUID>; token: string; csrf: string };
 type Harness = { source: DataSource; leader: Actor; lead: Actor; developer: Actor; manager: Actor; projectId: string; hiddenProjectId: string; teamId: string; periodId: string; call: (path: string, actor: Actor, body?: unknown, expected?: number) => Promise<unknown>; state: (actor?: Actor) => Promise<V2Workspace> };
 
+/** 分类筛选分别保存，跨账号、非未开始分类和旧版本均不能写入。 */
+async function verifyCategoryPeriodFilters({ source, developer, lead, call, state }: Harness): Promise<void> {
+  const before = await state(developer);
+  const first = before.categories.find((category) => category.status === 'not_started');
+  const ongoing = before.categories.find((category) => category.status === 'in_progress');
+  assert.ok(first && ongoing);
+  assert.deepEqual(before.categoryPeriodFilters, []);
+  const secondId = v2ResultSchema.parse(await call('personal', developer, {
+    action: 'create_category', operationId: randomUUID(), version: before.personalVersion,
+    status: 'not_started', isDefault: false, name: '周期筛选验证列',
+  })).objectIds[0];
+  assert.ok(secondId);
+
+  const enable = { action: 'set_category_period_filter', operationId: randomUUID(), categoryId: first.id, version: first.version, enabled: true };
+  await call('personal-settings', lead, enable, 409);
+  await call('personal-settings', developer, { ...enable, categoryId: ongoing.id, version: ongoing.version }, 409);
+  await call('personal-settings', developer, enable);
+  await call('personal-settings', developer, enable);
+  const enabled = await state(developer);
+  assert.deepEqual(enabled.categoryPeriodFilters, [first.id]);
+  assert.deepEqual((await state(lead)).categoryPeriodFilters, []);
+  assert.deepEqual(enabled.placements, before.placements);
+  assert.equal(enabled.categories.find(({ id }) => id === first.id)?.version, first.version + 1);
+  await call('personal-settings', developer, { ...enable, operationId: randomUUID(), enabled: false }, 409);
+
+  const stored = z.array(z.object({ enabled: z.number(), comment: z.string() })).parse(await source.query(
+    "SELECT p.period_filter_enabled AS enabled,c.COLUMN_COMMENT AS comment FROM v2_categories p JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME='v2_categories' AND c.COLUMN_NAME='period_filter_enabled' WHERE p.id IN (?,?) ORDER BY p.period_filter_enabled",
+    [first.id, secondId],
+  ));
+  assert.deepEqual(stored.map(({ enabled }) => enabled), [0, 1]);
+  assert.match(stored[0]?.comment ?? '', /未开始分类.*周期筛选/u);
+  await call('personal', developer, { action: 'rename_category', operationId: randomUUID(), categoryId: first.id, name: '周期筛选改名', version: enabled.personalVersion });
+  const renamed = await state(developer);
+  assert.deepEqual(renamed.categoryPeriodFilters, [first.id]);
+  await call('personal-settings', developer, { ...enable, operationId: randomUUID(), enabled: false, version: renamed.categories.find(({ id }) => id === first.id)?.version });
+  assert.deepEqual((await state(developer)).categoryPeriodFilters, []);
+}
+
 /** 复用主夹具验证私人权限、历史、并发及持久化，所有随机记录由主夹具回收。 */
 export async function verifyPersonalWork(h: Harness): Promise<void> {
+  await verifyCategoryPeriodFilters(h);
   const { source, leader, lead, developer, manager, projectId, hiddenProjectId, teamId, periodId, call, state } = h;
   const today = (await state()).today, yesterday = shiftDate(today, -1);
   const taskId = v2ResultSchema.parse(await call('tasks', lead, { action: 'create_project', operationId: randomUUID(), task: { projectId, periodId, executorId: developer.id, title: '私人步骤父任务', plannedDays: 1 } })).objectIds[0]; assert.ok(taskId);

@@ -21,7 +21,7 @@ export class PersonalWorkController {
   /** 私人文字保护与来源确认。 */
   @Post('daily') @HttpCode(200)
   saveDaily(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.saveDaily(businessToken(request), csrfHeader(request), parseBody(v2DailyCommandSchema, body)); }
-  /** 当前账号模式与私人日报排序。 */
+  /** 当前账号的分类筛选、展示模式与私人日报排序。 */
   @Post('personal-settings') @HttpCode(200)
   settings(@Req() request: IncomingMessage, @Body() body: unknown) { assertBusinessOrigin(request); return this.service.settings(businessToken(request), csrfHeader(request), parseBody(v2PersonalSettingsCommandSchema, body)); }
 }

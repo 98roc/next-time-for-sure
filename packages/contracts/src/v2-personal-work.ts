@@ -24,6 +24,7 @@ export const v2PersonalPreferencesSchema = z.object({ completedMode: v2Completed
 export type V2PersonalPreferences = z.infer<typeof v2PersonalPreferencesSchema>;
 export const v2PersonalSettingsCommandSchema = z.discriminatedUnion('action', [
   z.object({ operationId: id, action: z.literal('set_completed_mode'), version, mode: v2CompletedModeSchema }).strict(),
+  z.object({ operationId: id, action: z.literal('set_category_period_filter'), version, categoryId: id, enabled: z.boolean() }).strict(),
   z.object({ operationId: id, action: z.literal('set_daily_project_order'), version, projectIds: z.array(id).max(500).nullable() }).strict(),
   z.object({ operationId: id, action: z.literal('set_milestone_mode'), version, mode: v2MilestoneModeSchema }).strict(),
 ]);

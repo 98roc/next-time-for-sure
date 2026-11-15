@@ -7,7 +7,11 @@ import { readWorkspace, sendCommand, type Commands } from './api';
 import { IdentityApiError } from '../identity/api';
 import { Link, matchPath, useLocation } from 'react-router-dom';
 
-type WorkspaceContext = { data: V2Workspace; user: Identity; selectTeam: (teamId: string) => void; notify: (message: string) => void; run: <K extends keyof Commands>(path: K, body: Commands[K]) => Promise<{ objectIds: string[] }> };
+type WorkspaceContext = {
+  data: V2Workspace; user: Identity; selectTeam: (teamId: string) => void; notify: (message: string) => void;
+  refresh: () => Promise<void>; refreshError: string | null; refreshing: boolean;
+  run: <K extends keyof Commands>(path: K, body: Commands[K]) => Promise<{ objectIds: string[] }>;
+};
 const Workspace = createContext<WorkspaceContext | null>(null);
 
 /** 全部页面共享服务器快照；轮询失败保留已加载画面，但明确提示并阻止无反馈写入。 */
@@ -22,7 +26,8 @@ export function WorkspaceProvider({ user, children }: { user: Identity; children
     try { const stored = v2IdSchema.safeParse(localStorage.getItem(teamPreferenceKey)); return stored.success ? stored.data : undefined; } catch { return undefined; }
   });
   const effectiveTeamId = routeTeamId ?? (user.isSuperAdmin ? selectedTeamId : undefined);
-  const query = useQuery({ queryKey: ['v2', 'workspace', user.id, user.isSuperAdmin, effectiveTeamId], queryFn: () => readWorkspace(effectiveTeamId), refetchInterval: 10000, refetchOnWindowFocus: true });
+  const queryKey = ['v2', 'workspace', user.id, user.isSuperAdmin, effectiveTeamId];
+  const query = useQuery({ queryKey, queryFn: () => readWorkspace(effectiveTeamId), refetchInterval: 10000, refetchOnWindowFocus: true });
   const [message, setMessage] = useState('');
   const pendingCommands = useRef(new Map<string, string>());
   useEffect(() => { if (!message) return; const timer = setTimeout(() => setMessage(''), 4500); return () => clearTimeout(timer); }, [message]);
@@ -41,6 +46,8 @@ export function WorkspaceProvider({ user, children }: { user: Identity; children
   }
   if (!query.data || (routeTeamId && query.error instanceof IdentityApiError && [400, 403, 404].includes(query.error.status))) return <div className="v2-loading" role={query.isError ? 'alert' : 'status'}>{query.isError ? <>{query.error.message}<button onClick={() => { void query.refetch(); }}>重试</button>{routeTeamId && <Link to={user.isSuperAdmin ? '/organization' : '/personal'}>{user.isSuperAdmin ? '返回团队列表' : '返回我的工作'}</Link>}</> : '正在读取工作空间…'}</div>;
 
+  async function refresh() { await query.refetch({ cancelRefetch: false }); }
+
   /** 写入完成统一刷新跨入口数据；编辑草稿由表单保留，不随刷新重置。 */
   async function run<K extends keyof Commands>(path: K, body: Commands[K]) {
     const { operationId, ...payload } = body;
@@ -50,6 +57,15 @@ export function WorkspaceProvider({ user, children }: { user: Identity; children
     try {
       const result = await sendCommand(path, { ...body, operationId: stableId }, user.csrfToken, query.data?.team?.id);
       pendingCommands.current.delete(key);
+      // 创建已提交，先让各行选到新目标；工作区回读失败时仍能继续编辑。
+      const [createdId] = result.objectIds;
+      if (body.action === 'create_milestone' && createdId) {
+        client.setQueryData<V2Workspace>(queryKey, (current) => {
+          if (!current || current.milestones.some((row) => row.id === createdId)) return current;
+          const { projectId, title, expectedOn } = body;
+          return { ...current, milestones: [...current.milestones, { id: createdId, projectId, title, expectedOn, status: 'open', needsReview: false, version: 0 }] };
+        });
+      }
       // 成功操作会结束当前确认；重查其旧版本意图会闪出伪冲突，甚至改变仍在提交中的视图。
       // 只刷新业务数据，真实冲突仍由提交校验及确认页的主动重新核对处理。
       await client.invalidateQueries({ queryKey: ['v2'], predicate: (query) => query.queryKey[1] !== 'impact' });
@@ -60,7 +76,16 @@ export function WorkspaceProvider({ user, children }: { user: Identity; children
       throw error;
     }
   }
-  return <Workspace.Provider value={{ data: query.data, user, selectTeam, notify: setMessage, run }}>{query.isError && <div className="v2-error" role="alert">数据更新失败：{query.error.message}<button onClick={() => { void query.refetch(); }}>重试</button></div>}{children}{message && <div className="v2-toast" role="status">{message}</div>}</Workspace.Provider>;
+  return <Workspace.Provider value={{ data: query.data, user, selectTeam, notify: setMessage, run, refresh, refreshError: query.error?.message ?? null, refreshing: query.isFetching }}>
+    <WorkspaceRefreshNotice />
+    {children}{message && <div className="v2-toast" role="status">{message}</div>}
+  </Workspace.Provider>;
+}
+
+/** 工作区刷新失败时在当前操作内提供重试入口，保留已保存数据和表单草稿。 */
+export function WorkspaceRefreshNotice() {
+  const { refreshError, refreshing, refresh } = useWorkspace();
+  return refreshError && <div className="v2-error" role="alert">数据更新失败：{refreshError} <button type="button" disabled={refreshing} onClick={() => { void refresh(); }}>重试刷新</button></div>;
 }
 
 /** 仅在已认证工作区内调用，避免每页重复身份与加载逻辑。 */

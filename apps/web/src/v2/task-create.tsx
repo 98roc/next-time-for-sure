@@ -3,7 +3,7 @@ import { useId, useState } from 'react';
 import { v2TaskCommandSchema, type V2Completion, type V2ProjectTaskInput } from '@ntfs/contracts';
 import { TaskCompletion } from './task-results';
 import { createOperationId } from '../identity/operation-id';
-import { useWorkspace } from './workspace';
+import { useWorkspace, WorkspaceRefreshNotice } from './workspace';
 import { ModalPage, useModal } from './modal';
 import { currentPeriod, Feedback, Field, useAction } from './controls';
 import { PriorityField, TaskFields } from './task-fields';
@@ -11,7 +11,7 @@ import { otherTaskSource, taskSourceProjects, TaskCreateSource } from './task-cr
 
 /** 单条新建、批量新建和待建转换复用核心字段，入口只提供默认项目与日期。 */
 export function TaskCreate({ projectId, periodId, personal = false, batch = false, backlog, onDone }: { projectId?: string; periodId?: string; personal?: boolean; batch?: boolean; backlog?: { id: string; version: number; title: string; priority: number; creatorId: string }; onDone?: () => void }) {
-  const { data, user, run, notify } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
+  const { data, user, run, notify, refresh } = useWorkspace(), modal = useModal(), action = useAction(), formId = useId();
   const initialProject = projectId ?? (personal ? 'private' : data.projects.find((row) => row.canCreate)?.id ?? '');
   const [source, setSource] = useState(initialProject);
   const forOthers = personal && source === otherTaskSource;
@@ -42,7 +42,13 @@ export function TaskCreate({ projectId, periodId, personal = false, batch = fals
       const candidate = source === 'private' ? { action: 'create_private', operationId: createOperationId(), task: { title: first.title, priority: first.priority, remark: first.remark, categoryId } } : batch ? { action: 'create_batch', operationId: createOperationId(), tasks: rows.map((row) => row.value) } : { action: 'create_project', operationId: createOperationId(), task: { ...first, ...(completion ? { completion } : {}) }, ...(personalPlacement ? { categoryId } : {}) };
       const parsed = v2TaskCommandSchema.safeParse(candidate);
       if (!parsed.success) throw new Error('请检查任务名称、执行人、日期区间和预计天数。');
-      await run('tasks', parsed.data);
+      try {
+        await run('tasks', parsed.data);
+      } catch (error) {
+        // 保存期间目标可能已变更，刷新后让各行标出失效的选择。
+        if (rows.some((row) => row.value.milestoneId)) void refresh();
+        throw error;
+      }
     }
   }
   function finish() { if (onDone) onDone(); else modal.finish(); if (forOthers) notify('操作成功'); }
@@ -53,6 +59,7 @@ export function TaskCreate({ projectId, periodId, personal = false, batch = fals
     } else void action.act(async () => { await save(); finish(); });
   }
   return <ModalPage title={backlog ? '转为正式任务' : batch ? '批量新增任务' : '新建任务'} busy={action.busy} dirty={dirty} wide={batch || source !== 'private'} actions={<button className="nt-primary" form={formId} type="submit" disabled={action.busy}>{backlog ? '转为任务' : '保存'}</button>}>
+    <WorkspaceRefreshNotice />
     <form id={formId} onSubmit={(event) => { event.preventDefault(); submit(); }}><fieldset disabled={action.busy}>
       {personal ? <TaskCreateSource source={source} projectId={rows[0]?.value.projectId ?? ''} projects={projects} onSource={changeSource} onProject={(id) => changeProject(id, true)} /> : <p className="v2-context">项目：{data.projects.find((row) => row.id === source)?.name} · 创建人：{backlog ? data.accounts.find((row) => row.id === backlog.creatorId)?.displayName ?? '历史成员' : user.displayName}</p>}
       {batch && <div className="v2-section-head"><h3>任务记录</h3><button type="button" onClick={() => setRows((previous) => [...previous, { key: createOperationId(), value: { ...makeRow(), title: '', milestoneId: null } }])}>＋ 添加一行</button></div>}

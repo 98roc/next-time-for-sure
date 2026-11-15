@@ -34,6 +34,8 @@ export const v2WorkspaceSchema = z.object({
   accounts: z.array(directoryAccountSchema), projects: z.array(v2ProjectSchema), periods: z.array(v2PeriodSchema),
   tasks: z.array(v2TaskSchema), arrangements: z.array(v2ArrangementSchema), milestones: z.array(v2MilestoneSchema), backlog: z.array(v2BacklogSchema),
   planningLabels: z.array(v2PlanningLabelSchema).default([]),
+  /** 已启用周期筛选的本人分类，具体周期只保存在当前页面。 */
+  categoryPeriodFilters: z.array(id).default([]),
   categories: z.array(v2CategorySchema), placements: z.array(v2PlacementSchema), personalVersion: version, orders: z.array(v2OrderSchema.extend({ scope: z.string() })),
 });
 export type V2Workspace = z.infer<typeof v2WorkspaceSchema>;

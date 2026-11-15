@@ -1,0 +1,4 @@
+.v2-scope .v2-task-milestone-controls { display:flex;align-items:end;gap:8px; }
+.v2-scope .v2-task-milestone-controls .v2-field { flex:1;margin-bottom:0; }
+.v2-scope .v2-task-milestone-controls button { flex:none;white-space:nowrap; }
+.v2-scope .v2-task-milestone-hint { margin:4px 0 0;color:var(--v2-muted);font-size:12px; }
